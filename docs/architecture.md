@@ -56,16 +56,79 @@ suggested-path: ~/.prime/agent/settings.json
 
 The `BEGIN` line, metadata order, separator, final newline, and `END` line are stable. This makes the stream readable and lets a later `--format bundle-json` be added without changing emitters. A native fragment is never mixed with bundle metadata when it is the only artifact.
 
+
+## Required Go toolchain and dependencies
+
+The implementation has these non-negotiable choices:
+
+| Concern | Choice | Reason and boundary |
+|---|---|---|
+| CLI | `github.com/spf13/cobra` | Root command plus `validate` and `gen` subcommands; Cobra owns flag parsing, usage, and completion generation. Business logic must not depend on `*cobra.Command`. |
+| YAML | `go.yaml.in/yaml/v3` | Pure Go, no CGO, maintained YAML-org fork, and the fastest eligible typed-decoding baseline identified in the research. It provides `Decoder.KnownFields(true)` for strict IR decoding. A repository benchmark must confirm this choice against the exact IR fixtures before implementation is finalized. |
+| Logging | `github.com/GoFarsi/zapper` | Required structured logging facade over Zap. Application code receives a logger; it must not use package-global logging. |
+| Releases | GoReleaser v2 | Builds reproducible release archives and checksums; release configuration lives in `.goreleaser.yaml`. |
+
+`go.mod` must declare a current supported Go version. CI and release builds set `CGO_ENABLED=0`. Dependency review must reject packages that require CGO on any release target. `go list -deps` and GoReleaser's build matrix are part of the release verification.
+
+### Cobra command boundary
+
+```text
+agentcfg
+├── validate  [--config FILE] [--to TARGETS]
+└── gen       [--config FILE] [--to TARGETS]
+```
+
+The root command constructs shared dependencies once: stdout, stderr, filesystem reader for the source YAML, target registry, and logger. Each Cobra handler converts flags into an `app.Request` then calls `app.Validate` or `app.Generate`. It contains no IR validation or target-switch logic.
+
+Help, version, shell completion, and a future `--log-level` are Cobra concerns. The first release has no flags that mutate target files.
+
+### YAML loading policy
+
+`ir.Load` accepts bytes and a source label; it does not open paths. It decodes into typed structs with `go.yaml.in/yaml/v3`, calling `Decoder.KnownFields(true)` in strict mode, returns source-positioned diagnostics where available, then runs semantic normalization and validation.
+
+The accepted format is the `agentcfg.yaml` IR in `protocol.md`, not arbitrary YAML. Anchors and aliases may be accepted by the parser but must resolve to values allowed by the typed IR. Custom YAML tags are rejected. `go test -bench` includes realistic small and multi-provider IR fixtures; changing the YAML library requires recording a faster eligible result without changing parsing correctness. YAML is used for input only in v1; no emitter serializes the source document.
+
+### Logging with zapper
+
+Logs are operational diagnostics, not generated output. `gen` reserves stdout for artifacts, so zapper always writes to stderr. The default level is `warn`; `--verbose` switches to `info`, and `--debug` switches to `debug`. Logs use stable structured fields:
+
+```text
+command, target, artifact, source, duration_ms
+```
+
+No logger may log `api_key_env` values after environment resolution because agentcfg never resolves them. It may log environment **names**. No log line may contain generated secret material; this is enforced through tests using representative credential references.
+
+### GoReleaser v2 release design
+
+`.goreleaser.yaml` will use schema version 2 and build the Cobra binary with:
+
+```text
+CGO_ENABLED=0
+goos:   darwin, linux, windows
+goarch: amd64, arm64
+```
+
+It will produce archives (`tar.gz` for Unix, `zip` for Windows), SHA-256 checksums, and a Homebrew formula only after the repository has a release destination. Version, commit, and build date are injected with `-ldflags` into a narrow `internal/buildinfo` package and shown by Cobra's version command. GoReleaser must run `goreleaser check` in CI before a release tag is accepted.
+
 ## Packages
 
 ```text
 cmd/agentcfg/
   main.go                         # process exit code only
 
+internal/buildinfo/
+  buildinfo.go                    # version, commit, date injected by GoReleaser
+
+internal/logging/
+  logger.go                       # zapper construction; stderr-only logger
+
 internal/app/
-  run.go                          # parse command request; stdout/stderr wiring
+  run.go                          # application request orchestration
   targets.go                      # --to parsing and target selection
-  bundle.go                       # deterministic artifact rendering
+
+internal/artifact/
+  artifact.go                     # target-neutral Artifact type
+  bundle.go                       # deterministic stdout rendering
 
 internal/ir/
   types.go                        # YAML-facing semantic structs
@@ -89,6 +152,8 @@ testdata/
   ir/                             # valid and invalid YAML input
   targets/<target>/               # native artifact golden files
   bundles/                        # multi-artifact stdout golden files
+
+.goreleaser.yaml                  # GoReleaser v2 release matrix and archives
 ```
 
 No `internal/document`, merge engine, native-config parser, filesystem target-path resolver, or plugin loader belongs in v1.
@@ -103,7 +168,7 @@ YAML bytes
   -> select targets
   -> target.Validate(config) for each selected target
   -> target.Emit(config) for each selected target
-  -> app.RenderArtifacts
+  -> artifact.RenderBundle
   -> stdout
 ```
 
@@ -115,7 +180,7 @@ YAML bytes
 type Target interface {
     ID() string
     Validate(ir.Config) []diag.Diagnostic
-    Emit(ir.Config) ([]app.Artifact, error)
+    Emit(ir.Config) ([]artifact.Artifact, error)
 }
 ```
 
