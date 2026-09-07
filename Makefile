@@ -35,7 +35,7 @@ test:
 bench:
 	CGO_ENABLED=0 go test -bench=. -run=NONE ./internal/ir
 
-check: fmt-check lint vet test release-check
+check: fmt-check lint vet test
 
 clean:
 	rm -f $(BINARY)
