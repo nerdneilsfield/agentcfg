@@ -54,7 +54,7 @@ mcp:
 defaults:
   model: volcengine/glm-5.3
 
-targets: [codex, opencode, pi, prime-agent, deepseek-harness, grok, kimi, zcode, mimocode, jcode, cline, gajae, hermes, openclaw]
+targets: [codex, opencode, pi, prime-agent, deepseek-harness, grok, kimi, zcode, mimocode, jcode, cline, gajae, hermes, openclaw, crush, goose]
 ```
 
 ## Provider

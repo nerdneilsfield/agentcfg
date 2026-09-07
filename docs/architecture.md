@@ -39,6 +39,8 @@ An emitter returns zero or more named artifacts. A target does not have to corre
 - Gajae Code: `models.yml` fragment, a `config.yml` `modelRoles` fragment, and `mcp.json`.
 - Hermes Agent: one YAML fragment (`config.yaml`).
 - OpenClaw: one JSON fragment (`openclaw.json`).
+- Crush: one JSON fragment (`crush.json`).
+- Goose: one JSON file per custom provider plus a `config.yaml` fragment.
 
 ```go
 type Artifact struct {
@@ -162,6 +164,8 @@ internal/target/
   gajae/gajae.go
   hermes/hermes.go
   openclaw/openclaw.go
+  crush/crush.go
+  goose/goose.go
 
 internal/diag/
   diagnostic.go                   # severity, source path, target, stable formatter
