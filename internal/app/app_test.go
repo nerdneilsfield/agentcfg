@@ -68,13 +68,20 @@ func TestGenerateBundleGolden(t *testing.T) {
 func TestGenerateAllTargets(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	err := Generate(newRequest(fixture(t, "ir", "example.yaml"), "all", &stdout, &stderr))
-	if err != nil {
-		t.Fatalf("Generate: %v\nstderr: %s", err, stderr.String())
-	}
 	out := stdout.String()
-	for _, marker := range []string{"target: codex", "target: opencode", "target: pi", "target: prime-agent", "target: deepseek-harness"} {
-		if !strings.Contains(out, marker) {
-			t.Fatalf("bundle missing %q:\n%s", marker, out)
+	// example.yaml is rejected by the newer targets (kimi/zcode reject
+	// api_key_env and env-derived headers; mimocode/zcode reject
+	// openai-responses providers), so --to all must fail with diagnostics
+	// instead of emitting a partial bundle.
+	if err == nil {
+		t.Fatalf("expected --to all to fail for example.yaml, got output:\n%s", out)
+	}
+	if stdout.Len() != 0 {
+		t.Fatalf("stdout must stay empty on failure: %q", out)
+	}
+	for _, marker := range []string{"kimi", "zcode", "mimocode"} {
+		if !strings.Contains(stderr.String(), marker) {
+			t.Fatalf("diagnostics missing %q: %q", marker, stderr.String())
 		}
 	}
 }
