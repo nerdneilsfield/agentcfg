@@ -1,0 +1,9 @@
+[model_providers]
+  [model_providers.volcengine]
+    name = "Volcengine"
+    base_url = "https://example.com/v1"
+    env_key = "VOLC_API_KEY"
+    wire_api = "responses"
+    requires_openai_auth = false
+    [model_providers.volcengine.http_headers]
+      X-Tenant = "engineering"

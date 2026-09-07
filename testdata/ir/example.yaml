@@ -1,0 +1,27 @@
+version: 1
+
+providers:
+  - id: volcengine
+    name: Volcengine
+    protocol: openai-responses
+    base_url: https://example.com/v1
+    api_key_env: VOLC_API_KEY
+    headers:
+      X-Tenant:
+        value: engineering
+      X-Gateway-Key:
+        from_env: GATEWAY_KEY
+    models:
+      - id: glm-5.3
+        name: GLM-5.3
+        context_window: 128000
+        max_output_tokens: 8192
+        input: [text, image]
+        output: [text]
+        reasoning: true
+        tool_calling: true
+
+defaults:
+  model: volcengine/glm-5.3
+
+targets: [codex, opencode, pi, prime-agent, deepseek-harness]

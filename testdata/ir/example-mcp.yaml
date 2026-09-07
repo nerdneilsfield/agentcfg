@@ -1,0 +1,29 @@
+version: 1
+
+providers:
+  - id: volcengine
+    protocol: openai-responses
+    base_url: https://example.com/v1
+    api_key_env: VOLC_API_KEY
+    models:
+      - id: glm-5.3
+
+mcp:
+  - id: context7
+    transport: stdio
+    command: [npx, -y, "@upstash/context7-mcp"]
+    env:
+      CONTEXT7_API_KEY:
+        from_env: CONTEXT7_API_KEY
+
+  - id: github
+    transport: http
+    url: https://api.githubcopilot.com/mcp/
+    headers:
+      Authorization:
+        bearer_from_env: GITHUB_TOKEN
+
+defaults:
+  model: volcengine/glm-5.3
+
+targets: [opencode, prime-agent]
