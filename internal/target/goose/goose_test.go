@@ -46,14 +46,13 @@ func exampleConfig() ir.Config {
 				"X-Tenant": {Value: "engineering"},
 			},
 			Models: []ir.Model{{
-				ID:              "glm-5.3",
-				Name:            "GLM-5.3",
-				ContextWindow:   i64(128000),
-				MaxOutputTokens: i64(8192),
-				Input:           []ir.Modality{ir.ModalityText, ir.ModalityImage},
-				Output:          []ir.Modality{ir.ModalityText},
-				Reasoning:       b(true),
-				ToolCalling:     b(true),
+				ID:            "glm-5.3",
+				Name:          "GLM-5.3",
+				ContextWindow: i64(128000),
+				Input:         []ir.Modality{ir.ModalityText},
+				Output:        []ir.Modality{ir.ModalityText},
+				Reasoning:     b(true),
+				ToolCalling:   b(true),
 			}},
 		}},
 		MCP: []ir.MCPServer{{
@@ -114,8 +113,12 @@ func TestEmitGolden(t *testing.T) {
 ` {
 		t.Fatalf("goose provider JSON mismatch\ngot:\n%s", got)
 	}
-	if got := string(arts[1].Content); got != `GOOSE_PROVIDER: volcengine
-GOOSE_MODEL: glm-5.3
+	if got := string(arts[1].Content); got != `active_provider: volcengine
+providers:
+  volcengine:
+    enabled: true
+    model: glm-5.3
+    configured: true
 extensions:
   context7:
     type: stdio
@@ -132,6 +135,8 @@ extensions:
     type: streamable_http
     name: github
     enabled: true
+    env_keys:
+      - GITHUB_TOKEN
     uri: https://api.githubcopilot.com/mcp/
     headers:
       Authorization: Bearer ${GITHUB_TOKEN}
@@ -140,10 +145,47 @@ extensions:
 	}
 }
 
-func TestRejectsOpenAIResponses(t *testing.T) {
+func TestMapsOpenAIResponses(t *testing.T) {
 	cfg := exampleConfig()
 	cfg.Providers[0].Protocol = ir.ProtocolOpenAIResponses
-	expectInvalid(t, cfg, "openai-responses")
+	expectValid(t, cfg)
+	arts, err := (Target{}).Emit(cfg)
+	if err != nil {
+		t.Fatalf("Emit: %v", err)
+	}
+	if !strings.Contains(string(arts[0].Content), `"base_path": "v1/responses"`) {
+		t.Fatalf("openai-responses should emit base_path v1/responses:\n%s", arts[0].Content)
+	}
+}
+
+func TestRejectsPerModelMaxOutputTokens(t *testing.T) {
+	cfg := exampleConfig()
+	cfg.Providers[0].Models[0].MaxOutputTokens = i64(8192)
+	expectInvalid(t, cfg, "max-tokens")
+}
+
+func TestRejectsNonTextModality(t *testing.T) {
+	cfg := exampleConfig()
+	cfg.Providers[0].Models[0].Input = append(cfg.Providers[0].Models[0].Input, ir.ModalityAudio)
+	expectInvalid(t, cfg, "modality")
+}
+
+func TestRejectsToolCallingFalse(t *testing.T) {
+	cfg := exampleConfig()
+	cfg.Providers[0].Models[0].ToolCalling = b(false)
+	expectInvalid(t, cfg, "tool_calling")
+}
+
+func TestRejectsMCPEnvBearer(t *testing.T) {
+	cfg := exampleConfig()
+	cfg.MCP[0].Env["AUTH"] = ir.HeaderValue{BearerFromEnv: "AUTH_TOKEN"}
+	expectInvalid(t, cfg, "bearer_from_env is not representable on env")
+}
+
+func TestRejectsFractionalTimeout(t *testing.T) {
+	cfg := exampleConfig()
+	cfg.MCP[0].TimeoutMS = i64(1500)
+	expectInvalid(t, cfg, "divisible by 1000")
 }
 
 func TestRejectsEnvDerivedProviderHeaders(t *testing.T) {

@@ -1,5 +1,5 @@
 // Package goose emits Block Goose custom-provider JSON and a config.yaml
-// fragment covering GOOSE_PROVIDER / GOOSE_MODEL plus MCP extensions.
+// fragment covering the active provider/model plus MCP extensions.
 package goose
 
 import (
@@ -23,8 +23,14 @@ type Target struct{}
 
 func (Target) ID() string { return "goose" }
 
+// responsesBasePath forces the OpenAI Responses API for a custom provider.
+// An explicit base_path replaces the base_url path entirely, mirroring
+// from_declarative_config in crates/goose-providers/src/openai.rs.
+const responsesBasePath = "v1/responses"
+
 var engineName = map[ir.Protocol]string{
 	ir.ProtocolOpenAICompletions: "openai",
+	ir.ProtocolOpenAIResponses:   "openai",
 	ir.ProtocolAnthropicMessages: "anthropic",
 }
 
@@ -32,10 +38,7 @@ func (t Target) Validate(cfg ir.Config) []diag.Diagnostic {
 	var diags []diag.Diagnostic
 	for i, p := range cfg.Providers {
 		path := fmt.Sprintf("providers[%d]", i)
-		if p.Protocol == ir.ProtocolOpenAIResponses {
-			diags = append(diags, diag.TargetErrorf(t.ID(), path+".protocol",
-				"goose custom providers pick chat vs responses via base_path, not a protocol enum; openai-responses is not a native engine — emit openai (chat) or set base_path to v1/responses yourself, so this IR protocol is rejected"))
-		} else if _, ok := engineName[p.Protocol]; !ok {
+		if _, ok := engineName[p.Protocol]; !ok {
 			diags = append(diags, diag.TargetErrorf(t.ID(), path+".protocol",
 				"goose custom provider engine must be openai or anthropic; got %q", p.Protocol))
 		}
@@ -43,6 +46,42 @@ func (t Target) Validate(cfg ir.Config) []diag.Diagnostic {
 			if v.FromEnv != "" || v.BearerFromEnv != "" {
 				diags = append(diags, diag.TargetErrorf(t.ID(), path+".headers."+name,
 					"goose custom-provider headers are literal strings with no interpolation"))
+			}
+		}
+		for j, m := range p.Models {
+			mpath := fmt.Sprintf("%s.models[%d]", path, j)
+			if m.MaxOutputTokens != nil {
+				diags = append(diags, diag.TargetErrorf(t.ID(), mpath+".max_output_tokens",
+					"goose ModelInfo has no per-model max-tokens field (global GOOSE_MAX_TOKENS only); per-model max_output_tokens is not representable"))
+			}
+			for _, mod := range m.Input {
+				if mod != ir.ModalityText {
+					diags = append(diags, diag.TargetErrorf(t.ID(), mpath+".input",
+						"goose ModelInfo has no modality fields; %q is not representable", mod))
+				}
+			}
+			for _, mod := range m.Output {
+				if mod != ir.ModalityText {
+					diags = append(diags, diag.TargetErrorf(t.ID(), mpath+".output",
+						"goose ModelInfo has no modality fields; %q is not representable", mod))
+				}
+			}
+			if m.ToolCalling != nil && !*m.ToolCalling {
+				diags = append(diags, diag.TargetErrorf(t.ID(), mpath+".tool_calling",
+					"goose agents always expose tools; tool_calling: false is not representable"))
+			}
+		}
+	}
+	for i, s := range cfg.MCP {
+		path := fmt.Sprintf("mcp[%d]", i)
+		if s.TimeoutMS != nil && *s.TimeoutMS%1000 != 0 {
+			diags = append(diags, diag.TargetErrorf(t.ID(), path+".timeout_ms",
+				"goose extension timeout is whole seconds; %d ms is not divisible by 1000", *s.TimeoutMS))
+		}
+		for name, v := range s.Env {
+			if v.BearerFromEnv != "" {
+				diags = append(diags, diag.TargetErrorf(t.ID(), path+".env."+name,
+					"goose extension env values are plain environment names or literals; bearer_from_env is not representable on env"))
 			}
 		}
 	}
@@ -71,6 +110,9 @@ func (t Target) Emit(cfg ir.Config) ([]artifact.Artifact, error) {
 			SupportsStreaming: true,
 			RequiresAuth:      p.APIKeyEnv != "",
 			DynamicModels:     false,
+		}
+		if p.Protocol == ir.ProtocolOpenAIResponses {
+			gp.BasePath = responsesBasePath
 		}
 		if len(p.Headers) > 0 {
 			headers := map[string]string{}
@@ -111,8 +153,10 @@ func (t Target) Emit(cfg ir.Config) ([]artifact.Artifact, error) {
 	cfgDoc := gooseConfig{Extensions: map[string]gooseExt{}}
 	if cfg.Defaults != nil && cfg.Defaults.Model != "" {
 		pid, mid, _ := splitRef(cfg.Defaults.Model)
-		cfgDoc.Provider = pid
-		cfgDoc.Model = mid
+		cfgDoc.ActiveProvider = pid
+		cfgDoc.Providers = map[string]gooseProviderEntry{
+			pid: {Enabled: true, Model: mid, Configured: true},
+		}
 	}
 	for _, s := range cfg.MCP {
 		ext := gooseExt{
@@ -157,10 +201,20 @@ func (t Target) Emit(cfg ir.Config) ([]artifact.Artifact, error) {
 			ext.URI = s.URL
 			if len(s.Headers) > 0 {
 				headers := map[string]string{}
+				keys := []string{}
 				for name, v := range s.Headers {
 					headers[name] = envInterp(v)
+					if v.FromEnv != "" {
+						keys = append(keys, v.FromEnv)
+					} else if v.BearerFromEnv != "" {
+						keys = append(keys, v.BearerFromEnv)
+					}
 				}
 				ext.Headers = headers
+				if len(keys) > 0 {
+					sort.Strings(keys)
+					ext.EnvKeys = keys
+				}
 			}
 		}
 		cfgDoc.Extensions[s.ID] = ext
@@ -168,7 +222,7 @@ func (t Target) Emit(cfg ir.Config) ([]artifact.Artifact, error) {
 	if len(cfgDoc.Extensions) == 0 {
 		cfgDoc.Extensions = nil
 	}
-	if cfgDoc.Provider != "" || cfgDoc.Extensions != nil {
+	if cfgDoc.ActiveProvider != "" || cfgDoc.Extensions != nil {
 		var ybuf bytes.Buffer
 		yenc := yaml.NewEncoder(&ybuf)
 		yenc.SetIndent(2)
@@ -235,6 +289,7 @@ type gooseProvider struct {
 	DisplayName       string            `json:"display_name"`
 	APIKeyEnv         string            `json:"api_key_env,omitempty"`
 	BaseURL           string            `json:"base_url"`
+	BasePath          string            `json:"base_path,omitempty"`
 	Models            []gooseModel      `json:"models"`
 	Headers           map[string]string `json:"headers,omitempty"`
 	SupportsStreaming bool              `json:"supports_streaming"`
@@ -249,9 +304,15 @@ type gooseModel struct {
 }
 
 type gooseConfig struct {
-	Provider   string              `yaml:"GOOSE_PROVIDER,omitempty"`
-	Model      string              `yaml:"GOOSE_MODEL,omitempty"`
-	Extensions map[string]gooseExt `yaml:"extensions,omitempty"`
+	ActiveProvider string                        `yaml:"active_provider,omitempty"`
+	Providers      map[string]gooseProviderEntry `yaml:"providers,omitempty"`
+	Extensions     map[string]gooseExt           `yaml:"extensions,omitempty"`
+}
+
+type gooseProviderEntry struct {
+	Enabled    bool   `yaml:"enabled"`
+	Model      string `yaml:"model"`
+	Configured bool   `yaml:"configured"`
 }
 
 type gooseExt struct {
