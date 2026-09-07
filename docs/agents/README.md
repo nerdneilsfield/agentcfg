@@ -13,5 +13,10 @@ This directory records the native configuration evidence used by agentcfg emitte
 | [Kimi Code](kimi.md) | TOML `[providers]`/`[models]` | JSON `mcp.json` | official repo zod schemas |
 | [ZCode](zcode.md) | JSON `provider` | JSON `mcp.servers` | installed v3.11.2 bundled schema |
 | [MiMo Code](mimocode.md) | JSON `provider` (AI SDK npm) | JSON `mcp` local/remote | official live JSON schema |
+| [jcode](jcode.md) | TOML `[providers]` | JSON `mcp.json` | official repo (Rust) |
+| [Cline CLI](cline.md) | JSON `providers.json` | JSON `cline_mcp_settings.json` | official repo zod schemas |
+| [Gajae Code](gajae.md) | YAML `models.yml` providers | JSON `mcp.json` | official repo zod schemas |
+| [Hermes Agent](hermes.md) | YAML `providers` | YAML `mcp_servers` | official repo config |
+| [OpenClaw](openclaw.md) | JSON `models.providers` | JSON `mcp.servers` | official repo zod schemas |
 
 Every emitter change must update the applicable target contract with version, source URL/path, and tested status.

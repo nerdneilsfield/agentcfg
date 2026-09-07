@@ -1,0 +1,52 @@
+# OpenClaw
+
+- **Target id:** `openclaw`
+- **Verified against:** official repo `openclaw/openclaw` (steipete/OpenClaw Foundation; research report `.research/openclaw.md`, fetched 2026-09-07). The npm package is `openclaw` (bin `openclaw`). OpenClaw is a personal/team AI-assistant gateway rather than a pure coding-agent CLI, but its provider/MCP config surfaces fit agentcfg scope. (Ruled out: the `pjasicek/OpenClaw` Captain Claw game engine and the PyPI `openclaw` cmdop installer.)
+- **Native file:** `~/.openclaw/openclaw.json` (JSON5, comments + `$include`; `OPENCLAW_STATE_DIR` overrides). The generated agent-local catalog `~/.openclaw/agents/<id>/agent/models.json` must NOT be written.
+- **v1 artifact:** a single JSON fragment for `openclaw.json`. v1 does not edit this file.
+
+## Provider route
+
+`models.providers.<id>` (strict zod) requires `baseUrl` + `models[]`:
+
+```json
+{
+  "models": {
+    "providers": {
+      "volcengine": {
+        "baseUrl": "https://example.com/v1",
+        "api": "openai-completions",
+        "apiKey": "${VOLC_API_KEY}",
+        "headers": {"X-Gateway-Key": "${GATEWAY_KEY}"},
+        "models": [{
+          "id": "glm-5.3",
+          "name": "GLM-5.3",
+          "contextWindow": 128000,
+          "maxTokens": 8192,
+          "input": ["text", "image"],
+          "reasoning": true,
+          "compat": {"supportsTools": true}
+        }]
+      }
+    }
+  }
+}
+```
+
+- `api` is a protocol enum including `openai-completions`, `openai-responses`, and `anthropic-messages`; all three IR protocols map 1:1.
+- `apiKey` is a `SecretInput`: it accepts a `$VAR`/`${VAR}` env shorthand, so IR `api_key_env` maps to `"${VAR}"` and no secret is rendered. Provider `headers` are also `SecretInput`-capable; IR `from_env` renders as `"${VAR}"` and `Authorization.bearer_from_env` as `"Bearer ${VAR}"`.
+- Model entries support `id`, `name`, `reasoning`, `input` (`text|image|video|audio`), `contextWindow`, `maxTokens`, and `compat` (including `supportsTools`). IR `tool_calling` maps to `compat.supportsTools`. IR output modalities have no OpenClaw field and are not emitted; non-text/image/audio/video inputs are rejected.
+- Whole-config load-time `${VAR}` interpolation applies to MCP env/headers too (uppercase vars only).
+
+## Defaults
+
+`defaults.model "provider/model"` maps to `agents.defaults.model` verbatim.
+
+## MCP
+
+`mcp.servers.<id>` supports stdio (`command`, `args`, `env`, `cwd`) and
+`transport: "streamable-http"` with `url` + `headers` (IR `http` maps here;
+`sse` also exists). `connectionTimeoutMs` / `requestTimeoutMs` take the IR
+`timeout_ms` value duplicated across both. IR `enabled` maps to the native
+`enabled` flag. First-party OAuth (`auth: "oauth"`) and mTLS options have no
+IR counterpart and are not emitted.

@@ -34,6 +34,11 @@ An emitter returns zero or more named artifacts. A target does not have to corre
 - Kimi Code: `config.toml` fragment and `mcp.json` fragment.
 - ZCode: one JSON fragment (`config.json`).
 - MiMo Code: one JSON fragment (`mimocode.jsonc`).
+- jcode: `config.toml` fragment and `mcp.json` fragment.
+- Cline CLI: `providers.json`, `models.json`, and `cline_mcp_settings.json` fragments.
+- Gajae Code: `models.yml` fragment, a `config.yml` `modelRoles` fragment, and `mcp.json`.
+- Hermes Agent: one YAML fragment (`config.yaml`).
+- OpenClaw: one JSON fragment (`openclaw.json`).
 
 ```go
 type Artifact struct {
@@ -152,6 +157,11 @@ internal/target/
   kimi/kimi.go
   zcode/zcode.go
   mimocode/mimocode.go
+  jcode/jcode.go
+  cline/cline.go
+  gajae/gajae.go
+  hermes/hermes.go
+  openclaw/openclaw.go
 
 internal/diag/
   diagnostic.go                   # severity, source path, target, stable formatter

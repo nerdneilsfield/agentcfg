@@ -1,0 +1,51 @@
+# Cline CLI
+
+- **Target id:** `cline`
+- **Verified against:** official repo `cline/cline` (apps/cli; research report `.research/cline.md`, fetched 2026-09-07). The npm package is `cline` v3.0.61 (bin `cline`); the similarly named `@cline/cli` experimental SDK (bin `clite`) is a different tool and is not targeted.
+- **Native files:** `~/.cline/data/settings/providers.json` (0600), `~/.cline/data/settings/models.json`, `~/.cline/data/settings/cline_mcp_settings.json`. `CLINE_DIR` / `CLINE_DATA_DIR` override the root.
+- **v1 artifacts:** JSON fragments for all three files. v1 does not edit these files.
+
+## Provider route
+
+Custom providers are entries of `providers.json`:
+
+```json
+{
+  "version": 1,
+  "lastUsedProvider": "volcengine",
+  "providers": {
+    "volcengine": {
+      "settings": {
+        "provider": "volcengine",
+        "baseUrl": "https://example.com/v1",
+        "protocol": "openai-chat",
+        "model": "glm-5.3",
+        "headers": {"X-Tenant": "engineering"}
+      },
+      "tokenSource": "manual"
+    }
+  }
+}
+```
+
+- `protocol` renames: `openai-completions` → `openai-chat`, `openai-responses` → `openai-responses`, `anthropic-messages` → `anthropic`.
+- Cline config is **literal-only**: there is no `${VAR}` expansion anywhere, and the environment fallback for API keys only exists for built-in provider ids. Custom providers therefore effectively need a stored literal `apiKey`, so IR `api_key_env` is rejected, and provider `headers` with `from_env` / `bearer_from_env` are rejected. Constant `value` headers are emitted.
+
+## Models
+
+Rich model metadata lives in `models.json` under
+`providers.<id>.models.<model-id>`: `name`, `contextWindow`, `maxTokens`,
+`modalities {input, output}`, and `capabilities` (`images`, `video`, `tools`,
+`reasoning`). IR model fields map 1:1 onto these. Cline `settings.model` holds
+only the bare default model id, and `defaults.model "provider/model"` maps to
+`lastUsedProvider` + `settings.model`.
+
+## MCP
+
+`cline_mcp_settings.json` uses a nested `transport` form: stdio
+(`command`/`args`/`cwd`/`env`) or `streamableHttp` (`url`/`headers`; the IR
+`http` transport maps here). `enabled: false` maps to `disabled: true`.
+`timeout` is whole seconds clamped to 1..3600; the emitter rejects IR
+`timeout_ms` values outside 1000..3600000. MCP `env` and `headers` are literal
+strings, so IR `from_env` / `bearer_from_env` MCP values are rejected. When the
+IR has no MCP servers, the artifact is omitted.

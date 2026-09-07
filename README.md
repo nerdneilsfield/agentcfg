@@ -2,7 +2,7 @@
 
 agentcfg compiles one `agentcfg.yaml` into native config artifacts for
 coding-agent CLIs: Codex, OpenCode, Pi, Prime Agent, DeepSeek Harness,
-Grok Build, Kimi Code, ZCode, and MiMo Code.
+Grok Build, Kimi Code, ZCode, MiMo Code, jcode, Cline CLI, Gajae Code, Hermes Agent, and OpenClaw.
 
 It manages **custom providers (models) and MCP servers only**. It does not
 store secrets (environment references only), run providers, or modify
