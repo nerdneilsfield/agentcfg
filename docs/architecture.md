@@ -30,6 +30,10 @@ An emitter returns zero or more named artifacts. A target does not have to corre
 - Pi: a TypeScript provider extension; later, an adapter-owned MCP JSON file if explicitly enabled.
 - Prime Agent: `models.json` provider fragment and `settings.json` MCP fragment.
 - DeepSeek Harness: `settings.yaml` provider fragment and Cordis MCP patch.
+- Grok Build: one TOML fragment (`config.toml`).
+- Kimi Code: `config.toml` fragment and `mcp.json` fragment.
+- ZCode: one JSON fragment (`config.json`).
+- MiMo Code: one JSON fragment (`mimocode.jsonc`).
 
 ```go
 type Artifact struct {
@@ -144,6 +148,10 @@ internal/target/
   pi/emit.go
   primeagent/emit.go
   deepseekharness/emit.go
+  grok/grok.go
+  kimi/kimi.go
+  zcode/zcode.go
+  mimocode/mimocode.go
 
 internal/diag/
   diagnostic.go                   # severity, source path, target, stable formatter

@@ -9,5 +9,9 @@ This directory records the native configuration evidence used by agentcfg emitte
 | [Pi](pi.md) | TypeScript extension | external adapter only | upstream docs |
 | [Prime Agent](prime-agent.md) | JSON `models.json` | JSON `settings.json.mcpServers` | installed 0.9.3 source contract |
 | [DeepSeek Harness](deepseek-harness.md) | YAML `llm-pi-ai` route | Cordis MCP-client patch | provider guide; MCP partial |
+| [Grok Build](grok.md) | TOML `[model."<id>"]` | TOML `[mcp_servers]` | local install + upstream docs |
+| [Kimi Code](kimi.md) | TOML `[providers]`/`[models]` | JSON `mcp.json` | official repo zod schemas |
+| [ZCode](zcode.md) | JSON `provider` | JSON `mcp.servers` | installed v3.11.2 bundled schema |
+| [MiMo Code](mimocode.md) | JSON `provider` (AI SDK npm) | JSON `mcp` local/remote | official live JSON schema |
 
 Every emitter change must update the applicable target contract with version, source URL/path, and tested status.
