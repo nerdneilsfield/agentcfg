@@ -1,0 +1,9 @@
+// Package buildinfo carries release metadata injected by GoReleaser.
+package buildinfo
+
+// Values are set with -ldflags at release time.
+var (
+	Version = "dev"
+	Commit  = "none"
+	Date    = "unknown"
+)
