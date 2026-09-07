@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"sort"
 
 	"agentcfg/internal/artifact"
 	"agentcfg/internal/diag"
@@ -172,16 +171,6 @@ type opencodeModel struct {
 	Modalities map[string][]ir.Modality `json:"modalities"`
 	Reasoning  bool                     `json:"reasoning,omitempty"`
 	Tools      bool                     `json:"tools,omitempty"`
-}
-
-// sortedKeys is kept for future deterministic iteration helpers.
-func sortedKeys[V any](m map[string]V) []string {
-	keys := make([]string, 0, len(m))
-	for k := range m {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-	return keys
 }
 
 func orDefault(v, def string) string {

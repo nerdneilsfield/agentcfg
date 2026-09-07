@@ -28,17 +28,17 @@ type Request struct {
 func Validate(req Request) error {
 	cfg, targets, err := loadAndSelect(req)
 	if err != nil {
-		fmt.Fprintln(req.Stderr, "error:", err)
+		_, _ = fmt.Fprintln(req.Stderr, "error:", err)
 		return err
 	}
 	req.Log.InfoW("validation started", "command", "validate", "source", req.ConfigPath, "targets", len(targets))
 	if diags := runTargetValidation(cfg, targets); len(diags) > 0 {
 		printDiagnostics(req.Stderr, diags)
 		err := fmt.Errorf("validation failed with %d diagnostic(s)", len(diags))
-		fmt.Fprintln(req.Stderr, "error:", err)
+		_, _ = fmt.Fprintln(req.Stderr, "error:", err)
 		return err
 	}
-	fmt.Fprintf(req.Stderr, "%s: OK (%d providers, %d MCP servers, %d targets)\n",
+	_, _ = fmt.Fprintf(req.Stderr, "%s: OK (%d providers, %d MCP servers, %d targets)\n",
 		req.ConfigPath, len(cfg.Providers), len(cfg.MCP), len(targets))
 	return nil
 }
@@ -48,13 +48,13 @@ func Validate(req Request) error {
 func Generate(req Request) error {
 	cfg, targets, err := loadAndSelect(req)
 	if err != nil {
-		fmt.Fprintln(req.Stderr, "error:", err)
+		_, _ = fmt.Fprintln(req.Stderr, "error:", err)
 		return err
 	}
 	if diags := runTargetValidation(cfg, targets); len(diags) > 0 {
 		printDiagnostics(req.Stderr, diags)
 		err := fmt.Errorf("validation failed with %d diagnostic(s)", len(diags))
-		fmt.Fprintln(req.Stderr, "error:", err)
+		_, _ = fmt.Fprintln(req.Stderr, "error:", err)
 		return err
 	}
 
@@ -63,7 +63,7 @@ func Generate(req Request) error {
 		emitted, err := t.Emit(cfg)
 		if err != nil {
 			err = fmt.Errorf("emitting %s: %w", t.ID(), err)
-			fmt.Fprintln(req.Stderr, "error:", err)
+			_, _ = fmt.Fprintln(req.Stderr, "error:", err)
 			return err
 		}
 		req.Log.InfoW("emitted artifacts", "command", "gen", "target", t.ID(), "artifacts", len(emitted))
@@ -73,11 +73,11 @@ func Generate(req Request) error {
 
 	var buf bytesBuf
 	if err := artifact.Render(&buf, len(targets), arts); err != nil {
-		fmt.Fprintln(req.Stderr, "error:", err)
+		_, _ = fmt.Fprintln(req.Stderr, "error:", err)
 		return err
 	}
 	if _, err := req.Stdout.Write(buf.Bytes()); err != nil {
-		fmt.Fprintln(req.Stderr, "error:", err)
+		_, _ = fmt.Fprintln(req.Stderr, "error:", err)
 		return err
 	}
 	return nil
@@ -119,7 +119,7 @@ func runTargetValidation(cfg ir.Config, targets []target.Target) []diag.Diagnost
 
 func printDiagnostics(w io.Writer, diags []diag.Diagnostic) {
 	for _, d := range diags {
-		fmt.Fprintln(w, d.String())
+		_, _ = fmt.Fprintln(w, d.String())
 	}
 }
 

@@ -197,12 +197,12 @@ func splitModelRef(ref string) (string, string, bool) {
 }
 
 func validID(id string) bool {
-	if id == "" || !(id[0] >= 'a' && id[0] <= 'z') {
+	if id == "" || id[0] < 'a' || id[0] > 'z' {
 		return false
 	}
 	for i := 1; i < len(id); i++ {
 		c := id[i]
-		if !(c >= 'a' && c <= 'z' || c >= '0' && c <= '9' || c == '-' || c == '_') {
+		if (c < 'a' || c > 'z') && (c < '0' || c > '9') && c != '-' && c != '_' {
 			return false
 		}
 	}
