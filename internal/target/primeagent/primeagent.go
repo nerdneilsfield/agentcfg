@@ -21,15 +21,31 @@ func (Target) ID() string { return "prime-agent" }
 
 func (t Target) Validate(cfg ir.Config) []diag.Diagnostic {
 	var diags []diag.Diagnostic
+	for i, p := range cfg.Providers {
+		if len(p.Headers) > 0 {
+			diags = append(diags, diag.TargetErrorf(t.ID(), fmt.Sprintf("providers[%d].headers", i),
+				"prime-agent models.json providers have no headers field; provider headers are not representable"))
+		}
+	}
 	for i, s := range cfg.MCP {
 		path := fmt.Sprintf("mcp[%d]", i)
-		if s.Transport != ir.TransportStdio {
-			continue // http is validated below through headers/env rules
+		if s.Transport == ir.TransportStdio {
+			for name, v := range s.Env {
+				if v.FromEnv == "" {
+					diags = append(diags, diag.TargetErrorf(t.ID(), path+".env."+name,
+						"prime-agent stdio env entries are environment references only (prime-agent mcp add --env CHILD=SOURCE)"))
+				}
+			}
+			continue
 		}
-		for name, v := range s.Env {
-			if v.FromEnv == "" || v.FromEnv != name {
-				diags = append(diags, diag.TargetErrorf(t.ID(), path+".env."+name,
-					"prime-agent stdio env entries are same-name environment references only"))
+		for name, v := range s.Headers {
+			if v.BearerFromEnv != "" && name != "Authorization" {
+				diags = append(diags, diag.TargetErrorf(t.ID(), path+".headers."+name,
+					"prime-agent bearerTokenEnvVar applies to Authorization only; use a constant value for other headers"))
+			}
+			if v.FromEnv != "" {
+				diags = append(diags, diag.TargetErrorf(t.ID(), path+".headers."+name,
+					"prime-agent http headers are static strings; environment interpolation is not verified for MCP headers"))
 			}
 		}
 	}
@@ -114,9 +130,7 @@ func (t Target) Emit(cfg ir.Config) ([]artifact.Artifact, error) {
 				}
 				headers := map[string]string{}
 				for name, v := range s.Headers {
-					if v.FromEnv != "" {
-						headers[name] = "{env:" + v.FromEnv + "}"
-					} else {
+					if v.Value != "" {
 						headers[name] = v.Value
 					}
 				}
@@ -132,7 +146,7 @@ func (t Target) Emit(cfg ir.Config) ([]artifact.Artifact, error) {
 				mcp[s.ID] = entry
 			}
 		}
-		settings["mcp"] = mcp
+		settings["mcpServers"] = mcp
 	}
 
 	modelsJSON, err := marshal(models)

@@ -22,9 +22,9 @@ func (Target) ID() string { return "opencode" }
 func (t Target) Validate(cfg ir.Config) []diag.Diagnostic {
 	var diags []diag.Diagnostic
 	for i, p := range cfg.Providers {
-		if p.Protocol == ir.ProtocolAnthropicMessages {
+		if p.Protocol != ir.ProtocolOpenAICompletions {
 			diags = append(diags, diag.TargetErrorf(t.ID(), fmt.Sprintf("providers[%d].protocol", i),
-				"opencode v1 maps openai-compatible providers only; got %q", p.Protocol))
+				"opencode v1 maps openai-completions providers only; %q needs a verified adapter package and is rejected", p.Protocol))
 		}
 	}
 	return diags

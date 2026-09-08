@@ -47,7 +47,7 @@ func TestGenerateCodexGolden(t *testing.T) {
 
 func TestGenerateOpenCodeGolden(t *testing.T) {
 	var stdout, stderr bytes.Buffer
-	if err := Generate(newRequest(fixture(t, "ir", "example.yaml"), "opencode", &stdout, &stderr)); err != nil {
+	if err := Generate(newRequest(fixture(t, "ir", "example-completions.yaml"), "opencode", &stdout, &stderr)); err != nil {
 		t.Fatalf("Generate: %v\nstderr: %s", err, stderr.String())
 	}
 	if got, want := stdout.String(), readGolden(t, "targets", "opencode", "opencode.json.golden"); got != want {
@@ -57,10 +57,10 @@ func TestGenerateOpenCodeGolden(t *testing.T) {
 
 func TestGenerateBundleGolden(t *testing.T) {
 	var stdout, stderr bytes.Buffer
-	if err := Generate(newRequest(fixture(t, "ir", "example.yaml"), "codex,opencode", &stdout, &stderr)); err != nil {
+	if err := Generate(newRequest(fixture(t, "ir", "example.yaml"), "codex,pi", &stdout, &stderr)); err != nil {
 		t.Fatalf("Generate: %v\nstderr: %s", err, stderr.String())
 	}
-	if got, want := stdout.String(), readGolden(t, "bundles", "codex-opencode.txt.golden"); got != want {
+	if got, want := stdout.String(), readGolden(t, "bundles", "codex-pi.txt.golden"); got != want {
 		t.Fatalf("bundle output mismatch\ngot:\n%s\nwant:\n%s", got, want)
 	}
 }
@@ -93,6 +93,16 @@ func TestValidateExampleOK(t *testing.T) {
 	}
 	if stdout.Len() != 0 {
 		t.Fatalf("validate wrote to stdout: %q", stdout.String())
+	}
+	if !strings.Contains(stderr.String(), "OK") {
+		t.Fatalf("missing OK summary: %q", stderr.String())
+	}
+}
+
+func TestValidateExampleCompletionsOK(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	if err := Validate(newRequest(fixture(t, "ir", "example-completions.yaml"), "", &stdout, &stderr)); err != nil {
+		t.Fatalf("Validate: %v\nstderr: %s", err, stderr.String())
 	}
 	if !strings.Contains(stderr.String(), "OK") {
 		t.Fatalf("missing OK summary: %q", stderr.String())

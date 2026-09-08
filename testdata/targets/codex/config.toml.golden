@@ -7,3 +7,5 @@
     requires_openai_auth = false
     [model_providers.volcengine.http_headers]
       X-Tenant = "engineering"
+    [model_providers.volcengine.env_http_headers]
+      X-Gateway-Key = "GATEWAY_KEY"

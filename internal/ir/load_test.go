@@ -52,7 +52,7 @@ func TestLoadExample(t *testing.T) {
 	if cfg.Defaults == nil || cfg.Defaults.Model != "volcengine/glm-5.3" {
 		t.Fatalf("defaults = %+v", cfg.Defaults)
 	}
-	if len(cfg.Targets) != 5 {
+	if len(cfg.Targets) != 3 {
 		t.Fatalf("targets = %v", cfg.Targets)
 	}
 }

@@ -26,7 +26,7 @@ var protocolName = map[ir.Protocol]string{
 	ir.ProtocolAnthropicMessages: "anthropic",
 }
 
-// cline timeout is whole seconds clamped to [1, 3600].
+// cline timeout is whole seconds in [1, 3600]; out-of-range values are rejected.
 const (
 	minTimeoutMS = 1000
 	maxTimeoutMS = 3_600_000

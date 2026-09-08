@@ -3,7 +3,7 @@ version: 1
 providers:
   - id: volcengine
     name: Volcengine
-    protocol: openai-responses
+    protocol: openai-completions
     base_url: https://example.com/v1
     api_key_env: VOLC_API_KEY
     headers:
@@ -24,4 +24,4 @@ providers:
 defaults:
   model: volcengine/glm-5.3
 
-targets: [codex, pi, deepseek-harness]
+targets: [opencode]
