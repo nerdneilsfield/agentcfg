@@ -86,7 +86,11 @@ cd agentcfg && make build   # 产出 ./agentcfg
 ## 快速上手
 
 1. 在项目旁写一份 `agentcfg.yaml`（完整字段说明见
-   [`docs/protocol.md`](docs/protocol.md)）：
+   [`docs/protocol.md`](docs/protocol.md)）。仓库自带一份完整的
+   [`example.yaml`](example.yaml)，也可以用 `agentcfg gen-example -o agentcfg.yaml`
+   在项目旁生成一份新副本（不带 `-o` 时输出到 stdout）。所有参数都有
+   短、长两种形式（`-c`/`--config`、`-t`/`--to`、`-v`/`--verbose`、
+   `-d`/`--debug`、`-o`/`--output`）：
 
 ```yaml
 version: 1

@@ -89,7 +89,11 @@ cd agentcfg && make build   # produces ./agentcfg
 ## Quick start
 
 1. Write `agentcfg.yaml` next to your project (full field reference:
-   [`docs/protocol.md`](docs/protocol.md)):
+   [`docs/protocol.md`](docs/protocol.md)). The repository ships a complete
+   [`example.yaml`](example.yaml), and `agentcfg gen-example -o agentcfg.yaml`
+   writes a fresh copy next to your project (without `-o` it prints to
+   stdout). Every flag accepts a short and a long form (`-c`/`--config`,
+   `-t`/`--to`, `-v`/`--verbose`, `-d`/`--debug`, `-o`/`--output`):
 
 ```yaml
 version: 1
