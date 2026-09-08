@@ -1,0 +1,62 @@
+# agentcfg example IR.
+#
+# Compile with:  agentcfg validate --config example.yaml
+#                 agentcfg gen --config example.yaml
+# Or copy it elsewhere first:  agentcfg gen-example -o my-agentcfg.yaml
+
+version: 1
+
+providers:
+  - id: volcengine
+    name: Volcengine
+    protocol: openai-completions
+    base_url: https://example.com/v1
+    api_key_env: VOLC_API_KEY
+    headers:
+      X-Tenant:
+        value: engineering
+      X-Gateway-Key:
+        from_env: GATEWAY_KEY
+    models:
+      - id: glm-5.3
+        name: GLM-5.3
+        context_window: 128000
+        max_output_tokens: 8192
+        input: [text, image]
+        output: [text]
+        reasoning: true
+        tool_calling: true
+
+  - id: anthropic-internal
+    name: Anthropic Internal
+    protocol: anthropic-messages
+    base_url: https://anthropic-internal.example.com
+    api_key_env: ANTHROPIC_INTERNAL_TOKEN
+    models:
+      - id: claude-internal
+        name: Claude Internal
+        context_window: 200000
+        max_output_tokens: 64000
+        input: [text, image]
+        output: [text]
+        reasoning: true
+
+mcp:
+  - id: context7
+    transport: stdio
+    command: [npx, -y, "@upstash/context7-mcp"]
+    env:
+      CONTEXT7_API_KEY:
+        from_env: CONTEXT7_API_KEY
+
+  - id: github
+    transport: http
+    url: https://api.githubcopilot.com/mcp/
+    headers:
+      Authorization:
+        bearer_from_env: GITHUB_TOKEN
+
+defaults:
+  model: volcengine/glm-5.3
+
+targets: [crush, gajae, hermes, openclaw, mimocode]

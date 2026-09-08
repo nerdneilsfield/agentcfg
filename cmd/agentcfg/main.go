@@ -23,6 +23,7 @@ func run(args []string) int {
 		to         string
 		verbose    bool
 		debug      bool
+		exampleOut string
 	)
 
 	root := &cobra.Command{
@@ -33,9 +34,9 @@ func run(args []string) int {
 		Version:       fmt.Sprintf("%s (commit %s, built %s)", buildinfo.Version, buildinfo.Commit, buildinfo.Date),
 	}
 	root.PersistentFlags().StringVarP(&configPath, "config", "c", "agentcfg.yaml", "path to agentcfg.yaml")
-	root.PersistentFlags().StringVar(&to, "to", "", `comma-separated target ids, or "all"`)
-	root.PersistentFlags().BoolVar(&verbose, "verbose", false, "log at info level to stderr")
-	root.PersistentFlags().BoolVar(&debug, "debug", false, "log at debug level to stderr")
+	root.PersistentFlags().StringVarP(&to, "to", "t", "", `comma-separated target ids, or "all"`)
+	root.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "log at info level to stderr")
+	root.PersistentFlags().BoolVarP(&debug, "debug", "d", false, "log at debug level to stderr")
 
 	level := logging.LevelWarn
 	if verbose {
@@ -69,6 +70,15 @@ func run(args []string) int {
 			return app.Generate(newRequest())
 		},
 	})
+	genExample := &cobra.Command{
+		Use:   "gen-example",
+		Short: "Print the example agentcfg.yaml to stdout (or write it with -o)",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return app.GenExample(newRequest(), exampleOut)
+		},
+	}
+	genExample.Flags().StringVarP(&exampleOut, "output", "o", "", "write the example to this file instead of stdout")
+	root.AddCommand(genExample)
 
 	root.SetArgs(args)
 	if err := root.Execute(); err != nil {

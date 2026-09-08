@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"agentcfg/internal/example"
 	"agentcfg/internal/logging"
 	_ "agentcfg/internal/target/all"
 )
@@ -178,5 +179,54 @@ providers:
 	}
 	if !strings.Contains(stderr.String(), "wire_api=responses") {
 		t.Fatalf("unexpected stderr: %q", stderr.String())
+	}
+}
+
+func TestGenExampleStdout(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	if err := GenExample(newRequest("", "", &stdout, &stderr), ""); err != nil {
+		t.Fatalf("GenExample: %v\nstderr: %s", err, stderr.String())
+	}
+	if got, want := stdout.String(), example.IR; got != want {
+		t.Fatalf("stdout mismatch: got %d bytes, want %d", len(got), len(want))
+	}
+	if stderr.Len() != 0 {
+		t.Fatalf("unexpected stderr: %s", stderr.String())
+	}
+}
+
+func TestGenExampleWritesFile(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "agentcfg.yaml")
+	var stdout, stderr bytes.Buffer
+	if err := GenExample(newRequest("", "", &stdout, &stderr), path); err != nil {
+		t.Fatalf("GenExample: %v\nstderr: %s", err, stderr.String())
+	}
+	b, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("reading written file: %v", err)
+	}
+	if got, want := string(b), example.IR; got != want {
+		t.Fatalf("written file mismatch: got %d bytes, want %d", len(got), len(want))
+	}
+	if stdout.Len() != 0 {
+		t.Fatalf("unexpected stdout: %s", stdout.String())
+	}
+}
+
+func TestGenExampleRefusesExistingFile(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "agentcfg.yaml")
+	if err := os.WriteFile(path, []byte("mine"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var stdout, stderr bytes.Buffer
+	if err := GenExample(newRequest("", "", &stdout, &stderr), path); err == nil {
+		t.Fatal("expected error overwriting an existing file")
+	}
+	b, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := string(b); got != "mine" {
+		t.Fatalf("existing file was modified: %q", got)
 	}
 }

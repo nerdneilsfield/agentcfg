@@ -11,6 +11,7 @@ import (
 
 	"agentcfg/internal/artifact"
 	"agentcfg/internal/diag"
+	"agentcfg/internal/example"
 	"agentcfg/internal/ir"
 	"agentcfg/internal/target"
 )
@@ -40,6 +41,39 @@ func Validate(req Request) error {
 	}
 	_, _ = fmt.Fprintf(req.Stderr, "%s: OK (%d providers, %d MCP servers, %d targets)\n",
 		req.ConfigPath, len(cfg.Providers), len(cfg.MCP), len(targets))
+	return nil
+}
+
+// GenExample writes the bundled example IR to req.Stdout, or to the file at
+// path when path is non-empty. An existing file is never overwritten:
+// generating a starter config must not clobber user work.
+func GenExample(req Request, path string) error {
+	if req.Stdout == nil || req.Stderr == nil {
+		return fmt.Errorf("stdout and stderr are required")
+	}
+	if path == "" {
+		if _, err := req.Stdout.Write([]byte(example.IR)); err != nil {
+			_, _ = fmt.Fprintln(req.Stderr, "error:", err)
+			return err
+		}
+		return nil
+	}
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o644)
+	if err != nil {
+		if os.IsExist(err) {
+			err = fmt.Errorf("%s already exists; refusing to overwrite it", path)
+		} else {
+			err = fmt.Errorf("creating %s: %w", path, err)
+		}
+		_, _ = fmt.Fprintln(req.Stderr, "error:", err)
+		return err
+	}
+	defer func() { _ = f.Close() }()
+	if _, err := f.WriteString(example.IR); err != nil {
+		_, _ = fmt.Fprintln(req.Stderr, "error:", err)
+		return err
+	}
+	_, _ = fmt.Fprintf(req.Stderr, "wrote %s\n", path)
 	return nil
 }
 
