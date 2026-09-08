@@ -45,7 +45,8 @@ only the bare default model id, and `defaults.model "provider/model"` maps to
 `cline_mcp_settings.json` uses a nested `transport` form: stdio
 (`command`/`args`/`cwd`/`env`) or `streamableHttp` (`url`/`headers`; the IR
 `http` transport maps here). `enabled: false` maps to `disabled: true`.
-`timeout` is whole seconds clamped to 1..3600; the emitter rejects IR
-`timeout_ms` values outside 1000..3600000. MCP `env` and `headers` are literal
+`timeout` is whole seconds in 1..3600; the emitter rejects IR
+`timeout_ms` values outside 1000..3600000 and truncates non-multiples of 1000
+toward zero (e.g. 1500 ms becomes 1 s). MCP `env` and `headers` are literal
 strings, so IR `from_env` / `bearer_from_env` MCP values are rejected. When the
 IR has no MCP servers, the artifact is omitted.

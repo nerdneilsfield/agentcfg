@@ -24,16 +24,16 @@ agentcfg 把一份 `agentcfg.yaml` 编译成各编码智能体 CLI 的原生配�
 
 | Target | 智能体 | Provider 支持 | MCP | 说明 |
 |---|---|---|---|---|
-| `codex` | [openai/codex](https://github.com/openai/codex) | 仅 Responses | stdio | `[model_providers]` TOML 片段；Codex 只支持 Responses API |
+| `codex` | [openai/codex](https://github.com/openai/codex) | 仅 Responses | stdio + HTTP | `[model_providers]` TOML 片段；Codex 只支持 Responses API |
 | `opencode` | [sst/opencode](https://github.com/sst/opencode) | 仅 OpenAI 兼容 | stdio + HTTP | `opencode.json` 中的 `provider` + `mcp`；v1 拒绝 Anthropic/Responses 供应商 |
-| `pi` | [earendil-works/pi](https://github.com/earendil-works/pi) | 任意（TypeScript 扩展） | 经 `pi-mcp-adapter` | 输出 provider 扩展；默认模型在扩展加载前保持延后 |
-| `prime-agent` | [契约文档](docs/agents/prime-agent.md) | 任意（`models.json`） | stdio + HTTP | `models.json` + `settings.json` `mcpServers` 片段 |
+| `pi` | [earendil-works/pi](https://github.com/earendil-works/pi) | 任意（TypeScript 扩展） | v1 拒绝（无内置 MCP） | 输出 provider 扩展；header 值用 Pi `$NAME` 语法；默认模型在扩展加载前保持延后 |
+| `prime-agent` | [契约文档](docs/agents/prime-agent.md) | 任意（`models.json`） | stdio + HTTP | `models.json` + `settings.json` `mcpServers` 片段；v1 拒绝 provider headers |
 | `deepseek-harness` | [deepseek-ai/deepseek-harness](https://github.com/deepseek-ai/deepseek-harness) | 任意（`api` 路由字段） | stdio（Cordis 补丁） | YAML provider 路由 + `@deepseek-ai/dsh-mcp-client` 补丁 |
 | `grok` | [xai-org/grok-build](https://github.com/xai-org/grok-build) | Chat · Responses · Anthropic | stdio + HTTP | 按模型拆 TOML 表；跨供应商重复模型 id 会被拒绝；headers 仅字面量 |
 | `kimi` | [MoonshotAI/kimi-code](https://github.com/MoonshotAI/kimi-code) | Chat · Responses · Anthropic | stdio + HTTP | 扁平 `[models]` 别名表；重复模型 id 与环境变量引用均拒绝 |
-| `zcode` | [zcode.z.ai](https://zcode.z.ai) | Chat · Responses · Anthropic | stdio | 闭源 CLI；MCP env/headers 仅支持字面量 |
-| `mimocode` | [XiaomiMiMo/MiMo-Code](https://github.com/XiaomiMiMo/MiMo-Code) | Chat · Responses · Anthropic | stdio + HTTP | 单个 JSON 片段，对齐官方线上 schema |
-| `jcode` | [1jehuang/jcode](https://github.com/1jehuang/jcode) | Chat · Anthropic | stdio + HTTP | 仅自定义供应商；Responses API 仅内置供应商可用；headers 仅字面量 |
+| `zcode` | [zcode.z.ai](https://zcode.z.ai) | Chat · Anthropic | stdio + HTTP | 闭源 CLI；MCP env/headers 仅支持字面量 |
+| `mimocode` | [XiaomiMiMo/MiMo-Code](https://github.com/XiaomiMiMo/MiMo-Code) | Chat · Anthropic | stdio + HTTP | 单个 JSON 片段，对齐官方线上 schema |
+| `jcode` | [1jehuang/jcode](https://github.com/1jehuang/jcode) | Chat · Anthropic | stdio | 仅自定义供应商；Responses API 仅内置供应商可用；headers 仅字面量 |
 | `cline` | [cline/cline](https://github.com/cline/cline) | Chat · Responses · Anthropic | stdio + HTTP | `apiKey` 仅字面量（拒绝 `api_key_env`）；拒绝 MCP 环境变量引用；timeout 收敛到 1–3600 秒 |
 | `gajae` | [Yeachan-Heo/gajae-code](https://github.com/Yeachan-Heo/gajae-code) | Chat · Responses · Anthropic | stdio + HTTP | 三种协议 1:1 映射 |
 | `hermes` | [NousResearch/hermes-agent](https://github.com/NousResearch/hermes-agent) | Chat · Responses · Anthropic | stdio + HTTP | 不输出供应商显示 `name` |

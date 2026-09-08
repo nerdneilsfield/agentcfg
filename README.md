@@ -25,16 +25,16 @@ Design principles:
 
 | Target | Agent | Providers | MCP | Notes |
 |---|---|---|---|---|
-| `codex` | [openai/codex](https://github.com/openai/codex) | Responses only | stdio | `[model_providers]` TOML fragment; Codex requires the Responses API |
+| `codex` | [openai/codex](https://github.com/openai/codex) | Responses only | stdio + HTTP | `[model_providers]` TOML fragment; Codex requires the Responses API |
 | `opencode` | [sst/opencode](https://github.com/sst/opencode) | OpenAI-compatible only | stdio + HTTP | `provider` + `mcp` in `opencode.json`; Anthropic/Responses providers rejected in v1 |
-| `pi` | [earendil-works/pi](https://github.com/earendil-works/pi) | any (TypeScript extension) | via `pi-mcp-adapter` | emits a provider extension; defaults stay deferred until it is loaded |
-| `prime-agent` | [contract](docs/agents/prime-agent.md) | any (`models.json`) | stdio + HTTP | `models.json` + `settings.json` `mcpServers` fragments |
+| `pi` | [earendil-works/pi](https://github.com/earendil-works/pi) | any (TypeScript extension) | rejected in v1 (no built-in MCP) | emits a provider extension; header values use Pi `$NAME` syntax; defaults stay deferred until it is loaded |
+| `prime-agent` | [contract](docs/agents/prime-agent.md) | any (`models.json`) | stdio + HTTP | `models.json` + `settings.json` `mcpServers` fragments; provider headers rejected in v1 |
 | `deepseek-harness` | [deepseek-ai/deepseek-harness](https://github.com/deepseek-ai/deepseek-harness) | any (`api` route field) | stdio (Cordis patch) | YAML provider route + `@deepseek-ai/dsh-mcp-client` patch |
 | `grok` | [xai-org/grok-build](https://github.com/xai-org/grok-build) | Chat · Responses · Anthropic | stdio + HTTP | per-model TOML tables; duplicate model ids rejected; literal headers |
 | `kimi` | [MoonshotAI/kimi-code](https://github.com/MoonshotAI/kimi-code) | Chat · Responses · Anthropic | stdio + HTTP | flat `[models]` aliases; duplicate model ids and env refs rejected |
-| `zcode` | [zcode.z.ai](https://zcode.z.ai) | Chat · Responses · Anthropic | stdio | closed-source CLI; MCP env/headers are literal-only |
-| `mimocode` | [XiaomiMiMo/MiMo-Code](https://github.com/XiaomiMiMo/MiMo-Code) | Chat · Responses · Anthropic | stdio + HTTP | single JSON fragment against the official live schema |
-| `jcode` | [1jehuang/jcode](https://github.com/1jehuang/jcode) | Chat · Anthropic | stdio + HTTP | custom providers only; Responses API is built-in-provider-only; literal headers |
+| `zcode` | [zcode.z.ai](https://zcode.z.ai) | Chat · Anthropic | stdio + HTTP | closed-source CLI; MCP env/headers are literal-only |
+| `mimocode` | [XiaomiMiMo/MiMo-Code](https://github.com/XiaomiMiMo/MiMo-Code) | Chat · Anthropic | stdio + HTTP | single JSON fragment against the official live schema |
+| `jcode` | [1jehuang/jcode](https://github.com/1jehuang/jcode) | Chat · Anthropic | stdio | custom providers only; Responses API is built-in-provider-only; literal headers |
 | `cline` | [cline/cline](https://github.com/cline/cline) | Chat · Responses · Anthropic | stdio + HTTP | literal `apiKey` only (`api_key_env` rejected); MCP env refs rejected; timeout clamped to 1–3600 s |
 | `gajae` | [Yeachan-Heo/gajae-code](https://github.com/Yeachan-Heo/gajae-code) | Chat · Responses · Anthropic | stdio + HTTP | all three protocols map 1:1 |
 | `hermes` | [NousResearch/hermes-agent](https://github.com/NousResearch/hermes-agent) | Chat · Responses · Anthropic | stdio + HTTP | provider display `name` not emitted |

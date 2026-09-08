@@ -29,9 +29,9 @@ The installed `~/.prime/agent/models.json` is Pi-compatible. It contains a `prov
 }
 ```
 
-Unlike Pi's extension, the observed Prime registry accepts model records without Pi's required cost object. The v1 emitter maps all three IR protocols to the same Pi-AI names.
+Unlike Pi's extension, the observed Prime registry accepts model records without Pi's required cost object. The v1 emitter maps all three IR protocols to the same Pi-AI names. Provider records have no `headers` field, so IR provider headers are rejected in v1 rather than silently dropped.
 
-`~/.prime/agent/settings.json` has `defaultProvider` and `defaultModel`. The first version does not emit it: writing two separate JSON fragments to copy manually is error-prone and automatic merge is deliberately deferred.
+`~/.prime/agent/settings.json` has `defaultProvider` and `defaultModel`. The v1 emitter writes a `settings.json` fragment containing `mcpServers` (below) and, when `defaults.model` is present, `defaultProvider`/`defaultModel`. Automatic merge into an existing settings file is deliberately deferred, so the fragment is copied manually.
 
 ## MCP
 
@@ -55,7 +55,14 @@ The installed source declares `settings.json.mcpServers` as a map. Its verified 
 }
 ```
 
-The source also supports static HTTP `headers`, `oauth`, `enabled`, tool allow/deny lists, and startup/call timeouts. v1 maps only safe env-derived fields, `enabled`, and `timeout_ms` (to the target's start/call timeout policy when that policy is finalized). The CLI independently exposes `prime-agent mcp add`, including `--url`, `--bearer-token-env-var`, `--oauth`, and stdio `--env CHILD=SOURCE`.
+The source also supports static HTTP `headers`, `oauth`, `enabled`, tool allow/deny lists, and startup/call timeouts. v1 maps only safe env-derived fields, `enabled`, and `timeout_ms` (to the target's start/call timeout policy when that policy is finalized). Concretely, the v1 emitter writes `settings.json.mcpServers` with:
+
+- stdio `env` entries as `{ "env": "SOURCE" }` objects; renamed references (`CHILD` key mapping to a different `SOURCE` name) are representable, but literal values are rejected because only env-derived fields are verified;
+- static HTTP `headers` (constant values only; IR `from_env` header references are rejected because no env interpolation syntax is verified for MCP headers);
+- `bearerTokenEnvVar` from an `Authorization` IR `bearer_from_env` entry only; bearer references on other header names are rejected;
+- `enabled: false` when the IR server is disabled.
+
+The CLI independently exposes `prime-agent mcp add`, including `--url`, `--bearer-token-env-var`, `--oauth`, and stdio `--env CHILD=SOURCE`.
 
 ## Sources
 
