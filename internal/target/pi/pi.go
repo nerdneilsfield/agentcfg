@@ -21,10 +21,15 @@ func (Target) ID() string { return "pi" }
 func (t Target) Validate(cfg ir.Config) []diag.Diagnostic {
 	var diags []diag.Diagnostic
 	for i, p := range cfg.Providers {
+		if strings.HasPrefix(p.APIKey.Value, "$") || strings.HasPrefix(p.APIKey.Value, "!") {
+			diags = append(diags, diag.TargetErrorf(t.ID(), fmt.Sprintf("providers[%d].api_key", i), "literal API key contains native expression syntax and cannot be represented literally"))
+		}
+	}
+	for i, p := range cfg.Providers {
 		for name, v := range p.Headers {
 			if v.BearerFromEnv != "" {
 				diags = append(diags, diag.TargetErrorf(t.ID(), fmt.Sprintf("providers[%d].headers.%s", i, name),
-					"pi header values use the $NAME expression syntax; bearer_from_env has no verified bearer expansion and is rejected"))
+					"pi header values use the $NAME expression syntax; Bearer ENV:NAME has no verified bearer expansion and is rejected"))
 			}
 		}
 	}
@@ -46,8 +51,10 @@ func (t Target) Emit(cfg ir.Config) ([]artifact.Artifact, error) {
 		fmt.Fprintf(&b, "    name: %q,\n", orDefault(p.Name, p.ID))
 		fmt.Fprintf(&b, "    api: %q,\n", string(p.Protocol))
 		fmt.Fprintf(&b, "    baseUrl: %q,\n", p.BaseURL)
-		if p.APIKeyEnv != "" {
-			fmt.Fprintf(&b, "    apiKey: \"$%s\",\n", p.APIKeyEnv)
+		if p.APIKey.FromEnv != "" {
+			fmt.Fprintf(&b, "    apiKey: \"$%s\",\n", p.APIKey.FromEnv)
+		} else if p.APIKey.Value != "" {
+			fmt.Fprintf(&b, "    apiKey: %q,\n", p.APIKey.Value)
 		} else {
 			b.WriteString("    apiKey: \"\",\n")
 		}

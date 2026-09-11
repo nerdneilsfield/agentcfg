@@ -63,6 +63,9 @@ func Validate(cfg Config) []diag.Diagnostic {
 		if len(p.Models) == 0 {
 			diags = append(diags, diag.Errorf(path+".models", "at least one model is required"))
 		}
+		if p.APIKey.BearerFromEnv != "" {
+			diags = append(diags, diag.Errorf(path+".api_key", "Bearer ENV: is only valid for HTTP Authorization headers"))
+		}
 		diags = append(diags, validateHeaderValues(path+".headers", p.Headers)...)
 
 		modelIDs := map[string]bool{}
@@ -102,7 +105,7 @@ func Validate(cfg Config) []diag.Diagnostic {
 			}
 			for name, v := range s.Env {
 				if v.BearerFromEnv != "" {
-					diags = append(diags, diag.Errorf(path+".env."+name, "bearer_from_env is only valid for HTTP Authorization headers"))
+					diags = append(diags, diag.Errorf(path+".env."+name, "Bearer ENV: is only valid for HTTP Authorization headers"))
 				}
 			}
 		case TransportHTTP:
@@ -154,19 +157,9 @@ func Validate(cfg Config) []diag.Diagnostic {
 func validateHeaderValues(path string, headers map[string]HeaderValue) []diag.Diagnostic {
 	var diags []diag.Diagnostic
 	for name, v := range headers {
-		set := 0
-		for _, s := range []string{v.Value, v.FromEnv, v.BearerFromEnv} {
-			if s != "" {
-				set++
-			}
-		}
 		hpath := path + "." + name
-		if set != 1 {
-			diags = append(diags, diag.Errorf(hpath, "exactly one of value, from_env, bearer_from_env is required"))
-			continue
-		}
 		if v.BearerFromEnv != "" && name != "Authorization" {
-			diags = append(diags, diag.Errorf(hpath, "bearer_from_env is only valid for the Authorization header"))
+			diags = append(diags, diag.Errorf(hpath, "Bearer ENV: is only valid for the Authorization header"))
 		}
 	}
 	return diags

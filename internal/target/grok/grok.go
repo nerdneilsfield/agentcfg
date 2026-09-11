@@ -56,7 +56,7 @@ func (t Target) Validate(cfg ir.Config) []diag.Diagnostic {
 			for name, v := range srv.Headers {
 				if v.BearerFromEnv != "" && name != "Authorization" {
 					diags = append(diags, diag.TargetErrorf(t.ID(), path+".headers."+name,
-						"grok bearer_token_env_var applies to Authorization only; use a constant value or from_env for other headers"))
+						"grok bearer_token_env_var applies to Authorization only; use a constant value or ENV:NAME for other headers"))
 				}
 			}
 		}
@@ -80,15 +80,14 @@ func (t Target) Emit(cfg ir.Config) ([]artifact.Artifact, error) {
 		backend := apiBackend[p.Protocol]
 		headers := map[string]string{}
 		for name, v := range p.Headers {
-			if v.Value != "" {
-				headers[name] = v.Value
-			}
+			headers[name] = v.Value
 		}
 		for _, m := range p.Models {
 			gm := grokModel{
 				Model:      m.ID,
 				BaseURL:    p.BaseURL,
-				EnvKey:     p.APIKeyEnv,
+				EnvKey:     p.APIKey.FromEnv,
+				APIKey:     p.APIKey.Value,
 				APIBackend: backend,
 			}
 			if m.Name != "" {
@@ -191,6 +190,7 @@ type grokModels struct {
 }
 
 type grokModel struct {
+	APIKey              string            `toml:"api_key,omitempty"`
 	Model               string            `toml:"model"`
 	BaseURL             string            `toml:"base_url"`
 	Name                string            `toml:"name,omitempty"`

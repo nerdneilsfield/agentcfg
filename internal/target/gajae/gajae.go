@@ -39,7 +39,7 @@ func (t Target) Validate(cfg ir.Config) []diag.Diagnostic {
 		for name, v := range p.Headers {
 			if v.BearerFromEnv != "" {
 				diags = append(diags, diag.TargetErrorf(t.ID(), path+".headers."+name,
-					"gajae provider headers are flat strings with no bearer-from-env convention; use from_env or a constant value"))
+					"gajae provider headers are flat strings with no bearer-from-env convention; use ENV:NAME or a constant value"))
 			}
 		}
 		for j, m := range p.Models {
@@ -62,7 +62,8 @@ func (t Target) Emit(cfg ir.Config) ([]artifact.Artifact, error) {
 		gp := gajaeProvider{
 			BaseURL:   p.BaseURL,
 			API:       apiName[p.Protocol],
-			APIKeyEnv: p.APIKeyEnv,
+			APIKeyEnv: p.APIKey.FromEnv,
+			APIKey:    p.APIKey.Value,
 		}
 		if len(p.Headers) > 0 {
 			headers := map[string]string{}
@@ -205,7 +206,7 @@ func (t Target) Emit(cfg ir.Config) ([]artifact.Artifact, error) {
 
 // headerValue renders provider header values for models.yml. Gajae
 // resolves values with env-name-or-literal semantics (a value matching a
-// set environment variable is replaced by it), so an IR from_env maps to a
+// set environment variable is replaced by it), so an IR ENV:NAME maps to a
 // bare environment variable name.
 func headerValue(v ir.HeaderValue) string {
 	if v.FromEnv != "" {
@@ -227,6 +228,7 @@ func envValue(v ir.HeaderValue) string {
 }
 
 type gajaeProvider struct {
+	APIKey    string            `yaml:"apiKey,omitempty"`
 	BaseURL   string            `yaml:"baseUrl"`
 	API       string            `yaml:"api,omitempty"`
 	APIKeyEnv string            `yaml:"apiKeyEnv,omitempty"`

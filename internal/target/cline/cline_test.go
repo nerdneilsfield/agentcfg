@@ -37,11 +37,11 @@ func exampleConfig() ir.Config {
 	return ir.Config{
 		Version: 1,
 		Providers: []ir.Provider{{
-			ID:        "volcengine",
-			Name:      "Volcengine",
-			Protocol:  ir.ProtocolOpenAICompletions,
-			BaseURL:   "https://example.com/v1",
-			APIKeyEnv: "VOLC_API_KEY",
+			ID:       "volcengine",
+			Name:     "Volcengine",
+			Protocol: ir.ProtocolOpenAICompletions,
+			BaseURL:  "https://example.com/v1",
+			APIKey:   ir.HeaderValue{FromEnv: "VOLC_API_KEY"},
 			Headers: map[string]ir.HeaderValue{
 				"X-Tenant":      {Value: "engineering"},
 				"X-Gateway-Key": {FromEnv: "GATEWAY_KEY"},
@@ -80,7 +80,7 @@ func exampleConfig() ir.Config {
 func TestEmitGolden(t *testing.T) {
 	// cline rejects api_key_env and env-derived headers: use a clean config.
 	cfg := exampleConfig()
-	cfg.Providers[0].APIKeyEnv = ""
+	cfg.Providers[0].APIKey.FromEnv = ""
 	delete(cfg.Providers[0].Headers, "X-Gateway-Key")
 	cfg.MCP[0].Env["CONTEXT7_API_KEY"] = ir.HeaderValue{Value: "literal-key"}
 	cfg.MCP[1].Headers["Authorization"] = ir.HeaderValue{Value: "Bearer literal-token"}
@@ -193,20 +193,20 @@ func TestRejectsAPIKeyEnv(t *testing.T) {
 
 func TestRejectsEnvDerivedProviderHeaders(t *testing.T) {
 	cfg := exampleConfig()
-	cfg.Providers[0].APIKeyEnv = ""
+	cfg.Providers[0].APIKey.FromEnv = ""
 	expectInvalid(t, cfg, "literal strings")
 }
 
 func TestRejectsMCPEnvRef(t *testing.T) {
 	cfg := exampleConfig()
-	cfg.Providers[0].APIKeyEnv = ""
+	cfg.Providers[0].APIKey.FromEnv = ""
 	delete(cfg.Providers[0].Headers, "X-Gateway-Key")
 	expectInvalid(t, cfg, "literal strings")
 }
 
 func TestRejectsTimeoutOutOfRange(t *testing.T) {
 	cfg := exampleConfig()
-	cfg.Providers[0].APIKeyEnv = ""
+	cfg.Providers[0].APIKey.FromEnv = ""
 	delete(cfg.Providers[0].Headers, "X-Gateway-Key")
 	cfg.MCP[0].Env["CONTEXT7_API_KEY"] = ir.HeaderValue{Value: "literal-key"}
 	cfg.MCP[0].TimeoutMS = i64(10)
@@ -215,7 +215,7 @@ func TestRejectsTimeoutOutOfRange(t *testing.T) {
 
 func TestOmitsMCPArtifactWhenEmpty(t *testing.T) {
 	cfg := exampleConfig()
-	cfg.Providers[0].APIKeyEnv = ""
+	cfg.Providers[0].APIKey.FromEnv = ""
 	delete(cfg.Providers[0].Headers, "X-Gateway-Key")
 	cfg.MCP = nil
 	expectValid(t, cfg)

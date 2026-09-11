@@ -7,6 +7,10 @@
 
 ## Provider route
 
+An IR literal such as `api_key: "example-key"` is emitted in the native
+`api_key` field. The example key is a placeholder; real literals also appear in
+generated output.
+
 Custom providers live under `providers.<id>` (`ProviderConfig`, `additionalProperties: false`):
 
 ```json
@@ -37,8 +41,8 @@ Custom providers live under `providers.<id>` (`ProviderConfig`, `additionalPrope
 ```
 
 - `type` enum includes `openai` (Responses API), `openai-compat` (Chat Completions), `anthropic`, and several hosted backends. IR `openai-completions` maps to `openai-compat`; `openai-responses` maps to `openai`; `anthropic-messages` maps to `anthropic`. Crush `type=openai` always calls the Responses API, so a completions-only gateway should use `openai-completions` instead.
-- `api_key` is a string whose documented example is `"$OPENAI_API_KEY"`; IR `api_key_env` maps to `"$VAR"` and no secret is rendered.
-- `extra_headers` is a flat `Record<string,string>`. IR `from_env` renders as `"$VAR"`; `Authorization.bearer_from_env` as `"Bearer ${VAR}"`. `bearer_from_env` on any other header name is rejected. Explicit model lists set `discover_models: false` so Catwalk cannot merge unexpected models.
+- `api_key` is a string whose documented example is `"$OPENAI_API_KEY"`; IR `api_key: "ENV:NAME"` maps to `"$VAR"` without resolving the reference.
+- `extra_headers` is a flat `Record<string,string>`. IR `ENV:NAME` renders as `"$VAR"`; `Authorization: "Bearer ENV:NAME"` as `"Bearer ${VAR}"`. `Bearer ENV:NAME` on any other header name is rejected. Explicit model lists set `discover_models: false` so Catwalk cannot merge unexpected models.
 - Model schema **requires** `id`, `name`, `context_window`, `default_max_tokens`, `can_reason`, `supports_attachments`, and four cost fields. The emitter writes `cost_per_1m_*` as `0` (IR has no cost fields). Missing `context_window` or `max_output_tokens` is rejected. `can_reason` comes from IR `reasoning`; `supports_attachments` is true when IR input includes `image`. IR `tool_calling` and output modalities have no Crush field and are not emitted.
 
 ## Defaults

@@ -7,6 +7,10 @@
 
 ## Provider route
 
+An IR literal such as `api_key: "example-key"` is emitted in the native
+`apiKey` field. The example key is a placeholder; real literals also appear in
+generated output.
+
 Pi does not use a static provider section in `settings.json`. A custom route is registered by a TypeScript extension through `pi.registerProvider()`:
 
 ```ts
@@ -31,7 +35,7 @@ export default function (pi: ExtensionAPI) {
 }
 ```
 
-Pi's declarative custom-provider API requires `api`, model `input`, `cost`, `contextWindow`, and `maxTokens`; agentcfg supplies zero costs because source configuration has no pricing scope. `tool_calling` has no corresponding Pi model field. Provider header values use Pi's `$NAME` expression syntax: IR `value` headers are emitted as constants and `from_env` headers as `$NAME`. IR `bearer_from_env` has no verified Pi bearer expansion and is rejected.
+Pi's declarative custom-provider API requires `api`, model `input`, `cost`, `contextWindow`, and `maxTokens`; agentcfg supplies zero costs because source configuration has no pricing scope. `tool_calling` has no corresponding Pi model field. Provider header values use Pi's `$NAME` expression syntax: IR literal headers are emitted as constants and `ENV:NAME` headers as `$NAME`. IR `Bearer ENV:NAME` has no verified Pi bearer expansion and is rejected.
 
 The v1 Pi emitter supports all three IR protocols by mapping them to Pi's `openai-completions`, `openai-responses`, and `anthropic-messages` API names.
 

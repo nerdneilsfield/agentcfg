@@ -7,6 +7,10 @@
 
 ## Provider route
 
+An IR literal such as `api_key: "example-key"` is emitted in the native
+`options.apiKey` field. The example key is a placeholder; real literals also appear in
+generated output.
+
 ZCode uses `provider.<id>` objects with a `kind` discriminator, `options`, and an inline `models` catalog:
 
 ```json
@@ -36,7 +40,7 @@ ZCode uses `provider.<id>` objects with a `kind` discriminator, `options`, and a
 
 `kind` is `anthropic` | `openai` | `openai-compatible`. IR `anthropic-messages` and `openai-completions` map to `anthropic` / `openai-compatible`. IR `openai-responses` has no native location for custom providers and is rejected.
 
-`options.apiKey` is a literal string with **no** user-level `${ENV}` expansion, so IR `api_key_env` is rejected (never render a secret inline). `headers` values are literal; IR `from_env`/`bearer_from_env` provider headers are rejected.
+`options.apiKey` is a literal string with **no** user-level `${ENV}` expansion, so IR `api_key: "ENV:NAME"` is rejected. `headers` values are literal; IR `ENV:NAME`/`Bearer ENV:NAME` provider headers are rejected.
 
 Model `limit`, `modalities`, `reasoning`, and `tool_call` are emitted natively from the IR (`reasoning`/`tool_call` only when set).
 
@@ -44,7 +48,7 @@ Model `limit`, `modalities`, `reasoning`, and `tool_call` are emitted natively f
 
 ZCode uses `mcp.servers.<id>` with `type` `stdio` (`command`, `args`, `env`, `cwd`) or `http`/`sse` (`url`, `headers`, `oauth`), plus shared `enabled` and `timeoutMs`.
 
-MCP `env` and `headers` values are literal strings with no documented expansion, so IR `from_env`/`bearer_from_env` MCP references are rejected.
+MCP `env` and `headers` values are literal strings with no documented expansion, so IR `ENV:NAME`/`Bearer ENV:NAME` MCP references are rejected.
 
 ## Defaults
 

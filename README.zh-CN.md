@@ -13,8 +13,8 @@ agentcfg 把一份 `agentcfg.yaml` 编译成各编码智能体 CLI 的原生配�
 
 设计原则：
 
-- **不碰密钥。** 配置只引用环境变量（`from_env`、`api_key_env`、
-  `bearer_from_env`）；agentcfg 既不读取也不写出任何密钥值。
+- **显式配置凭据。** 使用字符串字面量或 `ENV:NAME` 引用。
+  agentcfg 不解析环境变量引用；字面量会按原值写入生成结果。
 - **只写 stdout。** `gen` 只打印片段，从不写目标文件。你先审阅，再自行合并
   进原生配置。
 - **绝不瞎猜。** 当某个 target 无法表示 IR 中的字段时，emitter 会带诊断信息
@@ -34,7 +34,7 @@ agentcfg 把一份 `agentcfg.yaml` 编译成各编码智能体 CLI 的原生配�
 | `zcode` | [zcode.z.ai](https://zcode.z.ai) | Chat · Anthropic | stdio + HTTP | 闭源 CLI；MCP env/headers 仅支持字面量 |
 | `mimocode` | [XiaomiMiMo/MiMo-Code](https://github.com/XiaomiMiMo/MiMo-Code) | Chat · Anthropic | stdio + HTTP | 单个 JSON 片段，对齐官方线上 schema |
 | `jcode` | [1jehuang/jcode](https://github.com/1jehuang/jcode) | Chat · Anthropic | stdio | 仅自定义供应商；Responses API 仅内置供应商可用；headers 仅字面量 |
-| `cline` | [cline/cline](https://github.com/cline/cline) | Chat · Responses · Anthropic | stdio + HTTP | `apiKey` 仅字面量（拒绝 `api_key_env`）；拒绝 MCP 环境变量引用；timeout 收敛到 1–3600 秒 |
+| `cline` | [cline/cline](https://github.com/cline/cline) | Chat · Responses · Anthropic | stdio + HTTP | `apiKey` 仅字面量（拒绝 `api_key: "ENV:NAME"`）；拒绝 MCP 环境变量引用；timeout 收敛到 1–3600 秒 |
 | `gajae` | [Yeachan-Heo/gajae-code](https://github.com/Yeachan-Heo/gajae-code) | Chat · Responses · Anthropic | stdio + HTTP | 三种协议 1:1 映射 |
 | `hermes` | [NousResearch/hermes-agent](https://github.com/NousResearch/hermes-agent) | Chat · Responses · Anthropic | stdio + HTTP | 不输出供应商显示 `name` |
 | `openclaw` | [openclaw/openclaw](https://github.com/openclaw/openclaw) | Chat · Responses · Anthropic | stdio + HTTP | 原生 JSON5；绝不写 agent 本地 `models.json` |
@@ -85,6 +85,9 @@ cd agentcfg && make build   # 产出 ./agentcfg
 
 ## 快速上手
 
+输入中的密钥字面量也会出现在生成结果中。请勿将这类输入和输出提交到 Git 或写入日志。
+目标支持环境变量引用时，建议使用 `ENV:NAME`。
+
 1. 在项目旁写一份 `agentcfg.yaml`（完整字段说明见
    [`docs/protocol.md`](docs/protocol.md)）。仓库自带一份完整的
    [`example.yaml`](example.yaml)，也可以用 `agentcfg gen-example -o agentcfg.yaml`
@@ -100,10 +103,9 @@ providers:
     name: Volcengine
     protocol: openai-completions
     base_url: https://example.com/v1
-    api_key_env: VOLC_API_KEY
+    api_key: "ENV:VOLC_API_KEY"
     headers:
-      X-Tenant:
-        value: engineering
+      X-Tenant: "engineering"
     models:
       - id: glm-5.3
         name: GLM-5.3
@@ -119,14 +121,12 @@ mcp:
     transport: stdio
     command: [npx, -y, "@upstash/context7-mcp"]
     env:
-      CONTEXT7_API_KEY:
-        from_env: CONTEXT7_API_KEY
+      CONTEXT7_API_KEY: "ENV:CONTEXT7_API_KEY"
   - id: github
     transport: http
     url: https://api.githubcopilot.com/mcp/
     headers:
-      Authorization:
-        bearer_from_env: GITHUB_TOKEN
+      Authorization: "Bearer ENV:GITHUB_TOKEN"
 
 defaults:
   model: volcengine/glm-5.3

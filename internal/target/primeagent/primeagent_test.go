@@ -35,10 +35,10 @@ func exampleConfig() ir.Config {
 	return ir.Config{
 		Version: 1,
 		Providers: []ir.Provider{{
-			ID:        "volcengine",
-			Protocol:  ir.ProtocolOpenAICompletions,
-			BaseURL:   "https://example.com/v1",
-			APIKeyEnv: "VOLC_API_KEY",
+			ID:       "volcengine",
+			Protocol: ir.ProtocolOpenAICompletions,
+			BaseURL:  "https://example.com/v1",
+			APIKey:   ir.HeaderValue{FromEnv: "VOLC_API_KEY"},
 			Models: []ir.Model{{
 				ID:            "glm-5.3",
 				ContextWindow: i64(128000),

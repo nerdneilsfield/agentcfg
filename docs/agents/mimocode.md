@@ -9,6 +9,10 @@ Note: the npm package `mimocode` by `eurocybersecurite` is an unrelated name col
 
 ## Provider route
 
+An IR literal such as `api_key: "example-key"` is emitted in the native
+`options.apiKey` field. The example key is a placeholder; real literals also appear in
+generated output.
+
 MiMo Code (an opencode fork) uses AI SDK provider packages selected by an `npm` field:
 
 ```json
@@ -41,10 +45,10 @@ Protocol mapping: `openai-completions` → `@ai-sdk/openai-compatible`, `anthrop
 
 **Environment interpolation is the key advantage of this target:** MiMo Code substitutes `{env:VAR}` and `{file:path}` across the entire raw config text before parsing (verified in `config/variable.ts`). Therefore:
 
-- IR `api_key_env` → `"apiKey": "{env:VAR}"` (native, no secret rendered).
-- IR `from_env` headers → `"{env:VAR}"` values.
-- IR `bearer_from_env` → `"Bearer {env:VAR}"`.
-- MCP env `from_env` → `"{env:VAR}"` values.
+- IR `api_key: "ENV:NAME"` → `"apiKey": "{env:VAR}"` (native environment reference).
+- IR `ENV:NAME` headers → `"{env:VAR}"` values.
+- IR `Bearer ENV:NAME` → `"Bearer {env:VAR}"`.
+- MCP env `ENV:NAME` → `"{env:VAR}"` values.
 
 An unset variable expands to the empty string.
 

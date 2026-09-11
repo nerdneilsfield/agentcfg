@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"agentcfg/internal/artifact"
 	"agentcfg/internal/diag"
@@ -27,6 +28,11 @@ var npmByProtocol = map[ir.Protocol]string{
 func (t Target) Validate(cfg ir.Config) []diag.Diagnostic {
 	var diags []diag.Diagnostic
 	for i, p := range cfg.Providers {
+		if strings.Contains(p.APIKey.Value, "{env:") || strings.Contains(p.APIKey.Value, "{file:") {
+			diags = append(diags, diag.TargetErrorf(t.ID(), fmt.Sprintf("providers[%d].api_key", i), "literal API key contains native expression syntax and cannot be represented literally"))
+		}
+	}
+	for i, p := range cfg.Providers {
 		path := fmt.Sprintf("providers[%d]", i)
 		if p.Protocol == ir.ProtocolOpenAIResponses {
 			diags = append(diags, diag.TargetErrorf(t.ID(), path+".protocol",
@@ -46,8 +52,10 @@ func (t Target) Emit(cfg ir.Config) ([]artifact.Artifact, error) {
 	}
 	for _, p := range cfg.Providers {
 		opts := map[string]any{"baseURL": p.BaseURL}
-		if p.APIKeyEnv != "" {
-			opts["apiKey"] = "{env:" + p.APIKeyEnv + "}"
+		if p.APIKey.FromEnv != "" {
+			opts["apiKey"] = "{env:" + p.APIKey.FromEnv + "}"
+		} else if p.APIKey.Value != "" {
+			opts["apiKey"] = p.APIKey.Value
 		}
 		if len(p.Headers) > 0 {
 			headers := map[string]string{}

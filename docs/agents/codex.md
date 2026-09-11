@@ -7,7 +7,12 @@
 
 ## Provider route
 
-Codex uses `[model_providers.<id>]`. The official reference documents `name`, `base_url`, `env_key`, `wire_api`, `http_headers`, `env_http_headers`, and `query_params`.
+IR `api_key: "ENV:NAME"` maps to native `env_key`. A literal such as
+`api_key: "example-key"` maps to `experimental_bearer_token`, which Codex uses
+in the `Authorization: Bearer <token>` header. Codex recommends `env_key` for
+security; a literal key appears in generated output.
+
+Codex uses `[model_providers.<id>]`. The official reference documents `name`, `base_url`, `env_key`, `experimental_bearer_token`, `wire_api`, `http_headers`, `env_http_headers`, and `query_params`.
 
 ```toml
 [model_providers.volcengine]
@@ -39,7 +44,7 @@ url = "https://api.githubcopilot.com/mcp/"
 bearer_token_env_var = "GITHUB_TOKEN"
 ```
 
-The reference documents `command`, `args`, `url`, `enabled`, `required`, `env`, `env_vars`, `cwd`, `bearer_token_env_var`, `http_headers`, `env_http_headers`, `startup_timeout_sec`, and `tool_timeout_sec`. v1 maps a same-name environment reference through `env_vars`, a non-secret child value through `env`; a renamed environment reference is rejected because `env_vars` inherits only same-name variables. It maps `Authorization.bearer_from_env` through `bearer_token_env_var`; other static and environment-derived HTTP headers map to `http_headers` and `env_http_headers`. No secret value is ever rendered.
+The reference documents `command`, `args`, `url`, `enabled`, `required`, `env`, `env_vars`, `cwd`, `bearer_token_env_var`, `http_headers`, `env_http_headers`, `startup_timeout_sec`, and `tool_timeout_sec`. v1 maps a same-name environment reference through `env_vars`, a literal child value through `env`; a renamed environment reference is rejected because `env_vars` inherits only same-name variables. It maps `Authorization: "Bearer ENV:NAME"` through `bearer_token_env_var`; other static and environment-derived HTTP headers map to `http_headers` and `env_http_headers`. Literal values are rendered as supplied; environment references are not resolved by agentcfg.
 
 ## Defaults
 
@@ -47,5 +52,6 @@ Codex's top-level `model` selects a model string, but a custom provider also req
 
 ## Sources
 
+- https://raw.githubusercontent.com/openai/codex/main/codex-rs/core/config.schema.json (`ModelProviderInfo.experimental_bearer_token`)
 - https://openai-codex.mintlify.app/configuration/reference
 - Local `codex mcp add --help` (0.153.4)

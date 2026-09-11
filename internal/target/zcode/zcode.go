@@ -35,9 +35,9 @@ func (t Target) Validate(cfg ir.Config) []diag.Diagnostic {
 			diags = append(diags, diag.TargetErrorf(t.ID(), path+".protocol",
 				"zcode provider kind must be anthropic, openai, or openai-compatible; got %q", p.Protocol))
 		}
-		if p.APIKeyEnv != "" {
-			diags = append(diags, diag.TargetErrorf(t.ID(), path+".api_key_env",
-				"zcode stores inline apiKey strings only with no env interpolation; api_key_env is not representable"))
+		if p.APIKey.FromEnv != "" {
+			diags = append(diags, diag.TargetErrorf(t.ID(), path+".api_key",
+				"zcode stores inline apiKey strings only with no env interpolation; api_key environment references are not representable"))
 		}
 		for name, v := range p.Headers {
 			if v.FromEnv != "" || v.BearerFromEnv != "" {
@@ -71,12 +71,13 @@ func (t Target) Emit(cfg ir.Config) ([]artifact.Artifact, error) {
 	servers := map[string]any{}
 	for _, p := range cfg.Providers {
 		opts := map[string]any{"baseURL": p.BaseURL}
+		if p.APIKey.Value != "" {
+			opts["apiKey"] = p.APIKey.Value
+		}
 		if len(p.Headers) > 0 {
 			headers := map[string]string{}
 			for name, v := range p.Headers {
-				if v.Value != "" {
-					headers[name] = v.Value
-				}
+				headers[name] = v.Value
 			}
 			if len(headers) > 0 {
 				opts["headers"] = headers

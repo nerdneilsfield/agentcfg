@@ -14,8 +14,8 @@ render them for every supported CLI.
 
 Design principles:
 
-- **No secrets.** The config references environment variables (`from_env`,
-  `api_key_env`, `bearer_from_env`); agentcfg never reads or writes key values.
+- **Explicit credentials.** Use string literals or `ENV:NAME` references.
+  agentcfg never resolves environment references; it emits literals as supplied.
 - **stdout only.** `gen` prints fragments; it never writes target files. You
   review, then merge them into the native config yourself.
 - **Never guess.** When a target cannot represent an IR field, the emitter
@@ -35,7 +35,7 @@ Design principles:
 | `zcode` | [zcode.z.ai](https://zcode.z.ai) | Chat · Anthropic | stdio + HTTP | closed-source CLI; MCP env/headers are literal-only |
 | `mimocode` | [XiaomiMiMo/MiMo-Code](https://github.com/XiaomiMiMo/MiMo-Code) | Chat · Anthropic | stdio + HTTP | single JSON fragment against the official live schema |
 | `jcode` | [1jehuang/jcode](https://github.com/1jehuang/jcode) | Chat · Anthropic | stdio | custom providers only; Responses API is built-in-provider-only; literal headers |
-| `cline` | [cline/cline](https://github.com/cline/cline) | Chat · Responses · Anthropic | stdio + HTTP | literal `apiKey` only (`api_key_env` rejected); MCP env refs rejected; timeout clamped to 1–3600 s |
+| `cline` | [cline/cline](https://github.com/cline/cline) | Chat · Responses · Anthropic | stdio + HTTP | literal `apiKey` only (`api_key: "ENV:NAME"` rejected); MCP env refs rejected; timeout clamped to 1–3600 s |
 | `gajae` | [Yeachan-Heo/gajae-code](https://github.com/Yeachan-Heo/gajae-code) | Chat · Responses · Anthropic | stdio + HTTP | all three protocols map 1:1 |
 | `hermes` | [NousResearch/hermes-agent](https://github.com/NousResearch/hermes-agent) | Chat · Responses · Anthropic | stdio + HTTP | provider display `name` not emitted |
 | `openclaw` | [openclaw/openclaw](https://github.com/openclaw/openclaw) | Chat · Responses · Anthropic | stdio + HTTP | JSON5 native; never write the agent-local `models.json` |
@@ -88,6 +88,9 @@ cd agentcfg && make build   # produces ./agentcfg
 
 ## Quick start
 
+Literal secrets in the input also appear in generated output. Keep both out of
+Git and logs. Prefer `ENV:NAME` when the target supports environment references.
+
 1. Write `agentcfg.yaml` next to your project (full field reference:
    [`docs/protocol.md`](docs/protocol.md)). The repository ships a complete
    [`example.yaml`](example.yaml), and `agentcfg gen-example -o agentcfg.yaml`
@@ -103,10 +106,9 @@ providers:
     name: Volcengine
     protocol: openai-completions
     base_url: https://example.com/v1
-    api_key_env: VOLC_API_KEY
+    api_key: "ENV:VOLC_API_KEY"
     headers:
-      X-Tenant:
-        value: engineering
+      X-Tenant: "engineering"
     models:
       - id: glm-5.3
         name: GLM-5.3
@@ -122,14 +124,12 @@ mcp:
     transport: stdio
     command: [npx, -y, "@upstash/context7-mcp"]
     env:
-      CONTEXT7_API_KEY:
-        from_env: CONTEXT7_API_KEY
+      CONTEXT7_API_KEY: "ENV:CONTEXT7_API_KEY"
   - id: github
     transport: http
     url: https://api.githubcopilot.com/mcp/
     headers:
-      Authorization:
-        bearer_from_env: GITHUB_TOKEN
+      Authorization: "Bearer ENV:GITHUB_TOKEN"
 
 defaults:
   model: volcengine/glm-5.3

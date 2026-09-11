@@ -27,8 +27,9 @@ Custom providers are declarative JSON files (`DeclarativeProviderConfig` in `cra
 
 - `engine` is `openai` / `anthropic` / `ollama` (with `*_compatible` aliases). IR `openai-completions` and `openai-responses` → `openai`; `anthropic-messages` → `anthropic`.
 - Chat vs Responses is **not** an engine: OpenAI custom providers pick it via `base_path` (`from_declarative_config` in `openai.rs`). IR `openai-responses` emits `base_path: "v1/responses"`; an explicit `base_path` replaces the `base_url` path entirely, so no path doubling. IR `openai-completions` omits `base_path` and lets Goose derive it from `base_url` (`derive_base_path`). Note the Go-side caveat: with the derived default path, Goose routes `o*` / `gpt-5*` model names to the Responses API (`should_use_responses_api`); completions-only gateways serving those names need a custom `base_path` outside this emitter's scope.
-- `api_key_env` is native; IR `api_key_env` maps directly. `requires_auth` is true when an env key is present.
-- Provider `headers` are literal strings with no interpolation; IR `from_env` / `bearer_from_env` provider headers are rejected. Constant `value` headers are emitted.
+- Literal IR API keys are rejected: the verified custom-provider field accepts an environment-variable name, not a literal key.
+- `api_key_env` is native; IR `api_key: "ENV:NAME"` maps directly. `requires_auth` is true when an env key is present.
+- Provider `headers` are literal strings with no interpolation; IR `ENV:NAME` / `Bearer ENV:NAME` provider headers are rejected. Literal headers are emitted.
 - Models are `{name, context_limit, reasoning}`. IR model `id` maps to `name`; `context_window` → `context_limit`; `reasoning` → `reasoning`. `dynamic_models: false` so Goose uses the static list (construction fails if models is empty).
 - Rejected as unrepresentable: per-model `max_output_tokens` (goose only has the global `GOOSE_MAX_TOKENS`; never silently apply it globally), any non-text input/output modality, and `tool_calling: false` (goose agents always expose tools).
 
@@ -51,6 +52,6 @@ providers:
 
 Goose MCP servers are `extensions.<id>` in `config.yaml`:
 
-- stdio: `type: stdio`, `cmd`, `args`, `envs` (literal map), `env_keys` (names resolved from env then the Goose secret store), `cwd`, `timeout` (seconds). IR `from_env` MCP env values become `env_keys` entries; literal `value` env values become `envs`. `bearer_from_env` on MCP env is rejected.
-- http: `type: streamable_http`, `uri`, `headers`. `$VAR` / `${VAR}` substitution runs on `uri`, header values, `cwd`, and `socket` from the merged env map, so IR `from_env` renders as `${VAR}` and `Authorization.bearer_from_env` as `Bearer ${VAR}` — and each referenced name is also added to `env_keys` so substitution can resolve it.
+- stdio: `type: stdio`, `cmd`, `args`, `envs` (literal map), `env_keys` (names resolved from env then the Goose secret store), `cwd`, `timeout` (seconds). IR `ENV:NAME` MCP env values become `env_keys` entries; literal env values become `envs`. `Bearer ENV:NAME` on MCP env is rejected.
+- http: `type: streamable_http`, `uri`, `headers`. `$VAR` / `${VAR}` substitution runs on `uri`, header values, `cwd`, and `socket` from the merged env map, so IR `ENV:NAME` renders as `${VAR}` and `Authorization: "Bearer ENV:NAME"` as `Bearer ${VAR}` — and each referenced name is also added to `env_keys` so substitution can resolve it.
 - `enabled` maps 1:1; `timeout_ms` must be divisible by 1000 (whole seconds) and is rejected otherwise. Builtin / platform extensions are not in IR scope and are not emitted.

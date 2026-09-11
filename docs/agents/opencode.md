@@ -8,6 +8,10 @@
 
 ## Provider route
 
+An IR literal such as `api_key: "example-key"` is emitted in the native
+`options.apiKey` field. The example key is a placeholder; real literals also appear in
+generated output.
+
 For OpenAI-compatible routes OpenCode uses the AI SDK adapter package:
 
 ```json

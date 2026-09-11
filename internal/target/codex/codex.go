@@ -31,7 +31,7 @@ func (t Target) Validate(cfg ir.Config) []diag.Diagnostic {
 		for name, v := range p.Headers {
 			if v.BearerFromEnv != "" {
 				diags = append(diags, diag.TargetErrorf(t.ID(), path+".headers."+name,
-					"codex model_providers has no bearer field; use env_http_headers with from_env"))
+					"codex model_providers has no bearer field; use ENV:NAME for env_http_headers"))
 			}
 		}
 	}
@@ -53,7 +53,7 @@ func (t Target) Validate(cfg ir.Config) []diag.Diagnostic {
 			for name, v := range s.Headers {
 				if v.BearerFromEnv != "" && name != "Authorization" {
 					diags = append(diags, diag.TargetErrorf(t.ID(), path+".headers."+name,
-						"codex bearer_token_env_var applies to Authorization only; use value or from_env"))
+						"codex bearer_token_env_var applies to Authorization only; use a literal or ENV:NAME"))
 				}
 			}
 			if s.CWD != "" {
@@ -71,7 +71,8 @@ func (t Target) Emit(cfg ir.Config) ([]artifact.Artifact, error) {
 		cp := codexProvider{
 			Name:               orDefault(p.Name, p.ID),
 			BaseURL:            p.BaseURL,
-			EnvKey:             p.APIKeyEnv,
+			EnvKey:             p.APIKey.FromEnv,
+			BearerToken:        p.APIKey.Value,
 			WireAPI:            "responses",
 			RequiresOpenAIAuth: false,
 		}
@@ -81,7 +82,7 @@ func (t Target) Emit(cfg ir.Config) ([]artifact.Artifact, error) {
 					cp.EnvHTTPHeaders = map[string]string{}
 				}
 				cp.EnvHTTPHeaders[name] = v.FromEnv
-			} else if v.Value != "" {
+			} else {
 				if cp.HTTPHeaders == nil {
 					cp.HTTPHeaders = map[string]string{}
 				}
@@ -105,7 +106,7 @@ func (t Target) Emit(cfg ir.Config) ([]artifact.Artifact, error) {
 			for name, v := range s.Env {
 				if v.FromEnv != "" {
 					m.EnvVars = append(m.EnvVars, v.FromEnv)
-				} else if v.Value != "" {
+				} else {
 					if m.Env == nil {
 						m.Env = map[string]string{}
 					}
@@ -123,7 +124,7 @@ func (t Target) Emit(cfg ir.Config) ([]artifact.Artifact, error) {
 						m.EnvHTTPHeaders = map[string]string{}
 					}
 					m.EnvHTTPHeaders[name] = v.FromEnv
-				case v.Value != "":
+				default:
 					if m.HTTPHeaders == nil {
 						m.HTTPHeaders = map[string]string{}
 					}
@@ -155,6 +156,7 @@ type codexConfig struct {
 }
 
 type codexProvider struct {
+	BearerToken        string            `toml:"experimental_bearer_token,omitempty"`
 	Name               string            `toml:"name"`
 	BaseURL            string            `toml:"base_url"`
 	EnvKey             string            `toml:"env_key,omitempty"`

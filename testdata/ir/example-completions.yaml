@@ -5,12 +5,10 @@ providers:
     name: Volcengine
     protocol: openai-completions
     base_url: https://example.com/v1
-    api_key_env: VOLC_API_KEY
+    api_key: "ENV:VOLC_API_KEY"
     headers:
-      X-Tenant:
-        value: engineering
-      X-Gateway-Key:
-        from_env: GATEWAY_KEY
+      X-Tenant: engineering
+      X-Gateway-Key: "ENV:GATEWAY_KEY"
     models:
       - id: glm-5.3
         name: GLM-5.3

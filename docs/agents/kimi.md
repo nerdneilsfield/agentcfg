@@ -7,6 +7,10 @@
 
 ## Provider route
 
+An IR literal such as `api_key: "example-key"` is emitted in the native
+`api_key` field. The example key is a placeholder; real literals also appear in
+generated output.
+
 Kimi Code uses `[providers.<id>]` with a `type` discriminator and `[models.<alias>]` model entries:
 
 ```toml
@@ -26,7 +30,7 @@ capabilities = ["thinking", "tool_use", "image_in"]
 
 All three IR protocols map 1:1 (`openai`, `openai_responses`, `anthropic`).
 
-Kimi reads literal `api_key` values only and has **no** environment-variable fallback anywhere in `config.toml`. The IR `api_key_env` is therefore rejected for this target — never render a secret inline. `custom_headers` values are literal strings with no interpolation, so `from_env`/`bearer_from_env` provider headers are rejected.
+Kimi reads literal `api_key` values only and has **no** environment-variable fallback anywhere in `config.toml`. The IR `api_key: "ENV:NAME"` is therefore rejected for this target. `custom_headers` values are literal strings with no interpolation, so `ENV:NAME`/`Bearer ENV:NAME` provider headers are rejected.
 
 `max_context_size` is required for every model; an IR model without `context_window` is rejected. `capabilities` is emitted natively: `thinking` (IR `reasoning`), `tool_use` (IR `tool_calling`), `image_in`/`video_in`/`audio_in` (IR `input` modalities).
 
@@ -56,7 +60,7 @@ Kimi reads MCP servers from a separate `mcp.json`:
 }
 ```
 
-MCP `env` and `headers` values are literal strings: IR `from_env` MCP env/header references are rejected. `Authorization.bearer_from_env` maps to the native `bearerTokenEnvVar`.
+MCP `env` and `headers` values are literal strings: IR `ENV:NAME` MCP env/header references are rejected. `Authorization: "Bearer ENV:NAME"` maps to the native `bearerTokenEnvVar`.
 
 ## Defaults
 

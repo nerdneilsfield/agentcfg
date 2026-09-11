@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"agentcfg/internal/artifact"
 	"agentcfg/internal/diag"
@@ -28,6 +29,11 @@ var typeName = map[ir.Protocol]string{
 func (t Target) Validate(cfg ir.Config) []diag.Diagnostic {
 	var diags []diag.Diagnostic
 	for i, p := range cfg.Providers {
+		if strings.ContainsAny(p.APIKey.Value, "$`") {
+			diags = append(diags, diag.TargetErrorf(t.ID(), fmt.Sprintf("providers[%d].api_key", i), "literal API key contains native expression syntax and cannot be represented literally"))
+		}
+	}
+	for i, p := range cfg.Providers {
 		path := fmt.Sprintf("providers[%d]", i)
 		if _, ok := typeName[p.Protocol]; !ok {
 			diags = append(diags, diag.TargetErrorf(t.ID(), path+".protocol",
@@ -36,7 +42,7 @@ func (t Target) Validate(cfg ir.Config) []diag.Diagnostic {
 		for name, v := range p.Headers {
 			if v.BearerFromEnv != "" && name != "Authorization" {
 				diags = append(diags, diag.TargetErrorf(t.ID(), path+".headers."+name,
-					"crush extra_headers are flat strings; bearer_from_env is only representable as Authorization: Bearer ${VAR}"))
+					"crush extra_headers are flat strings; Bearer ENV:NAME is only representable as Authorization: Bearer ${VAR}"))
 			}
 		}
 		for j, m := range p.Models {
@@ -101,8 +107,10 @@ func (t Target) Emit(cfg ir.Config) ([]artifact.Artifact, error) {
 			Type:           typeName[p.Protocol],
 			DiscoverModels: false,
 		}
-		if p.APIKeyEnv != "" {
-			cp.APIKey = "$" + p.APIKeyEnv
+		if p.APIKey.FromEnv != "" {
+			cp.APIKey = "$" + p.APIKey.FromEnv
+		} else if p.APIKey.Value != "" {
+			cp.APIKey = p.APIKey.Value
 		}
 		if len(p.Headers) > 0 {
 			headers := map[string]string{}

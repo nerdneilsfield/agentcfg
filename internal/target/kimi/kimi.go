@@ -36,9 +36,9 @@ func (t Target) Validate(cfg ir.Config) []diag.Diagnostic {
 			diags = append(diags, diag.TargetErrorf(t.ID(), path+".protocol",
 				"kimi provider type must be one of kimi, anthropic, openai, openai_responses, google-genai, vertexai; got %q", p.Protocol))
 		}
-		if p.APIKeyEnv != "" {
-			diags = append(diags, diag.TargetErrorf(t.ID(), path+".api_key_env",
-				"kimi reads literal api_key values only and has no environment fallback; api_key_env is not representable"))
+		if p.APIKey.FromEnv != "" {
+			diags = append(diags, diag.TargetErrorf(t.ID(), path+".api_key",
+				"kimi reads literal api_key values only and has no environment fallback; api_key environment references are not representable"))
 		}
 		for name, v := range p.Headers {
 			if v.FromEnv != "" || v.BearerFromEnv != "" {
@@ -72,7 +72,7 @@ func (t Target) Validate(cfg ir.Config) []diag.Diagnostic {
 			for name, v := range s.Headers {
 				if v.FromEnv != "" {
 					diags = append(diags, diag.TargetErrorf(t.ID(), path+".headers."+name,
-						"kimi mcp.json header values are literal strings; use bearer_from_env on Authorization instead"))
+						"kimi mcp.json header values are literal strings; use Bearer ENV:NAME on Authorization instead"))
 				}
 				if v.BearerFromEnv != "" && name != "Authorization" {
 					diags = append(diags, diag.TargetErrorf(t.ID(), path+".headers."+name,
@@ -96,16 +96,14 @@ func (t Target) Emit(cfg ir.Config) ([]artifact.Artifact, error) {
 		Models:    map[string]kimiModel{},
 	}
 	for _, p := range cfg.Providers {
-		kp := kimiProvider{Type: providerType[p.Protocol]}
+		kp := kimiProvider{Type: providerType[p.Protocol], APIKey: p.APIKey.Value}
 		if p.BaseURL != "" {
 			kp.BaseURL = p.BaseURL
 		}
 		if len(p.Headers) > 0 {
 			headers := map[string]string{}
 			for name, v := range p.Headers {
-				if v.Value != "" {
-					headers[name] = v.Value
-				}
+				headers[name] = v.Value
 			}
 			if len(headers) > 0 {
 				kp.CustomHeaders = headers
@@ -240,6 +238,7 @@ type kimiConfig struct {
 }
 
 type kimiProvider struct {
+	APIKey        string            `toml:"api_key,omitempty"`
 	Type          string            `toml:"type"`
 	BaseURL       string            `toml:"base_url,omitempty"`
 	CustomHeaders map[string]string `toml:"custom_headers,omitempty"`

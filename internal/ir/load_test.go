@@ -99,8 +99,7 @@ func TestValidateFindings(t *testing.T) {
 		{"bad protocol", "version: 1\nproviders:\n  - id: a\n    protocol: gemini\n    base_url: https://e.com\n    models: [{id: m}]\n", "unknown protocol"},
 		{"missing base_url", "version: 1\nproviders:\n  - id: a\n    protocol: openai-responses\n    models: [{id: m}]\n", "base_url is required"},
 		{"empty models", "version: 1\nproviders:\n  - id: a\n    protocol: openai-responses\n    base_url: https://e.com\n", "at least one model"},
-		{"bearer wrong header", "version: 1\nproviders:\n  - id: a\n    protocol: openai-responses\n    base_url: https://e.com\n    headers:\n      X-Other:\n        bearer_from_env: TOKEN\n    models: [{id: m}]\n", "only valid for the Authorization header"},
-		{"header two values", "version: 1\nproviders:\n  - id: a\n    protocol: openai-responses\n    base_url: https://e.com\n    headers:\n      X-Other:\n        value: v\n        from_env: E\n    models: [{id: m}]\n", "exactly one of value, from_env, bearer_from_env"},
+		{"bearer wrong header", "version: 1\nproviders:\n  - id: a\n    protocol: openai-responses\n    base_url: https://e.com\n    headers:\n      X-Other: Bearer ENV:TOKEN\n    models: [{id: m}]\n", "only valid for the Authorization header"},
 		{"defaults unknown model", "version: 1\nproviders:\n  - id: a\n    protocol: openai-responses\n    base_url: https://e.com\n    models: [{id: m}]\ndefaults:\n  model: a/nope\n", "references unknown model"},
 		{"defaults bad ref", "version: 1\nproviders:\n  - id: a\n    protocol: openai-responses\n    base_url: https://e.com\n    models: [{id: m}]\ndefaults:\n  model: noref\n", "provider-id/model-id"},
 		{"stdio with url", "version: 1\nproviders: []\nmcp:\n  - id: s\n    transport: stdio\n    command: [npx]\n    url: https://e.com\n", "url is invalid for stdio"},
@@ -123,6 +122,57 @@ func TestValidateFindings(t *testing.T) {
 			}
 			if !strings.Contains(joined, tc.want) {
 				t.Fatalf("diagnostics %q do not contain %q", joined, tc.want)
+			}
+		})
+	}
+}
+
+func TestScalarValues(t *testing.T) {
+	t.Setenv("SOURCE", "not-the-IR-value")
+	cfg, ds, err := Load([]byte(`version: 1
+providers:
+  - id: p
+    protocol: openai-responses
+    base_url: https://example.com
+    api_key: ENV:SOURCE
+    headers:
+      Empty: ""
+      X-Literal: plain
+      X-Env: ENV:SOURCE
+      Authorization: Bearer ENV:SOURCE
+    models: [{id: m}]
+mcp:
+  - id: s
+    transport: stdio
+    command: [cmd]
+    env:
+      CHILD: ENV:SOURCE
+      EMPTY: ""
+`))
+	if err != nil || diag.HasErrors(ds) {
+		t.Fatalf("load: %v %v", err, ds)
+	}
+	if cfg.Providers[0].APIKey.FromEnv != "SOURCE" || cfg.MCP[0].Env["CHILD"].FromEnv != "SOURCE" {
+		t.Fatal("environment references were not preserved")
+	}
+	if cfg.Providers[0].Headers["X-Literal"].Value != "plain" || cfg.Providers[0].Headers["Authorization"].BearerFromEnv != "SOURCE" {
+		t.Fatal("incorrect scalar semantics")
+	}
+}
+
+func TestRejectsLegacyAndInvalidScalars(t *testing.T) {
+	for _, field := range []string{
+		`api_key_env: OLD`, `api_key: {value: secret}`, `api_key: {from_env: OLD}`,
+		`headers: {X: {value: literal}}`, `headers: {X: {from_env: OLD}}`,
+		`headers: {Authorization: {bearer_from_env: OLD}}`,
+		`api_key: 123`, `api_key: true`, `api_key: []`,
+		`api_key: "ENV:"`, `api_key: "ENV:BAD-NAME"`, `api_key: "ENV:1BAD"`,
+		`headers: {Authorization: "Bearer ENV:"}`,
+	} {
+		t.Run(field, func(t *testing.T) {
+			_, _, err := Load([]byte("version: 1\nproviders:\n  - " + field + "\n"))
+			if err == nil {
+				t.Fatal("expected scalar decode error")
 			}
 		})
 	}

@@ -7,6 +7,10 @@
 
 ## Provider route
 
+An IR literal such as `api_key: "example-key"` is emitted in the native
+`apiKey` field. The example key is a placeholder; real literals also appear in
+generated output.
+
 `models.providers.<id>` (strict zod) requires `baseUrl` + `models[]`:
 
 ```json
@@ -34,7 +38,7 @@
 ```
 
 - `api` is a protocol enum including `openai-completions`, `openai-responses`, and `anthropic-messages`; all three IR protocols map 1:1.
-- `apiKey` is a `SecretInput`: it accepts a `$VAR`/`${VAR}` env shorthand, so IR `api_key_env` maps to `"${VAR}"` and no secret is rendered. Provider `headers` are also `SecretInput`-capable; IR `from_env` renders as `"${VAR}"` and `Authorization.bearer_from_env` as `"Bearer ${VAR}"`.
+- `apiKey` is a `SecretInput`: it accepts a `$VAR`/`${VAR}` env shorthand, so IR `api_key: "ENV:NAME"` maps to `"${VAR}"` without resolving the reference. Provider `headers` are also `SecretInput`-capable; IR `ENV:NAME` renders as `"${VAR}"` and `Authorization: "Bearer ENV:NAME"` as `"Bearer ${VAR}"`.
 - Model entries support `id`, `name`, `reasoning`, `input` (`text|image|video|audio`), `contextWindow`, `maxTokens`, and `compat` (including `supportsTools`). IR `tool_calling` maps to `compat.supportsTools`. IR output modalities have no OpenClaw field and are not emitted; non-text/image/audio/video inputs are rejected.
 - Whole-config load-time `${VAR}` interpolation applies to MCP env/headers too (uppercase vars only).
 

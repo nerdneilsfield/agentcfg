@@ -7,6 +7,11 @@
 
 ## Provider route
 
+IR `api_key: "ENV:NAME"` maps to native `apiKeyEnv: NAME`. The provider
+schema and credential resolver support only this environment-reference field,
+not a literal `apiKey` field. Literal IR API keys are rejected. agentcfg does
+not resolve the environment reference.
+
 DSH custom routes live under the `llm-pi-ai` plugin namespace:
 
 ```yaml
@@ -48,6 +53,8 @@ The public evidence confirms stdio plugin configuration and that plugin configur
 
 ## Sources
 
+- https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/llm/llm-pi-ai/src/config.ts (`PiAiProviderProfile` and provider-profile schema)
+- https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/llm/llm-pi-ai/src/index.ts (`resolveApiKey`)
 - https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/user/guide/providers.md
 - https://github.com/deepseek-ai/deepseek-harness (official project)
 - DSH MCP-client example: https://github.com/sepinetam/mcp-for-stata/blob/75680cf849facd4464bec20e7d3a69e3bca592de/docs/agents/deepseek_harness.md (integration example, not official schema)

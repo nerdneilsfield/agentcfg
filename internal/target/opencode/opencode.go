@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"agentcfg/internal/artifact"
 	"agentcfg/internal/diag"
@@ -22,6 +23,11 @@ func (Target) ID() string { return "opencode" }
 func (t Target) Validate(cfg ir.Config) []diag.Diagnostic {
 	var diags []diag.Diagnostic
 	for i, p := range cfg.Providers {
+		if strings.Contains(p.APIKey.Value, "{env:") || strings.Contains(p.APIKey.Value, "{file:") {
+			diags = append(diags, diag.TargetErrorf(t.ID(), fmt.Sprintf("providers[%d].api_key", i), "literal API key contains native expression syntax and cannot be represented literally"))
+		}
+	}
+	for i, p := range cfg.Providers {
 		if p.Protocol != ir.ProtocolOpenAICompletions {
 			diags = append(diags, diag.TargetErrorf(t.ID(), fmt.Sprintf("providers[%d].protocol", i),
 				"opencode v1 maps openai-completions providers only; %q needs a verified adapter package and is rejected", p.Protocol))
@@ -38,8 +44,10 @@ func (t Target) Emit(cfg ir.Config) ([]artifact.Artifact, error) {
 	}
 	for _, p := range cfg.Providers {
 		opts := map[string]any{"baseURL": p.BaseURL}
-		if p.APIKeyEnv != "" {
-			opts["apiKey"] = "{env:" + p.APIKeyEnv + "}"
+		if p.APIKey.FromEnv != "" {
+			opts["apiKey"] = "{env:" + p.APIKey.FromEnv + "}"
+		} else if p.APIKey.Value != "" {
+			opts["apiKey"] = p.APIKey.Value
 		}
 		if len(p.Headers) > 0 {
 			headers := map[string]string{}

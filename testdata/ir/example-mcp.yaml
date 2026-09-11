@@ -4,7 +4,7 @@ providers:
   - id: volcengine
     protocol: openai-completions
     base_url: https://example.com/v1
-    api_key_env: VOLC_API_KEY
+    api_key: "ENV:VOLC_API_KEY"
     models:
       - id: glm-5.3
 
@@ -13,15 +13,13 @@ mcp:
     transport: stdio
     command: [npx, -y, "@upstash/context7-mcp"]
     env:
-      CONTEXT7_API_KEY:
-        from_env: CONTEXT7_API_KEY
+      CONTEXT7_API_KEY: "ENV:CONTEXT7_API_KEY"
 
   - id: github
     transport: http
     url: https://api.githubcopilot.com/mcp/
     headers:
-      Authorization:
-        bearer_from_env: GITHUB_TOKEN
+      Authorization: "Bearer ENV:GITHUB_TOKEN"
 
 defaults:
   model: volcengine/glm-5.3

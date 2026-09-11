@@ -107,7 +107,7 @@ Logs are operational diagnostics, not generated output. `gen` reserves stdout fo
 command, target, artifact, source, duration_ms
 ```
 
-No logger may log `api_key_env` values after environment resolution because agentcfg never resolves them. It may log environment **names**. No log line may contain generated secret material; this is enforced through tests using representative credential references.
+agentcfg never resolves `ENV:NAME` references. Logs may include environment names, but must not include credential literals or generated artifact content. Literal secrets are emitted on stdout when the target supports them; users must keep secret-bearing input and output out of Git and logs.
 
 ### GoReleaser v2 release design
 
@@ -221,10 +221,10 @@ The registry is a static map populated by constructors. Targets must not self-re
 `internal/ir` owns only cross-target semantics defined in [`protocol.md`](protocol.md). It does not import a target package. Emitters own spelling and narrowing:
 
 - `openai-responses` -> Codex `wire_api = "responses"`
-- `api_key_env` -> OpenCode `{env:NAME}`, Pi `$NAME`, DSH `apiKeyEnv: NAME`
+- `api_key: "ENV:NAME"` -> OpenCode `{env:NAME}`, Pi `$NAME`, DSH `apiKeyEnv: NAME`
 - `command` argv -> Codex `command` plus `args`, or OpenCode `command` array
 
-A field unavailable in a target is omitted only if omitting it preserves the documented semantics. Optional model capability metadata (`context_window`, modalities, `reasoning`, and `tool_calling`) may be omitted for a target that has no custom model catalog at all, such as Codex; the emitter is not claiming it configured those properties. A provider protocol, endpoint, credential reference, request header, MCP transport, MCP command/URL, MCP environment, or MCP authentication rule may never be dropped. Otherwise validation rejects the selected target. This rule prevents “successful” generation that silently makes a route or MCP server unusable.
+A field unavailable in a target is omitted only if omitting it preserves the documented semantics. Optional model capability metadata (`context_window`, modalities, `reasoning`, and `tool_calling`) may be omitted for a target that has no custom model catalog at all, such as Codex; the emitter is not claiming it configured those properties. A provider protocol, endpoint, credential literal or reference, request header, MCP transport, MCP command/URL, MCP environment, or MCP authentication rule may never be dropped. Otherwise validation rejects the selected target. This rule prevents “successful” generation that silently makes a route or MCP server unusable.
 
 ## Failure and stdout contract
 
@@ -237,7 +237,7 @@ Emitters build artifacts in memory. `app` writes stdout only after every target 
 
 ## Tests
 
-1. **IR unit tests**: YAML decoding, defaults, identifiers, secret-reference restrictions, duplicate IDs, model references, and transport constraints.
+1. **IR unit tests**: YAML decoding, defaults, identifiers, scalar values and environment-reference restrictions, duplicate IDs, model references, and transport constraints.
 2. **Target golden tests**: one fixture per supported protocol/MCP combination; compare each artifact byte-for-byte.
 3. **Target rejection tests**: unsupported protocol, unsupported transport, adapter prerequisite, and no-default-mapping diagnostics.
 4. **Bundle tests**: one artifact stays raw; multiple artifacts receive stable wrappers in target/artifact sort order.

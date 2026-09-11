@@ -38,6 +38,9 @@ func (t Target) Validate(cfg ir.Config) []diag.Diagnostic {
 	var diags []diag.Diagnostic
 	for i, p := range cfg.Providers {
 		path := fmt.Sprintf("providers[%d]", i)
+		if p.APIKey.Value != "" {
+			diags = append(diags, diag.TargetErrorf(t.ID(), path+".api_key", "goose does not support literal API keys in the verified native configuration"))
+		}
 		if _, ok := engineName[p.Protocol]; !ok {
 			diags = append(diags, diag.TargetErrorf(t.ID(), path+".protocol",
 				"goose custom provider engine must be openai or anthropic; got %q", p.Protocol))
@@ -81,7 +84,7 @@ func (t Target) Validate(cfg ir.Config) []diag.Diagnostic {
 		for name, v := range s.Env {
 			if v.BearerFromEnv != "" {
 				diags = append(diags, diag.TargetErrorf(t.ID(), path+".env."+name,
-					"goose extension env values are plain environment names or literals; bearer_from_env is not representable on env"))
+					"goose extension env values are plain environment names or literals; Bearer ENV:NAME is not representable on env"))
 			}
 		}
 	}
@@ -105,10 +108,10 @@ func (t Target) Emit(cfg ir.Config) ([]artifact.Artifact, error) {
 			Name:              p.ID,
 			Engine:            engineName[p.Protocol],
 			DisplayName:       orDefault(p.Name, p.ID),
-			APIKeyEnv:         p.APIKeyEnv,
+			APIKeyEnv:         p.APIKey.FromEnv,
 			BaseURL:           p.BaseURL,
 			SupportsStreaming: true,
-			RequiresAuth:      p.APIKeyEnv != "",
+			RequiresAuth:      p.APIKey.FromEnv != "",
 			DynamicModels:     false,
 		}
 		if p.Protocol == ir.ProtocolOpenAIResponses {
@@ -117,9 +120,7 @@ func (t Target) Emit(cfg ir.Config) ([]artifact.Artifact, error) {
 		if len(p.Headers) > 0 {
 			headers := map[string]string{}
 			for name, v := range p.Headers {
-				if v.Value != "" {
-					headers[name] = v.Value
-				}
+				headers[name] = v.Value
 			}
 			if len(headers) > 0 {
 				gp.Headers = headers
@@ -184,7 +185,7 @@ func (t Target) Emit(cfg ir.Config) ([]artifact.Artifact, error) {
 				for name, v := range s.Env {
 					if v.FromEnv != "" {
 						keys = append(keys, v.FromEnv)
-					} else if v.Value != "" {
+					} else {
 						env[name] = v.Value
 					}
 				}

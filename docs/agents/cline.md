@@ -7,6 +7,10 @@
 
 ## Provider route
 
+An IR literal such as `api_key: "example-key"` is emitted in the native
+`settings.apiKey` field. The example key is a placeholder; real literals also appear in
+generated output.
+
 Custom providers are entries of `providers.json`:
 
 ```json
@@ -29,7 +33,7 @@ Custom providers are entries of `providers.json`:
 ```
 
 - `protocol` renames: `openai-completions` → `openai-chat`, `openai-responses` → `openai-responses`, `anthropic-messages` → `anthropic`.
-- Cline config is **literal-only**: there is no `${VAR}` expansion anywhere, and the environment fallback for API keys only exists for built-in provider ids. Custom providers therefore effectively need a stored literal `apiKey`, so IR `api_key_env` is rejected, and provider `headers` with `from_env` / `bearer_from_env` are rejected. Constant `value` headers are emitted.
+- Cline config is **literal-only**: there is no `${VAR}` expansion anywhere, and the environment fallback for API keys only exists for built-in provider ids. Custom providers therefore effectively need a stored literal `apiKey`, so IR `api_key: "ENV:NAME"` is rejected, and provider `headers` with `ENV:NAME` / `Bearer ENV:NAME` are rejected. Literal headers are emitted.
 
 ## Models
 
@@ -48,5 +52,5 @@ only the bare default model id, and `defaults.model "provider/model"` maps to
 `timeout` is whole seconds in 1..3600; the emitter rejects IR
 `timeout_ms` values outside 1000..3600000 and truncates non-multiples of 1000
 toward zero (e.g. 1500 ms becomes 1 s). MCP `env` and `headers` are literal
-strings, so IR `from_env` / `bearer_from_env` MCP values are rejected. When the
+strings, so IR `ENV:NAME` / `Bearer ENV:NAME` MCP values are rejected. When the
 IR has no MCP servers, the artifact is omitted.

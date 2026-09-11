@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"agentcfg/internal/artifact"
 	"agentcfg/internal/diag"
@@ -21,6 +22,11 @@ func (Target) ID() string { return "prime-agent" }
 
 func (t Target) Validate(cfg ir.Config) []diag.Diagnostic {
 	var diags []diag.Diagnostic
+	for i, p := range cfg.Providers {
+		if strings.HasPrefix(p.APIKey.Value, "$") || strings.HasPrefix(p.APIKey.Value, "!") {
+			diags = append(diags, diag.TargetErrorf(t.ID(), fmt.Sprintf("providers[%d].api_key", i), "literal API key contains native expression syntax and cannot be represented literally"))
+		}
+	}
 	for i, p := range cfg.Providers {
 		if len(p.Headers) > 0 {
 			diags = append(diags, diag.TargetErrorf(t.ID(), fmt.Sprintf("providers[%d].headers", i),
@@ -80,8 +86,10 @@ func (t Target) Emit(cfg ir.Config) ([]artifact.Artifact, error) {
 			"api":     string(p.Protocol),
 			"models":  ms,
 		}
-		if p.APIKeyEnv != "" {
-			prov["apiKey"] = "$" + p.APIKeyEnv
+		if p.APIKey.FromEnv != "" {
+			prov["apiKey"] = "$" + p.APIKey.FromEnv
+		} else if p.APIKey.Value != "" {
+			prov["apiKey"] = p.APIKey.Value
 		} else {
 			prov["apiKey"] = ""
 		}
@@ -130,9 +138,7 @@ func (t Target) Emit(cfg ir.Config) ([]artifact.Artifact, error) {
 				}
 				headers := map[string]string{}
 				for name, v := range s.Headers {
-					if v.Value != "" {
-						headers[name] = v.Value
-					}
+					headers[name] = v.Value
 				}
 				if len(headers) > 0 {
 					entry["headers"] = headers

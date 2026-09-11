@@ -12,11 +12,11 @@ func exampleConfig() ir.Config {
 	return ir.Config{
 		Version: 1,
 		Providers: []ir.Provider{{
-			ID:        "volcengine",
-			Name:      "Volcengine",
-			Protocol:  ir.ProtocolOpenAIResponses,
-			BaseURL:   "https://example.com/v1",
-			APIKeyEnv: "VOLC_API_KEY",
+			ID:       "volcengine",
+			Name:     "Volcengine",
+			Protocol: ir.ProtocolOpenAIResponses,
+			BaseURL:  "https://example.com/v1",
+			APIKey:   ir.HeaderValue{FromEnv: "VOLC_API_KEY"},
 			Headers: map[string]ir.HeaderValue{
 				"X-Tenant":      {Value: "engineering"},
 				"X-Gateway-Key": {FromEnv: "GATEWAY_KEY"},

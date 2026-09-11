@@ -4,6 +4,7 @@ package hermes
 import (
 	"bytes"
 	"fmt"
+	"strings"
 
 	yaml "go.yaml.in/yaml/v3"
 
@@ -28,6 +29,11 @@ var apiMode = map[ir.Protocol]string{
 
 func (t Target) Validate(cfg ir.Config) []diag.Diagnostic {
 	var diags []diag.Diagnostic
+	for i, p := range cfg.Providers {
+		if strings.Contains(p.APIKey.Value, "${") {
+			diags = append(diags, diag.TargetErrorf(t.ID(), fmt.Sprintf("providers[%d].api_key", i), "literal API key contains native expression syntax and cannot be represented literally"))
+		}
+	}
 	for i, p := range cfg.Providers {
 		path := fmt.Sprintf("providers[%d]", i)
 		if _, ok := apiMode[p.Protocol]; !ok {
@@ -59,7 +65,8 @@ func (t Target) Emit(cfg ir.Config) ([]artifact.Artifact, error) {
 	}
 	for _, p := range cfg.Providers {
 		hp := hermesProvider{
-			APIKeyEnv: p.APIKeyEnv,
+			APIKeyEnv: p.APIKey.FromEnv,
+			APIKey:    p.APIKey.Value,
 			APIMode:   apiMode[p.Protocol],
 		}
 		if p.BaseURL != "" {
@@ -193,6 +200,7 @@ type hermesModelSel struct {
 }
 
 type hermesProvider struct {
+	APIKey       string                 `yaml:"api_key,omitempty"`
 	BaseURL      string                 `yaml:"base_url,omitempty"`
 	APIKeyEnv    string                 `yaml:"api_key_env,omitempty"`
 	APIMode      string                 `yaml:"api_mode"`

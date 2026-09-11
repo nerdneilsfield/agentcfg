@@ -40,8 +40,8 @@ func (t Target) Validate(cfg ir.Config) []diag.Diagnostic {
 			diags = append(diags, diag.TargetErrorf(t.ID(), path+".protocol",
 				"cline protocol must be anthropic, gemini, openai-chat, or openai-responses; got %q", p.Protocol))
 		}
-		if p.APIKeyEnv != "" {
-			diags = append(diags, diag.TargetErrorf(t.ID(), path+".api_key_env",
+		if p.APIKey.FromEnv != "" {
+			diags = append(diags, diag.TargetErrorf(t.ID(), path+".api_key",
 				"cline stores literal apiKey strings only; the environment fallback exists for built-in provider ids, not custom providers"))
 		}
 		for name, v := range p.Headers {
@@ -96,6 +96,7 @@ func (t Target) Emit(cfg ir.Config) ([]artifact.Artifact, error) {
 	providers := map[string]clineProviderEntry{}
 	for _, p := range cfg.Providers {
 		settings := clineSettings{
+			APIKey:   p.APIKey.Value,
 			Provider: p.ID,
 			BaseURL:  p.BaseURL,
 			Protocol: protocolName[p.Protocol],
@@ -104,9 +105,7 @@ func (t Target) Emit(cfg ir.Config) ([]artifact.Artifact, error) {
 		if len(p.Headers) > 0 {
 			headers := map[string]string{}
 			for name, v := range p.Headers {
-				if v.Value != "" {
-					headers[name] = v.Value
-				}
+				headers[name] = v.Value
 			}
 			if len(headers) > 0 {
 				settings.Headers = headers
@@ -329,6 +328,7 @@ type clineProviderEntry struct {
 }
 
 type clineSettings struct {
+	APIKey   string            `json:"apiKey,omitempty"`
 	Provider string            `json:"provider"`
 	BaseURL  string            `json:"baseUrl,omitempty"`
 	Protocol string            `json:"protocol"`

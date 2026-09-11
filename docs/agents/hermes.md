@@ -7,6 +7,10 @@
 
 ## Provider route
 
+An IR literal such as `api_key: "example-key"` is emitted in the native
+`api_key` field. The example key is a placeholder; real literals also appear in
+generated output.
+
 Hermes uses top-level `providers.<id>` tables:
 
 ```yaml
@@ -26,8 +30,8 @@ providers:
 ```
 
 - `api_mode` is one of `chat_completions`, `codex_responses`, `anthropic_messages`; the three IR protocols map 1:1.
-- `api_key_env` (alias `key_env`) is native; IR `api_key_env` maps directly.
-- Hermes expands `${VAR}` and `${env:VAR}` recursively over **all** config strings at load, so every IR env-reference form is native: provider `headers.from_env` → `"${VAR}"`, `Authorization.bearer_from_env` → `"Bearer ${VAR}"`.
+- `api_key_env` (alias `key_env`) is native; IR `api_key: "ENV:NAME"` maps directly.
+- Hermes expands `${VAR}` and `${env:VAR}` recursively over **all** config strings at load, so every IR env-reference form is native: provider header `ENV:NAME` → `"${VAR}"`, `Authorization: "Bearer ENV:NAME"` → `"Bearer ${VAR}"`.
 - `models` is a `<model-id> → {context_length}` mapping. IR `max_output_tokens`, `reasoning`, `tool_calling`, and input/output modalities have no Hermes config field and are not emitted; Hermes auto-detects capabilities from the provider.
 - Provider display `name` has no Hermes field and is not emitted.
 

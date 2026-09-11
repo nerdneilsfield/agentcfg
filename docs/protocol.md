@@ -6,7 +6,8 @@ This document specifies version 1 of the `agentcfg.yaml` intermediate representa
 
 - The IR represents target-independent runtime meaning, not any CLI's field names or interpolation syntax.
 - The model fields are a **minimal union**: a field exists when at least one supported target needs it to describe a valid model.
-- Credentials are references only. No scalar in this IR may contain a secret value.
+- Credentials may be string literals or environment references. agentcfg never resolves references during compilation; emitters translate them to supported native syntax.
+- Literal secrets are emitted into generated output. Keep inputs and outputs containing secrets out of Git and logs.
 - Shell commands are argv arrays. The IR has no shell-command form.
 - A provider has exactly one request protocol. A gateway serving two protocols is represented by two providers.
 
@@ -20,12 +21,10 @@ providers:
     name: Volcengine
     protocol: openai-completions
     base_url: https://example.com/v1
-    api_key_env: VOLC_API_KEY
+    api_key: "ENV:VOLC_API_KEY"
     headers:
-      X-Tenant:
-        value: engineering
-      X-Gateway-Key:
-        from_env: GATEWAY_KEY
+      X-Tenant: "engineering"
+      X-Gateway-Key: "ENV:GATEWAY_KEY"
     models:
       - id: glm-5.3
         name: GLM-5.3
@@ -41,15 +40,13 @@ mcp:
     transport: stdio
     command: [npx, -y, "@upstash/context7-mcp"]
     env:
-      CONTEXT7_API_KEY:
-        from_env: CONTEXT7_API_KEY
+      CONTEXT7_API_KEY: "ENV:CONTEXT7_API_KEY"
 
   - id: github
     transport: http
     url: https://api.githubcopilot.com/mcp/
     headers:
-      Authorization:
-        bearer_from_env: GITHUB_TOKEN
+      Authorization: "Bearer ENV:GITHUB_TOKEN"
 
 defaults:
   model: volcengine/glm-5.3
@@ -65,21 +62,51 @@ targets: [codex, opencode, pi, prime-agent, deepseek-harness, grok, kimi, zcode,
 | `name` | no | Human-facing display name; defaults to `id`. |
 | `protocol` | yes | `openai-completions`, `openai-responses`, or `anthropic-messages`. |
 | `base_url` | yes | Provider endpoint base URL. |
-| `api_key_env` | no | Environment-variable name containing the API key. |
-| `headers` | no | Non-secret values or environment-derived request headers. |
+| `api_key` | no | String literal API key or `ENV:NAME` environment reference. |
+| `headers` | no | Map of header names to string literals or environment references. |
 | `models` | yes | Non-empty list of models served by this provider. |
 
-A header value is exactly one of:
+### Scalar values
+
+`api_key`, provider and MCP header values, and MCP `env` values use string scalars:
 
 ```yaml
-value: non-secret constant
-# or
-from_env: HEADER_VALUE_ENV
-# or
-bearer_from_env: TOKEN_ENV
+api_key: "ENV:PROVIDER_API_KEY"
+headers:
+  X-Tenant: "engineering"
+  X-Token: "ENV:HEADER_VALUE_ENV"
+  Authorization: "Bearer ENV:TOKEN_ENV"
 ```
 
-`bearer_from_env` means `Authorization: Bearer <value>` and is only valid for the `Authorization` header.
+A plain string is a literal. `ENV:NAME` references an environment variable;
+`Bearer ENV:NAME` adds the `Bearer ` prefix to its runtime value and is valid only
+for an `Authorization` header. These are IR semantics, not native interpolation
+syntax. `NAME` must be non-empty and match `[A-Za-z_][A-Za-z0-9_]*`.
+The `ENV:` and `Bearer ENV:` prefixes are case-sensitive. agentcfg does not
+read the referenced environment variables.
+
+For a literal API key, use `api_key: "example-key"` (the value shown is a
+placeholder). The target must have a supported native literal credential field.
+If a target cannot represent a literal or reference, validation reports a
+diagnostic instead of resolving the reference or silently dropping the value.
+Literal API keys are also rejected when the target would interpret them as
+native expressions rather than literal text:
+
+| Target | Rejected literal API-key content |
+|---|---|
+| Crush | Contains `$` or a backtick. |
+| Pi, Prime Agent | Starts with `$` or `!`. |
+| OpenCode, MiMo Code | Contains `{env:` or `{file:`. |
+| Hermes, OpenClaw | Contains `${`. |
+
+Gajae uses native environment-name-or-literal semantics: a literal matching a
+set environment variable's name can be resolved by Gajae at runtime. agentcfg
+does not inspect the runtime environment to disambiguate it.
+
+The old IR `api_key_env` field and `{value: ...}`, `{from_env: ...}`, and
+`{bearer_from_env: ...}` value objects are not accepted. Native generated configs
+may still use fields such as `api_key_env`; those names belong to the target,
+not this IR.
 
 ## Model
 
@@ -106,10 +133,8 @@ Every MCP server has `id`, `transport`, and optional `enabled`, `cwd`, and `time
 transport: stdio
 command: [executable, arg1, arg2]
 env:
-  CHILD_VAR:
-    value: non-secret constant
-  TOKEN:
-    from_env: TOKEN_ENV
+  CHILD_VAR: "non-secret constant"
+  TOKEN: "ENV:TOKEN_ENV"
 ```
 
 `command` is required and non-empty. `url` and HTTP headers are invalid.
@@ -120,8 +145,7 @@ env:
 transport: http
 url: https://example.com/mcp
 headers:
-  Authorization:
-    bearer_from_env: TOKEN_ENV
+  Authorization: "Bearer ENV:TOKEN_ENV"
 ```
 
 `url` is required. `command`, `cwd`, and `env` are invalid. OAuth enrollment is deliberately out of v1: it is runtime-owned state, not source configuration.
@@ -136,4 +160,4 @@ headers:
 
 ## IR validation
 
-IR validation checks document version, field types, identifiers, safe credential-reference forms, duplicate IDs, provider/model references, protocol constraints, and transport constraints. It does not read environment-variable values, contact endpoints, or validate target support.
+IR validation checks document version, field types, identifiers, scalar value and environment-reference forms, duplicate IDs, provider/model references, protocol constraints, and transport constraints. It does not read environment-variable values, contact endpoints, or validate target support.

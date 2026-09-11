@@ -133,8 +133,8 @@ func TestEmitGolden(t *testing.T) {
 
 func TestRejectsAPIKeyEnv(t *testing.T) {
 	cfg := exampleConfig()
-	cfg.Providers[0].APIKeyEnv = "VOLC_API_KEY"
-	expectInvalid(t, cfg, "api_key_env")
+	cfg.Providers[0].APIKey.FromEnv = "VOLC_API_KEY"
+	expectInvalid(t, cfg, "api_key")
 }
 
 func TestRejectsMissingContextWindow(t *testing.T) {

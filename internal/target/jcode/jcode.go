@@ -86,15 +86,14 @@ func (t Target) Emit(cfg ir.Config) ([]artifact.Artifact, error) {
 		jp := jcodeProvider{
 			Type:         providerType[p.Protocol],
 			BaseURL:      p.BaseURL,
-			EnvKey:       p.APIKeyEnv,
+			EnvKey:       p.APIKey.FromEnv,
+			APIKey:       p.APIKey.Value,
 			DefaultModel: defaultModelFor(p, defPID, defMID),
 		}
 		if len(p.Headers) > 0 {
 			headers := map[string]string{}
 			for name, v := range p.Headers {
-				if v.Value != "" {
-					headers[name] = v.Value
-				}
+				headers[name] = v.Value
 			}
 			if len(headers) > 0 {
 				jp.Headers = headers
@@ -231,6 +230,7 @@ type jcodeDefaultProvider struct {
 }
 
 type jcodeProvider struct {
+	APIKey       string            `toml:"api_key,omitempty"`
 	Type         string            `toml:"type"`
 	BaseURL      string            `toml:"base_url"`
 	EnvKey       string            `toml:"api_key_env,omitempty"`

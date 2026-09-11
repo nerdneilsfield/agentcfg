@@ -37,11 +37,11 @@ func exampleConfig() ir.Config {
 	return ir.Config{
 		Version: 1,
 		Providers: []ir.Provider{{
-			ID:        "volcengine",
-			Name:      "Volcengine",
-			Protocol:  ir.ProtocolOpenAICompletions,
-			BaseURL:   "https://example.com/v1",
-			APIKeyEnv: "VOLC_API_KEY",
+			ID:       "volcengine",
+			Name:     "Volcengine",
+			Protocol: ir.ProtocolOpenAICompletions,
+			BaseURL:  "https://example.com/v1",
+			APIKey:   ir.HeaderValue{FromEnv: "VOLC_API_KEY"},
 			Headers: map[string]ir.HeaderValue{
 				"X-Tenant": {Value: "engineering"},
 			},
@@ -179,7 +179,7 @@ func TestRejectsToolCallingFalse(t *testing.T) {
 func TestRejectsMCPEnvBearer(t *testing.T) {
 	cfg := exampleConfig()
 	cfg.MCP[0].Env["AUTH"] = ir.HeaderValue{BearerFromEnv: "AUTH_TOKEN"}
-	expectInvalid(t, cfg, "bearer_from_env is not representable on env")
+	expectInvalid(t, cfg, "Bearer ENV:NAME is not representable on env")
 }
 
 func TestRejectsFractionalTimeout(t *testing.T) {

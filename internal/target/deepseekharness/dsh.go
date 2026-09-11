@@ -23,6 +23,11 @@ func (Target) ID() string { return "deepseek-harness" }
 
 func (t Target) Validate(cfg ir.Config) []diag.Diagnostic {
 	var diags []diag.Diagnostic
+	for i, p := range cfg.Providers {
+		if p.APIKey.Value != "" {
+			diags = append(diags, diag.TargetErrorf(t.ID(), fmt.Sprintf("providers[%d].api_key", i), "deepseek-harness supports apiKeyEnv credential references only; literal API keys are not representable"))
+		}
+	}
 	for i, s := range cfg.MCP {
 		path := fmt.Sprintf("mcp[%d]", i)
 		if s.Transport != ir.TransportStdio {
@@ -61,12 +66,12 @@ func (t Target) Emit(cfg ir.Config) ([]artifact.Artifact, error) {
 			ms = append(ms, mm)
 		}
 		prov := map[string]any{
-			"baseUrl": p.BaseURL,
+			"baseURL": p.BaseURL,
 			"api":     string(p.Protocol),
 			"models":  ms,
 		}
-		if p.APIKeyEnv != "" {
-			prov["apiKey"] = "$" + p.APIKeyEnv
+		if p.APIKey.FromEnv != "" {
+			prov["apiKeyEnv"] = p.APIKey.FromEnv
 		}
 		providers[p.ID] = prov
 	}
