@@ -28,11 +28,6 @@ func (t Target) Validate(cfg ir.Config) []diag.Diagnostic {
 		if p.APIKey.Value != "" {
 			diags = append(diags, diag.TargetErrorf(t.ID(), path+".api_key", "deepseek-harness supports apiKeyEnv credential references only; literal API keys are not representable"))
 		}
-		for name, v := range p.Headers {
-			if v.FromEnv != "" || v.BearerFromEnv != "" {
-				diags = append(diags, diag.TargetErrorf(t.ID(), path+".headers."+name, "deepseek-harness provider headers support literal values only"))
-			}
-		}
 		for j, m := range p.Models {
 			for _, mod := range m.Input {
 				if mod != ir.ModalityText && mod != ir.ModalityImage {
@@ -76,7 +71,9 @@ func (t Target) Emit(cfg ir.Config) ([]artifact.Artifact, error) {
 		if len(p.Headers) > 0 {
 			headers := map[string]string{}
 			for name, v := range p.Headers {
-				headers[name] = v.Value
+				if v.FromEnv == "" && v.BearerFromEnv == "" {
+					headers[name] = v.Value
+				}
 			}
 			prov["headers"] = headers
 		}

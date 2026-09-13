@@ -196,5 +196,3 @@ func orDefault(v, def string) string {
 }
 
 func boolPtr(b bool) *bool { return &b }
-
-func int64Ptr(v int64) *int64 { return &v }

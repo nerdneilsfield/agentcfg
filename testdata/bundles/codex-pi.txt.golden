@@ -4,6 +4,9 @@ name: config.toml
 format: toml
 suggested-path: ~/.codex/config.toml
 ===== artifact content begins =====
+model_provider = "volcengine"
+model = "glm-5.3"
+
 [model_providers]
   [model_providers.volcengine]
     name = "Volcengine"
@@ -27,8 +30,7 @@ suggested-path: ~/.pi/agent/extensions/agentcfg-providers.ts
 // Install: copy to ~/.pi/agent/extensions/ and restart pi.
 
 export default function (pi: any) {
-  pi.registerProvider({
-    id: "volcengine",
+  pi.registerProvider("volcengine", {
     name: "Volcengine",
     api: "openai-responses",
     baseUrl: "https://example.com/v1",

@@ -290,6 +290,7 @@ func gajaeEffortIndex(e ir.ReasoningEffort) int {
 	}
 	return -1
 }
+
 func gajaeSupportedEfforts(efforts []ir.ReasoningEffort) []ir.ReasoningEffort {
 	out := []ir.ReasoningEffort{}
 	for _, e := range efforts {
@@ -299,6 +300,7 @@ func gajaeSupportedEfforts(efforts []ir.ReasoningEffort) []ir.ReasoningEffort {
 	}
 	return out
 }
+
 func gajaeThinkingFor(efforts []ir.ReasoningEffort) *gajaeThinking {
 	min, max := efforts[0], efforts[0]
 	for _, e := range efforts {

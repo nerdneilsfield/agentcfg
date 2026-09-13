@@ -9,10 +9,9 @@
 
 IR `api_key: "ENV:NAME"` maps to native `apiKeyEnv: NAME`. The provider
 credential resolver supports this reference rather than a literal key, so literal
-IR API keys are rejected. A provider `name` maps to `displayName`. Literal
-provider headers map to native `headers`; environment and bearer header
-references are rejected because this target's provider expression form is not
-verified here.
+IR API keys are rejected. A provider `name` maps to `displayName`. Literal provider headers map to native `headers`. Environment and bearer header
+references have no verified native provider expression form, so this target skips
+them rather than emitting an incorrect literal.
 
 Custom routes are written to `$DSH_HOME/settings.yaml` under `llm-pi-ai`:
 
