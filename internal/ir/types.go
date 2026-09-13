@@ -110,7 +110,7 @@ func (v *HeaderValue) UnmarshalYAML(n *yaml.Node) error {
 	case strings.HasPrefix(n.Value, "Bearer ENV:"):
 		v.BearerFromEnv = strings.TrimPrefix(n.Value, "Bearer ENV:")
 		if !validEnvName(v.BearerFromEnv) {
-			return fmt.Errorf("Bearer ENV: requires an environment variable name matching [A-Za-z_][A-Za-z0-9_]*")
+			return fmt.Errorf("bearer ENV: requires an environment variable name matching [A-Za-z_][A-Za-z0-9_]*")
 		}
 	case strings.HasPrefix(n.Value, "ENV:"):
 		v.FromEnv = strings.TrimPrefix(n.Value, "ENV:")
