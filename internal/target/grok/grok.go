@@ -36,9 +36,9 @@ func (t Target) Validate(cfg ir.Config) []diag.Diagnostic {
 				"grok api_backend must be chat_completions, responses, or messages; got %q", p.Protocol))
 		}
 		for name, v := range p.Headers {
-			if v.FromEnv != "" || v.BearerFromEnv != "" {
+			if v.BearerFromEnv != "" {
 				diags = append(diags, diag.TargetErrorf(t.ID(), path+".headers."+name,
-					"grok extra_headers has no documented env expansion; only constant header values are representable"))
+					"grok env_http_headers inserts a raw environment value; Bearer ENV:NAME is not representable"))
 			}
 		}
 		for _, m := range p.Models {
@@ -79,8 +79,13 @@ func (t Target) Emit(cfg ir.Config) ([]artifact.Artifact, error) {
 	for _, p := range cfg.Providers {
 		backend := apiBackend[p.Protocol]
 		headers := map[string]string{}
+		envHeaders := map[string]string{}
 		for name, v := range p.Headers {
-			headers[name] = v.Value
+			if v.FromEnv != "" {
+				envHeaders[name] = v.FromEnv
+			} else {
+				headers[name] = v.Value
+			}
 		}
 		for _, m := range p.Models {
 			gm := grokModel{
@@ -102,9 +107,11 @@ func (t Target) Emit(cfg ir.Config) ([]artifact.Artifact, error) {
 			if len(headers) > 0 {
 				gm.ExtraHeaders = headers
 			}
-			if len(m.Variants) > 0 {
-				gm.SupportsReasoningEffort = true
-				gm.ReasoningEfforts = grokEfforts(m.Variants)
+			if len(envHeaders) > 0 {
+				gm.EnvHTTPHeaders = envHeaders
+			}
+			if efforts := grokSupportedEfforts(m.Variants); len(efforts) > 0 {
+				gm.ReasoningEfforts = grokEfforts(efforts)
 			}
 			doc.Model[m.ID] = gm
 		}
@@ -194,17 +201,17 @@ type grokModels struct {
 }
 
 type grokModel struct {
-	APIKey                  string                `toml:"api_key,omitempty"`
-	Model                   string                `toml:"model"`
-	BaseURL                 string                `toml:"base_url"`
-	Name                    string                `toml:"name,omitempty"`
-	EnvKey                  string                `toml:"env_key,omitempty"`
-	APIBackend              string                `toml:"api_backend"`
-	ContextWindow           *int64                `toml:"context_window,omitempty"`
-	MaxCompletionTokens     *int64                `toml:"max_completion_tokens,omitempty"`
-	ExtraHeaders            map[string]string     `toml:"extra_headers,omitempty"`
-	SupportsReasoningEffort bool                  `toml:"supports_reasoning_effort,omitempty"`
-	ReasoningEfforts        []grokReasoningEffort `toml:"reasoning_efforts,omitempty"`
+	APIKey              string                `toml:"api_key,omitempty"`
+	Model               string                `toml:"model"`
+	BaseURL             string                `toml:"base_url"`
+	Name                string                `toml:"name,omitempty"`
+	EnvKey              string                `toml:"env_key,omitempty"`
+	APIBackend          string                `toml:"api_backend"`
+	ContextWindow       *int64                `toml:"context_window,omitempty"`
+	MaxCompletionTokens *int64                `toml:"max_completion_tokens,omitempty"`
+	ExtraHeaders        map[string]string     `toml:"extra_headers,omitempty"`
+	EnvHTTPHeaders      map[string]string     `toml:"env_http_headers,omitempty"`
+	ReasoningEfforts    []grokReasoningEffort `toml:"reasoning_efforts,omitempty"`
 }
 
 type grokReasoningEffort struct {
@@ -229,6 +236,20 @@ func grokEfforts(efforts []ir.ReasoningEffort) []grokReasoningEffort {
 	out := make([]grokReasoningEffort, 0, len(efforts))
 	for _, effort := range efforts {
 		out = append(out, grokReasoningEffort{ID: string(effort), Value: string(effort)})
+	}
+	return out
+}
+
+var grokReasoningEfforts = map[ir.ReasoningEffort]bool{
+	"none": true, "minimal": true, "low": true, "medium": true, "high": true, "xhigh": true, "max": true,
+}
+
+func grokSupportedEfforts(efforts []ir.ReasoningEffort) []ir.ReasoningEffort {
+	out := make([]ir.ReasoningEffort, 0, len(efforts))
+	for _, effort := range efforts {
+		if grokReasoningEfforts[effort] {
+			out = append(out, effort)
+		}
 	}
 	return out
 }

@@ -62,6 +62,7 @@ func exampleConfig() ir.Config {
 			Env: map[string]ir.HeaderValue{
 				"CONTEXT7_API_KEY": {FromEnv: "CONTEXT7_API_KEY"},
 			},
+			TimeoutMS: i64(12000),
 		}, {
 			ID:        "github",
 			Transport: ir.TransportHTTP,
@@ -69,6 +70,7 @@ func exampleConfig() ir.Config {
 			Headers: map[string]ir.HeaderValue{
 				"Authorization": {BearerFromEnv: "GITHUB_TOKEN"},
 			},
+			TimeoutMS: i64(34000),
 		}},
 		Defaults: &ir.Defaults{Model: "volcengine/glm-5.3"},
 	}
@@ -128,6 +130,7 @@ func TestEmitGolden(t *testing.T) {
       "environment": {
         "CONTEXT7_API_KEY": "{env:CONTEXT7_API_KEY}"
       },
+      "timeout": 12000,
       "type": "local"
     },
     "github": {
@@ -135,6 +138,7 @@ func TestEmitGolden(t *testing.T) {
       "headers": {
         "Authorization": "Bearer {env:GITHUB_TOKEN}"
       },
+      "timeout": 34000,
       "type": "remote",
       "url": "https://api.githubcopilot.com/mcp/"
     }

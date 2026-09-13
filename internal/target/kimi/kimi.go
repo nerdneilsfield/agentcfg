@@ -123,8 +123,8 @@ func (t Target) Emit(cfg ir.Config) ([]artifact.Artifact, error) {
 				km.MaxOutputSize = m.MaxOutputTokens
 			}
 			km.Capabilities = capabilities(m)
-			if efforts := kimiSupportedEfforts(m.Variants); len(efforts) > 0 {
-				km.SupportEfforts = effortStrings(efforts)
+			if len(m.Variants) > 0 {
+				km.SupportEfforts = effortStrings(m.Variants)
 			}
 			doc.Models[m.ID] = km
 		}
@@ -269,27 +269,6 @@ type kimiMCPServer struct {
 	Env               map[string]string `json:"env,omitempty"`
 	CWD               string            `json:"cwd,omitempty"`
 	Enabled           bool              `json:"enabled"`
-}
-
-var kimiEfforts = []ir.ReasoningEffort{"low", "high", "max"}
-
-func kimiSupportsEffort(effort ir.ReasoningEffort) bool {
-	for _, v := range kimiEfforts {
-		if effort == v {
-			return true
-		}
-	}
-	return false
-}
-
-func kimiSupportedEfforts(efforts []ir.ReasoningEffort) []ir.ReasoningEffort {
-	out := []ir.ReasoningEffort{}
-	for _, effort := range efforts {
-		if kimiSupportsEffort(effort) {
-			out = append(out, effort)
-		}
-	}
-	return out
 }
 
 func effortStrings(efforts []ir.ReasoningEffort) []string {

@@ -31,7 +31,10 @@ max_completion_tokens = 8192
 
 Grok has no provider table: every model repeats `base_url`/`env_key`. The emitter therefore rejects duplicate model IDs across IR providers, because both would emit the same `[model."<id>"]` table.
 
-`extra_headers` is a literal string map with no documented environment expansion, so IR `ENV:NAME` / `Bearer ENV:NAME` provider headers are rejected; literal headers are emitted.
+Literal provider headers map to `extra_headers`. IR `ENV:NAME` provider headers
+map to the native per-model `env_http_headers` name-to-environment-name map, so
+the secret is not written to the fragment. `Bearer ENV:NAME` is rejected: that
+field inserts the raw environment value and cannot add the `Bearer ` prefix.
 
 ## Capabilities
 
@@ -49,7 +52,8 @@ Upstream documents `${VAR}` expansion for MCP string fields, so the emitter rend
 
 ## Reasoning variants
 
-`models[].variants` emits `supports_reasoning_effort = true` and one
-`[[model.<id>.reasoning_efforts]]` record per name, with identical `id` and
-`value`. It does not generate a selected/default `reasoning_effort`, labels, or
-descriptions. Provider-specific names such as `ultra` are preserved.
+`models[].variants` emits one `[[model.<id>.reasoning_efforts]]` record per
+native effort. Grok accepts only `none`, `minimal`, `low`, `medium`, `high`,
+`xhigh`, and `max`; other source names such as `ultra` are skipped. It does not
+generate a selected/default `reasoning_effort`, labels, descriptions, or the
+deprecated `supports_reasoning_effort` flag.

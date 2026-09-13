@@ -119,6 +119,9 @@ func (t Target) Emit(cfg ir.Config) ([]artifact.Artifact, error) {
 				"enabled":     enabled,
 				"environment": env,
 			}
+			if s.TimeoutMS != nil {
+				local["timeout"] = *s.TimeoutMS
+			}
 			doc.MCP[s.ID] = local
 		} else {
 			headers := map[string]string{}
@@ -130,6 +133,9 @@ func (t Target) Emit(cfg ir.Config) ([]artifact.Artifact, error) {
 				"url":     s.URL,
 				"enabled": enabled,
 				"headers": headers,
+			}
+			if s.TimeoutMS != nil {
+				remote["timeout"] = *s.TimeoutMS
 			}
 			doc.MCP[s.ID] = remote
 		}

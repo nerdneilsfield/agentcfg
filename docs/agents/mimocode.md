@@ -75,6 +75,11 @@ MiMo Code uses native `type` values `local` and `remote` (the `stdio`/`http` spe
 }
 ```
 
+### MCP timeout
+
+IR `timeout_ms` maps unchanged to native `mcp.<id>.timeout` for both `local`
+and `remote` servers.
+
 ## Defaults
 
 `defaults.model` maps to the top-level `"model": "provider/model"` string verbatim. MiMo Code's `small_model` / `vision_model` selectors have no IR equivalent and are not emitted.

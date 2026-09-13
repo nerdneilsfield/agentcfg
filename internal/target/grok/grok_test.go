@@ -115,10 +115,23 @@ func TestEmitGolden(t *testing.T) {
 	}
 }
 
-func TestRejectsEnvDerivedProviderHeaders(t *testing.T) {
+func TestEmitsEnvDerivedProviderHeaders(t *testing.T) {
 	cfg := exampleConfig()
 	cfg.Providers[0].Headers["X-Gateway-Key"] = ir.HeaderValue{FromEnv: "GATEWAY_KEY"}
-	expectInvalid(t, cfg, "extra_headers")
+	expectValid(t, cfg)
+	arts, err := (Target{}).Emit(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := string(arts[0].Content)
+	for _, want := range []string{`[model."glm-5.3".env_http_headers]`, `X-Gateway-Key = "GATEWAY_KEY"`} {
+		if !strings.Contains(out, want) {
+			t.Errorf("missing %q:\n%s", want, out)
+		}
+	}
+	if strings.Contains(out, `X-Gateway-Key = ""`) {
+		t.Fatalf("env header leaked into extra headers:\n%s", out)
+	}
 }
 
 func TestRejectsDuplicateModelIDs(t *testing.T) {
@@ -157,21 +170,23 @@ func TestOmitsEmptyMCPServers(t *testing.T) {
 	}
 }
 
-func TestEmitsReasoningEfforts(t *testing.T) {
+func TestEmitsSupportedReasoningEfforts(t *testing.T) {
 	cfg := exampleConfig()
 	cfg.Providers[0].Models[0].Variants = []ir.ReasoningEffort{"low", "high", "ultra"}
+	expectValid(t, cfg)
 	arts, err := (Target{}).Emit(cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
 	out := string(arts[0].Content)
-	for _, want := range []string{`supports_reasoning_effort = true`, `[[model."glm-5.3".reasoning_efforts]]`, `id = "ultra"`, `value = "ultra"`} {
+	for _, want := range []string{`[[model."glm-5.3".reasoning_efforts]]`, `id = "low"`, `value = "high"`} {
 		if !strings.Contains(out, want) {
 			t.Errorf("missing %q:\n%s", want, out)
 		}
 	}
-	if strings.Contains(out, `
-  reasoning_effort =`) {
-		t.Fatalf("must not select default effort:\n%s", out)
+	for _, forbidden := range []string{`id = "ultra"`, `value = "ultra"`, `supports_reasoning_effort`} {
+		if strings.Contains(out, forbidden) {
+			t.Errorf("unexpected %q:\n%s", forbidden, out)
+		}
 	}
 }

@@ -184,7 +184,7 @@ func TestEmitsSupportEfforts(t *testing.T) {
 	}
 }
 
-func TestSkipsUnsupportedReasoningEffort(t *testing.T) {
+func TestPreservesProviderReasoningEffortNames(t *testing.T) {
 	cfg := exampleConfig()
 	cfg.Providers[0].Models[0].Variants = []ir.ReasoningEffort{"low", "ultra"}
 	expectValid(t, cfg)
@@ -193,10 +193,7 @@ func TestSkipsUnsupportedReasoningEffort(t *testing.T) {
 		t.Fatal(err)
 	}
 	out := string(arts[0].Content)
-	if !strings.Contains(out, `support_efforts = ["low"]`) {
-		t.Fatalf("missing supported effort:\n%s", out)
-	}
-	if strings.Contains(out, `"ultra"`) {
-		t.Fatalf("unsupported effort must be skipped:\n%s", out)
+	if !strings.Contains(out, `support_efforts = ["low", "ultra"]`) {
+		t.Fatalf("missing provider effort names:\n%s", out)
 	}
 }
