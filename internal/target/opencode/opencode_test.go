@@ -93,3 +93,32 @@ func TestEmitsCompletionsProvider(t *testing.T) {
 		}
 	}
 }
+
+func TestEmitsModelReasoningVariants(t *testing.T) {
+	cfg := exampleConfig()
+	cfg.Providers[0].Models[0].Variants = []ir.ReasoningEffort{
+		ir.ReasoningEffortLow,
+		ir.ReasoningEffortHigh,
+		ir.ReasoningEffortMax,
+	}
+	arts, err := (Target{}).Emit(cfg)
+	if err != nil {
+		t.Fatalf("Emit: %v", err)
+	}
+	out := string(arts[0].Content)
+	for _, want := range []string{
+		`"variants": {`,
+		`"low": {`, `"reasoningEffort": "low"`,
+		`"high": {`, `"reasoningEffort": "high"`,
+		`"max": {`, `"reasoningEffort": "max"`,
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("missing %q in output:\n%s", want, out)
+		}
+	}
+	for _, forbidden := range []string{`reasoningSummary`, `textVerbosity`} {
+		if strings.Contains(out, forbidden) {
+			t.Errorf("unexpected %q in output:\n%s", forbidden, out)
+		}
+	}
+}

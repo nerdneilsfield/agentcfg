@@ -81,6 +81,12 @@ func (t Target) Emit(cfg ir.Config) ([]artifact.Artifact, error) {
 			if m.Reasoning != nil && *m.Reasoning {
 				om.Reasoning = true
 			}
+			if len(m.Variants) > 0 {
+				om.Variants = map[string]opencodeVariant{}
+				for _, effort := range m.Variants {
+					om.Variants[string(effort)] = opencodeVariant{ReasoningEffort: string(effort)}
+				}
+			}
 			if m.ToolCalling != nil && *m.ToolCalling {
 				om.Tools = true
 			}
@@ -174,11 +180,16 @@ type opencodeProvider struct {
 }
 
 type opencodeModel struct {
-	Name       string                   `json:"name"`
-	Limit      map[string]int64         `json:"limit,omitempty"`
-	Modalities map[string][]ir.Modality `json:"modalities"`
-	Reasoning  bool                     `json:"reasoning,omitempty"`
-	Tools      bool                     `json:"tools,omitempty"`
+	Name       string                     `json:"name"`
+	Limit      map[string]int64           `json:"limit,omitempty"`
+	Modalities map[string][]ir.Modality   `json:"modalities"`
+	Reasoning  bool                       `json:"reasoning,omitempty"`
+	Tools      bool                       `json:"tools,omitempty"`
+	Variants   map[string]opencodeVariant `json:"variants,omitempty"`
+}
+
+type opencodeVariant struct {
+	ReasoningEffort string `json:"reasoningEffort"`
 }
 
 func orDefault(v, def string) string {

@@ -40,7 +40,25 @@ For OpenAI-compatible routes OpenCode uses the AI SDK adapter package:
 
 The v1 emitter supports `openai-completions` only. It maps request headers to `options.headers`, using OpenCode's `{env:NAME}` interpolation. `openai-responses` and `anthropic-messages` need a verified adapter package and are rejected rather than guessed.
 
-The published schema supports additional model fields (`attachment`, `temperature`, cost, variants, options and more). They are intentionally outside the v1 IR until their semantics are shared and required.
+### Reasoning variants
+
+`models[].variants` emits an OpenCode model `variants` object. Each portable
+variant becomes a child key with only the matching native `reasoningEffort`:
+
+```json
+"variants": {
+  "low": { "reasoningEffort": "low" },
+  "high": { "reasoningEffort": "high" },
+  "max": { "reasoningEffort": "max" }
+}
+```
+
+It does not emit `reasoningSummary`, `textVerbosity`, token budgets, or other
+provider options. Those are not part of the agentcfg variant semantic.
+
+The published schema supports additional model fields (`attachment`,
+`temperature`, cost, options and more). They remain outside the IR until their
+semantics are shared and required.
 
 ## MCP
 
