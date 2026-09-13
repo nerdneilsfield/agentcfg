@@ -37,10 +37,6 @@ func (t Target) Validate(cfg ir.Config) []diag.Diagnostic {
 	}
 	for i, s := range cfg.MCP {
 		path := fmt.Sprintf("mcp[%d]", i)
-		if s.TimeoutMS != nil && *s.TimeoutMS%1000 != 0 {
-			diags = append(diags, diag.TargetErrorf(t.ID(), path+".timeout_ms",
-				"codex startup_timeout_sec is whole seconds; timeout_ms must be divisible by 1000"))
-		}
 		switch s.Transport {
 		case ir.TransportStdio:
 			for name, v := range s.Env {
@@ -67,6 +63,9 @@ func (t Target) Validate(cfg ir.Config) []diag.Diagnostic {
 
 func (t Target) Emit(cfg ir.Config) ([]artifact.Artifact, error) {
 	doc := codexConfig{ModelProviders: map[string]codexProvider{}, MCPServers: map[string]codexMCPServer{}}
+	if cfg.Defaults != nil && cfg.Defaults.Model != "" {
+		doc.ModelProvider, doc.Model = splitRef(cfg.Defaults.Model)
+	}
 	for _, p := range cfg.Providers {
 		cp := codexProvider{
 			Name:               orDefault(p.Name, p.ID),
@@ -97,7 +96,7 @@ func (t Target) Emit(cfg ir.Config) ([]artifact.Artifact, error) {
 			m.Enabled = boolPtr(false)
 		}
 		if s.TimeoutMS != nil {
-			m.StartupTimeoutSec = int64Ptr(*s.TimeoutMS / 1000)
+			m.StartupTimeoutMS = s.TimeoutMS
 		}
 		if s.Transport == ir.TransportStdio {
 			m.Command = s.Command[0]
@@ -177,7 +176,16 @@ type codexMCPServer struct {
 	BearerTokenEnvVar string            `toml:"bearer_token_env_var,omitempty"`
 	HTTPHeaders       map[string]string `toml:"http_headers,omitempty"`
 	EnvHTTPHeaders    map[string]string `toml:"env_http_headers,omitempty"`
-	StartupTimeoutSec *int64            `toml:"startup_timeout_sec,omitempty"`
+	StartupTimeoutMS  *int64            `toml:"startup_timeout_ms,omitempty"`
+}
+
+func splitRef(providerModel string) (string, string) {
+	for i := 0; i < len(providerModel); i++ {
+		if providerModel[i] == '/' {
+			return providerModel[:i], providerModel[i+1:]
+		}
+	}
+	return "", providerModel
 }
 
 func orDefault(v, def string) string {

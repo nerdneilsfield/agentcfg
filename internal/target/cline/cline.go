@@ -26,11 +26,9 @@ var protocolName = map[ir.Protocol]string{
 	ir.ProtocolAnthropicMessages: "anthropic",
 }
 
-// cline timeout is whole seconds in [1, 3600]; out-of-range values are rejected.
-const (
-	minTimeoutMS = 1000
-	maxTimeoutMS = 3_600_000
-)
+// Cline requires a RFC 3339 timestamp for every persisted provider entry.
+// A constant preserves reproducible generated fragments.
+const providerUpdatedAt = "1970-01-01T00:00:00Z"
 
 func (t Target) Validate(cfg ir.Config) []diag.Diagnostic {
 	var diags []diag.Diagnostic
@@ -50,13 +48,15 @@ func (t Target) Validate(cfg ir.Config) []diag.Diagnostic {
 					"cline headers are literal strings with no interpolation; only constant header values are representable"))
 			}
 		}
+		for j, m := range p.Models {
+			if m.ToolCalling != nil && !*m.ToolCalling {
+				diags = append(diags, diag.TargetErrorf(t.ID(), fmt.Sprintf("%s.models[%d].tool_calling", path, j),
+					"cline custom model capabilities cannot disable tools; tool_calling: false is not representable"))
+			}
+		}
 	}
 	for i, s := range cfg.MCP {
 		path := fmt.Sprintf("mcp[%d]", i)
-		if s.TimeoutMS != nil && (*s.TimeoutMS < minTimeoutMS || *s.TimeoutMS > maxTimeoutMS) {
-			diags = append(diags, diag.TargetErrorf(t.ID(), path+".timeout_ms",
-				"cline timeout is whole seconds clamped to 1..3600; %d ms is out of range", *s.TimeoutMS))
-		}
 		if s.Transport == ir.TransportStdio {
 			for name, v := range s.Env {
 				if v.FromEnv != "" || v.BearerFromEnv != "" {
@@ -113,6 +113,7 @@ func (t Target) Emit(cfg ir.Config) ([]artifact.Artifact, error) {
 		}
 		providers[p.ID] = clineProviderEntry{
 			Settings:    settings,
+			UpdatedAt:   providerUpdatedAt,
 			TokenSource: "manual",
 		}
 	}
@@ -201,7 +202,7 @@ func (t Target) Emit(cfg ir.Config) ([]artifact.Artifact, error) {
 				entry.Disabled = boolPtr(true)
 			}
 			if s.TimeoutMS != nil {
-				entry.Timeout = int64(*s.TimeoutMS / 1000)
+				entry.Timeout = float64(*s.TimeoutMS) / 1000
 			}
 			if s.Transport == ir.TransportStdio {
 				tr := clineTransport{
@@ -324,6 +325,7 @@ type clineProvidersDoc struct {
 
 type clineProviderEntry struct {
 	Settings    clineSettings `json:"settings"`
+	UpdatedAt   string        `json:"updatedAt"`
 	TokenSource string        `json:"tokenSource"`
 }
 
@@ -363,7 +365,7 @@ type clineModel struct {
 type clineMCPServer struct {
 	Transport clineTransport `json:"transport"`
 	Disabled  *bool          `json:"disabled,omitempty"`
-	Timeout   int64          `json:"timeout,omitempty"`
+	Timeout   float64        `json:"timeout,omitempty"`
 }
 
 type clineTransport struct {

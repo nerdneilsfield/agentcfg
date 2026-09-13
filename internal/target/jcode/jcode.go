@@ -54,6 +54,10 @@ func (t Target) Validate(cfg ir.Config) []diag.Diagnostic {
 			diags = append(diags, diag.TargetErrorf(t.ID(), path+".cwd",
 				"jcode MCP servers have no cwd field"))
 		}
+		if s.TimeoutMS != nil && *s.TimeoutMS%1000 != 0 {
+			diags = append(diags, diag.TargetErrorf(t.ID(), path+".timeout_ms",
+				"jcode timeout_secs is an integer; timeout_ms must be divisible by 1000"))
+		}
 		for name, v := range s.Headers {
 			if v.FromEnv != "" || v.BearerFromEnv != "" {
 				diags = append(diags, diag.TargetErrorf(t.ID(), path+".headers."+name,
@@ -154,7 +158,7 @@ func (t Target) Emit(cfg ir.Config) ([]artifact.Artifact, error) {
 				entry.Env = env
 			}
 			if s.TimeoutMS != nil {
-				entry.TimeoutSecs = float64(*s.TimeoutMS) / 1000
+				entry.TimeoutSecs = *s.TimeoutMS / 1000
 			}
 			servers[s.ID] = entry
 		}
@@ -250,6 +254,6 @@ type jcodeMCPServer struct {
 	Command     string            `json:"command"`
 	Args        []string          `json:"args,omitempty"`
 	Env         map[string]string `json:"env,omitempty"`
-	TimeoutSecs float64           `json:"timeout_secs,omitempty"`
+	TimeoutSecs int64             `json:"timeout_secs,omitempty"`
 	Enabled     bool              `json:"enabled"`
 }

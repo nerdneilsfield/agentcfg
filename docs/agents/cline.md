@@ -26,6 +26,7 @@ Custom providers are entries of `providers.json`:
         "model": "glm-5.3",
         "headers": {"X-Tenant": "engineering"}
       },
+      "updatedAt": "1970-01-01T00:00:00Z",
       "tokenSource": "manual"
     }
   }
@@ -40,7 +41,9 @@ Custom providers are entries of `providers.json`:
 Rich model metadata lives in `models.json` under
 `providers.<id>.models.<model-id>`: `name`, `contextWindow`, `maxTokens`,
 `modalities {input, output}`, and `capabilities` (`images`, `video`, `tools`,
-`reasoning`). IR model fields map 1:1 onto these. Cline `settings.model` holds
+`reasoning`). `tool_calling: true` maps to `tools`. `tool_calling: false` is
+rejected: Cline's persisted custom model registry treats missing capabilities as
+tool-enabled and cannot faithfully turn tools off. Cline `settings.model` holds
 only the bare default model id, and `defaults.model "provider/model"` maps to
 `lastUsedProvider` + `settings.model`.
 
@@ -49,9 +52,8 @@ only the bare default model id, and `defaults.model "provider/model"` maps to
 `cline_mcp_settings.json` uses a nested `transport` form: stdio
 (`command`/`args`/`cwd`/`env`) or `streamableHttp` (`url`/`headers`; the IR
 `http` transport maps here). `enabled: false` maps to `disabled: true`.
-`timeout` is whole seconds in 1..3600; the emitter rejects IR
-`timeout_ms` values outside 1000..3600000 and truncates non-multiples of 1000
-toward zero (e.g. 1500 ms becomes 1 s). MCP `env` and `headers` are literal
+`timeout` is a numeric number of seconds; the emitter preserves the IR
+millisecond value as seconds (for example 1500 ms becomes `1.5`). MCP `env` and `headers` are literal
 strings, so IR `ENV:NAME` / `Bearer ENV:NAME` MCP values are rejected. When the
 IR has no MCP servers, the artifact is omitted.
 

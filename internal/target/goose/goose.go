@@ -86,6 +86,10 @@ func (t Target) Validate(cfg ir.Config) []diag.Diagnostic {
 				diags = append(diags, diag.TargetErrorf(t.ID(), path+".env."+name,
 					"goose extension env values are plain environment names or literals; Bearer ENV:NAME is not representable on env"))
 			}
+			if v.FromEnv != "" && v.FromEnv != name {
+				diags = append(diags, diag.TargetErrorf(t.ID(), path+".env."+name,
+					"goose stdio env_keys preserve the source name; renamed environment references are not representable"))
+			}
 		}
 	}
 	if cfg.Defaults != nil && cfg.Defaults.Model != "" {

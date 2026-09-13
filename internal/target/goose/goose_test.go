@@ -215,3 +215,9 @@ func TestIgnoresModelReasoningVariants(t *testing.T) {
 		}
 	}
 }
+
+func TestRejectsRenamedStdioEnvReference(t *testing.T) {
+	cfg := exampleConfig()
+	cfg.MCP[0].Env["DEST"] = ir.HeaderValue{FromEnv: "SOURCE"}
+	expectInvalid(t, cfg, "renamed environment references")
+}

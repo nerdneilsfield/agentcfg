@@ -183,3 +183,9 @@ func TestIgnoresModelReasoningVariants(t *testing.T) {
 		}
 	}
 }
+
+func TestRejectsFractionalMCPTimeout(t *testing.T) {
+	cfg := exampleConfig()
+	cfg.MCP[0].TimeoutMS = i64(1500)
+	expectInvalid(t, cfg, "timeout_secs is an integer")
+}

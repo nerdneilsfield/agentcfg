@@ -76,7 +76,7 @@ func TestMapsStreamableHTTPServers(t *testing.T) {
 		`X-Team = "TEAM_HEADER"`,
 		`[mcp_servers.docs]`,
 		`url = "https://mcp.example.com"`,
-		`startup_timeout_sec = 20`,
+		`startup_timeout_ms = 20000`,
 		`[mcp_servers.context7]`,
 		`command = "npx"`,
 		`args = ["-y", "@upstash/context7-mcp"]`,
@@ -104,7 +104,6 @@ func TestRejectsUnrepresentableFields(t *testing.T) {
 			c.MCP[1].Headers["X-Other"] = ir.HeaderValue{BearerFromEnv: "TOK"}
 		}},
 		{"http cwd", func(c *ir.Config) { c.MCP[2].CWD = "/tmp" }},
-		{"fractional timeout", func(c *ir.Config) { c.MCP[2].TimeoutMS = int64p(1500) }},
 		{"renamed env ref", func(c *ir.Config) {
 			c.MCP[0].Env["RENAMED"] = ir.HeaderValue{FromEnv: "OTHER_NAME"}
 		}},
@@ -134,5 +133,26 @@ func TestIgnoresModelReasoningVariants(t *testing.T) {
 		if strings.Contains(string(art.Content), `"variants"`) {
 			t.Fatalf("variants must be skipped:\n%s", art.Content)
 		}
+	}
+}
+
+func TestEmitsDefaultProviderAndModel(t *testing.T) {
+	cfg := exampleConfig()
+	cfg.Providers[0].Models = []ir.Model{{ID: "glm-5.3"}}
+	cfg.Defaults = &ir.Defaults{Model: "volcengine/glm-5.3"}
+	out := gen(t, cfg)
+	for _, want := range []string{`model_provider = "volcengine"`, `model = "glm-5.3"`} {
+		if !strings.Contains(out, want) {
+			t.Errorf("missing %q:\n%s", want, out)
+		}
+	}
+}
+
+func TestEmitsMillisecondMCPTimeout(t *testing.T) {
+	cfg := exampleConfig()
+	cfg.MCP[2].TimeoutMS = int64p(1500)
+	out := gen(t, cfg)
+	if !strings.Contains(out, `startup_timeout_ms = 1500`) {
+		t.Fatalf("missing millisecond timeout:\n%s", out)
 	}
 }

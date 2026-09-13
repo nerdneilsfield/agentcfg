@@ -116,6 +116,7 @@ func TestEmitGolden(t *testing.T) {
           "X-Tenant": "engineering"
         }
       },
+      "updatedAt": "1970-01-01T00:00:00Z",
       "tokenSource": "manual"
     }
   }
@@ -204,13 +205,29 @@ func TestRejectsMCPEnvRef(t *testing.T) {
 	expectInvalid(t, cfg, "literal strings")
 }
 
-func TestRejectsTimeoutOutOfRange(t *testing.T) {
+func TestPreservesFractionalMCPTimeout(t *testing.T) {
 	cfg := exampleConfig()
 	cfg.Providers[0].APIKey.FromEnv = ""
 	delete(cfg.Providers[0].Headers, "X-Gateway-Key")
 	cfg.MCP[0].Env["CONTEXT7_API_KEY"] = ir.HeaderValue{Value: "literal-key"}
-	cfg.MCP[0].TimeoutMS = i64(10)
-	expectInvalid(t, cfg, "out of range")
+	cfg.MCP[1].Headers["Authorization"] = ir.HeaderValue{Value: "Bearer literal-token"}
+	cfg.MCP[0].TimeoutMS = i64(1500)
+	expectValid(t, cfg)
+	arts, err := (Target{}).Emit(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(arts[2].Content), `"timeout": 1.5`) {
+		t.Fatalf("fractional timeout lost:\n%s", arts[2].Content)
+	}
+}
+
+func TestRejectsToolCallingFalse(t *testing.T) {
+	cfg := exampleConfig()
+	cfg.Providers[0].APIKey.FromEnv = ""
+	delete(cfg.Providers[0].Headers, "X-Gateway-Key")
+	cfg.Providers[0].Models[0].ToolCalling = b(false)
+	expectInvalid(t, cfg, "cannot disable tools")
 }
 
 func TestOmitsMCPArtifactWhenEmpty(t *testing.T) {

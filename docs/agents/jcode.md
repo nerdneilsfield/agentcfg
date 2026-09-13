@@ -46,7 +46,9 @@ provider's first model.
 
 ## MCP
 
-`~/.jcode/mcp.json` holds `[server].<id>`-style entries with stdio-only support (`command`, `args`, `env`, `timeout_secs`, `enabled|disabled`). HTTP/SSE entries are parsed but skipped at load, so IR `http` transport is rejected. `${VAR}` / `${VAR:-default}` expansion is native for MCP string fields, so IR `ENV:NAME` renders as `"${VAR}"`. `Authorization: "Bearer ENV:NAME"` renders as `Bearer ${VAR}` inside headers. IR `timeout_ms` is emitted as `timeout_secs` (seconds, `ms/1000`); IR `cwd` has no jcode field and is rejected for MCP servers.
+`~/.jcode/mcp.json` holds `[server].<id>`-style entries with stdio-only support (`command`, `args`, `env`, `timeout_secs`, `enabled|disabled`). HTTP/SSE entries are parsed but skipped at load, so IR `http` transport is rejected. `${VAR}` / `${VAR:-default}` expansion is native for MCP string fields, so IR `ENV:NAME` renders as `"${VAR}"`. `Authorization: "Bearer ENV:NAME"` renders as `Bearer ${VAR}` inside headers. IR `timeout_ms` maps to integer `timeout_secs`; values not divisible by 1000
+are rejected because the native field is `u64`. IR `cwd` has no jcode field and
+is rejected for MCP servers.
 
 ## Reasoning variants
 

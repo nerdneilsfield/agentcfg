@@ -53,7 +53,7 @@ providers:
 Goose MCP servers are `extensions.<id>` in `config.yaml`:
 
 - stdio: `type: stdio`, `cmd`, `args`, `envs` (literal map), `env_keys` (names resolved from env then the Goose secret store), `cwd`, `timeout` (seconds). IR `ENV:NAME` MCP env values become `env_keys` entries; literal env values become `envs`. `Bearer ENV:NAME` on MCP env is rejected.
-- http: `type: streamable_http`, `uri`, `headers`. `$VAR` / `${VAR}` substitution runs on `uri`, header values, `cwd`, and `socket` from the merged env map, so IR `ENV:NAME` renders as `${VAR}` and `Authorization: "Bearer ENV:NAME"` as `Bearer ${VAR}` — and each referenced name is also added to `env_keys` so substitution can resolve it.
+- http: `type: streamable_http`, `uri`, `headers`. `$VAR` / `${VAR}` substitution runs on `uri`, header values, `cwd`, and `socket` from the merged env map, so IR `ENV:NAME` renders as `${VAR}` and `Authorization: "Bearer ENV:NAME"` as `Bearer ${VAR}` — and each referenced name is also added to `env_keys` so substitution can resolve it. For stdio `env`, a reference must use the same source and child name (`NAME: ENV:NAME`); Goose's `env_keys` cannot rename it, so `DEST: ENV:SOURCE` is rejected.
 - `enabled` maps 1:1; `timeout_ms` must be divisible by 1000 (whole seconds) and is rejected otherwise. Builtin / platform extensions are not in IR scope and are not emitted.
 
 ## Reasoning variants

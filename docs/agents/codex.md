@@ -44,11 +44,15 @@ url = "https://api.githubcopilot.com/mcp/"
 bearer_token_env_var = "GITHUB_TOKEN"
 ```
 
-The reference documents `command`, `args`, `url`, `enabled`, `required`, `env`, `env_vars`, `cwd`, `bearer_token_env_var`, `http_headers`, `env_http_headers`, `startup_timeout_sec`, and `tool_timeout_sec`. v1 maps a same-name environment reference through `env_vars`, a literal child value through `env`; a renamed environment reference is rejected because `env_vars` inherits only same-name variables. It maps `Authorization: "Bearer ENV:NAME"` through `bearer_token_env_var`; other static and environment-derived HTTP headers map to `http_headers` and `env_http_headers`. Literal values are rendered as supplied; environment references are not resolved by agentcfg.
+The reference documents `command`, `args`, `url`, `enabled`, `required`, `env`, `env_vars`, `cwd`, `bearer_token_env_var`, `http_headers`, `env_http_headers`, `startup_timeout_ms`, `startup_timeout_sec`, and `tool_timeout_sec`. IR
+`timeout_ms` maps losslessly to `startup_timeout_ms`. v1 maps a same-name environment reference through `env_vars`, a literal child value through `env`; a renamed environment reference is rejected because `env_vars` inherits only same-name variables. It maps `Authorization: "Bearer ENV:NAME"` through `bearer_token_env_var`; other static and environment-derived HTTP headers map to `http_headers` and `env_http_headers`. Literal values are rendered as supplied; environment references are not resolved by agentcfg.
 
 ## Defaults
 
-Codex's top-level `model` selects a model string, but a custom provider also requires the top-level `model_provider`. This mapping needs a live custom-provider smoke test before `defaults.model` is enabled for this target. v1 validates but does not emit defaults for Codex.
+Codex selects a custom default through top-level `model_provider` and `model`.
+`defaults.model: "provider/model"` maps to those two fields. This is separate
+from the replacement `model_catalog_json` mechanism, which agentcfg does not
+generate from the common model IR.
 
 ## Sources
 
