@@ -42,8 +42,8 @@ The v1 emitter supports `openai-completions` only. It maps request headers to `o
 
 ### Reasoning variants
 
-`models[].variants` emits an OpenCode model `variants` object. Each portable
-variant becomes a child key with only the matching native `reasoningEffort`:
+`models[].variants` emits an OpenCode model `variants` object. Each agentcfg variant becomes a child key with only the matching native
+`reasoningEffort`; provider/model-specific names such as `ultra` are preserved:
 
 ```json
 "variants": {

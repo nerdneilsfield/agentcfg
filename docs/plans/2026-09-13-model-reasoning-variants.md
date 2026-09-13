@@ -15,24 +15,24 @@ models:
     variants: [low, high, max]
 ```
 
-The allowed canonical effort identifiers are `off`, `minimal`, `low`, `medium`, `high`, `xhigh`, and `max`. Lists are non-empty, contain no duplicates, and require `reasoning: true`. `variants` does not select a default. Existing model configurations without variants retain their current output.
+Effort names are provider/model-supplied lowercase identifiers (for example `low`, `medium`, `high`, `xhigh`, `max`, or `ultra`). Lists are non-empty, contain no duplicates, and require `reasoning: true`. `variants` does not select a default. Existing model configurations without variants retain their current output.
 
 Existing changes: none in the agentcfg worktree. Authorization: implementation is authorized by the user's request to continue. Do not alter KVMux or any global configuration.
 
 ## Design and constraints
 
-`ir.Model.Variants` is a model-local ordered list of canonical reasoning efforts. Validation owns its syntax, duplication, and `reasoning: true` invariant. Emitters must treat a populated list as required configuration: render the documented native model-level availability structure or diagnose that the target cannot faithfully represent it. No target may reduce it to the existing boolean `reasoning` flag.
+`ir.Model.Variants` is a model-local ordered list of provider/model-supplied reasoning efforts. Validation owns its syntax, duplication, and `reasoning: true` invariant. Emitters must treat a populated list as required configuration: render the documented native model-level availability structure or diagnose that the target cannot faithfully represent it. No target may reduce it to the existing boolean `reasoning` flag.
 
 Exact native mapping is:
 
 - OpenCode: `models.<id>.variants.<effort>.reasoningEffort`.
-- Pi, Prime Agent, OpenClaw: `thinkingLevelMap`, with all unlisted canonical levels set to `null` and listed entries mapped to their same-named provider values.
+- Pi, Prime Agent, OpenClaw: `thinkingLevelMap` only when every configured variant name is a documented native level; unsupported names are target diagnostics, never remapped.
 - Kimi: `support_efforts` only; leave its unrelated `default_effort` unset.
 - Crush: `reasoning_levels` only; leave `default_reasoning_effort` unset.
 - Grok Build: `supports_reasoning_effort = true` plus `reasoning_efforts` records; no generated labels/descriptions/default selection beyond the canonical identifier.
 - Zcode: structured `reasoning` object with `enabled: true` and `levels`; no target-specific default or per-level request options.
 - Gajae: `thinking` in `effort` mode with `levels`; do not add its budget/adaptive mode fields.
-- DeepSeek Harness: `reasoningEfforts` canonical-to-same-name map. It does not include the route's active/default reasoning setting.
+- DeepSeek Harness: `reasoningEfforts` same-name map when every configured variant name is a documented native level. It does not include the route's active/default reasoning setting.
 
 Codex owns the active effort outside the provider model and needs a separate catalog artifact. Cline and Jcode only have one selected/provider default effort. Goose and Hermes have no model-level availability list. MiMo Code's generic pass-through variants/options do not establish a reasoning-effort selector. Those targets reject a non-empty `variants` list with a target diagnostic.
 
@@ -60,7 +60,7 @@ Contracts: `Model.Variants` is the ordered canonical effort list. It does not se
 - [x] Verified: `go test ./internal/ir ./internal/example` and `go run ./cmd/agentcfg validate -c example.yaml` passed; the example remains valid for its all-target subset.
 - [ ] Inspect the diff and commit `feat: add model reasoning variants to IR`.
 
-Evidence: 2026-09-13 focused IR and embedded-example tests passed; `example.yaml: OK (2 providers, 2 MCP servers, 5 targets)`.
+Evidence: 2026-09-13 focused IR and embedded-example tests passed; `example.yaml: OK (2 providers, 2 MCP servers, 5 targets)`. Follow-up: names are provider/model-supplied rather than fixed canonical values; `low, medium, high, xhigh, max, ultra` was emitted unchanged for OpenCode.
 
 ### T2: Emit exact model-level variant availability
 

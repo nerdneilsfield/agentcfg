@@ -108,7 +108,7 @@ func TestValidateFindings(t *testing.T) {
 		{"bad modality", "version: 1\nproviders:\n  - id: a\n    protocol: openai-responses\n    base_url: https://e.com\n    models:\n      - id: m\n        input: [smell]\n", "unknown modality"},
 		{"variants require reasoning", "version: 1\nproviders:\n  - id: a\n    protocol: openai-responses\n    base_url: https://e.com\n    models: [{id: m, variants: [low]}]\n", "requires reasoning: true"},
 		{"duplicate reasoning variant", "version: 1\nproviders:\n  - id: a\n    protocol: openai-responses\n    base_url: https://e.com\n    models: [{id: m, reasoning: true, variants: [low, low]}]\n", "duplicate reasoning effort"},
-		{"unknown reasoning variant", "version: 1\nproviders:\n  - id: a\n    protocol: openai-responses\n    base_url: https://e.com\n    models: [{id: m, reasoning: true, variants: [turbo]}]\n", "unknown reasoning effort"},
+		{"invalid reasoning variant", "version: 1\nproviders:\n  - id: a\n    protocol: openai-responses\n    base_url: https://e.com\n    models: [{id: m, reasoning: true, variants: [Ultra]}]\n", "unknown reasoning effort"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -196,7 +196,7 @@ providers:
 		t.Fatalf("Load: %v %v", err, ds)
 	}
 	got := cfg.Providers[0].Models[0].Variants
-	want := []ReasoningEffort{ReasoningEffortLow, ReasoningEffortHigh, ReasoningEffortMax}
+	want := []ReasoningEffort{"low", "high", "max"}
 	if len(got) != len(want) {
 		t.Fatalf("variants = %v, want %v", got, want)
 	}
@@ -204,5 +204,22 @@ providers:
 		if got[i] != want[i] {
 			t.Fatalf("variants = %v, want %v", got, want)
 		}
+	}
+}
+
+func TestLoadPreservesProviderReasoningEffortNames(t *testing.T) {
+	cfg, ds, err := Load([]byte(`version: 1
+providers:
+  - id: p
+    protocol: openai-completions
+    base_url: https://example.com/v1
+    models: [{id: m, reasoning: true, variants: [low, medium, high, xhigh, max, ultra]}]
+`))
+	if err != nil || diag.HasErrors(ds) {
+		t.Fatalf("Load: %v %v", err, ds)
+	}
+	got := cfg.Providers[0].Models[0].Variants
+	if got[len(got)-1] != "ultra" {
+		t.Fatalf("variants were rewritten: %v", got)
 	}
 }

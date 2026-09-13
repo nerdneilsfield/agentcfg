@@ -45,19 +45,9 @@ type HeaderValue struct {
 	BearerFromEnv string `yaml:"-"`
 }
 
-// ReasoningEffort is one portable, selectable model reasoning level.
-// It is a model variant, not a model identifier or output setting.
+// ReasoningEffort is one model-provider supplied selectable reasoning level.
+// Its name is passed through unchanged; it is not a model identifier or output setting.
 type ReasoningEffort string
-
-const (
-	ReasoningEffortOff     ReasoningEffort = "off"
-	ReasoningEffortMinimal ReasoningEffort = "minimal"
-	ReasoningEffortLow     ReasoningEffort = "low"
-	ReasoningEffortMedium  ReasoningEffort = "medium"
-	ReasoningEffortHigh    ReasoningEffort = "high"
-	ReasoningEffortXHigh   ReasoningEffort = "xhigh"
-	ReasoningEffortMax     ReasoningEffort = "max"
-)
 
 // Model describes one model served by a provider.
 type Model struct {

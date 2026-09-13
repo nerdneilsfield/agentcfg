@@ -189,12 +189,17 @@ func validateReasoningVariants(path string, m Model) []diag.Diagnostic {
 }
 
 func validReasoningEffort(effort ReasoningEffort) bool {
-	switch effort {
-	case ReasoningEffortOff, ReasoningEffortMinimal, ReasoningEffortLow, ReasoningEffortMedium, ReasoningEffortHigh, ReasoningEffortXHigh, ReasoningEffortMax:
-		return true
-	default:
+	name := string(effort)
+	if name == "" || name[0] < 'a' || name[0] > 'z' {
 		return false
 	}
+	for i := 1; i < len(name); i++ {
+		c := name[i]
+		if (c < 'a' || c > 'z') && (c < '0' || c > '9') && c != '-' && c != '_' {
+			return false
+		}
+	}
+	return true
 }
 
 func validateModalities(path string, mods []Modality) []diag.Diagnostic {

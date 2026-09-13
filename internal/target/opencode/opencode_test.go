@@ -97,9 +97,10 @@ func TestEmitsCompletionsProvider(t *testing.T) {
 func TestEmitsModelReasoningVariants(t *testing.T) {
 	cfg := exampleConfig()
 	cfg.Providers[0].Models[0].Variants = []ir.ReasoningEffort{
-		ir.ReasoningEffortLow,
-		ir.ReasoningEffortHigh,
-		ir.ReasoningEffortMax,
+		"low",
+		"high",
+		"max",
+		"ultra",
 	}
 	arts, err := (Target{}).Emit(cfg)
 	if err != nil {
@@ -111,6 +112,7 @@ func TestEmitsModelReasoningVariants(t *testing.T) {
 		`"low": {`, `"reasoningEffort": "low"`,
 		`"high": {`, `"reasoningEffort": "high"`,
 		`"max": {`, `"reasoningEffort": "max"`,
+		`"ultra": {`, `"reasoningEffort": "ultra"`,
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("missing %q in output:\n%s", want, out)

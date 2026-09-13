@@ -127,8 +127,9 @@ not this IR.
 
 `variants` belongs to a model. It declares the reasoning efforts that a user can
 select for that same model; it does not create more model IDs and it does not
-select a default effort. The portable identifiers are `off`, `minimal`, `low`,
-`medium`, `high`, `xhigh`, and `max`:
+select a default effort. The names are provider/model-supplied lowercase identifiers. Common values include
+`low`, `medium`, `high`, `xhigh`, `max`, and `ultra`; agentcfg preserves the
+configured name instead of mapping it to a fixed global enum:
 
 ```yaml
 models:
