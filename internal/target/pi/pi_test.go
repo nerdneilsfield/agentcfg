@@ -122,3 +122,15 @@ func TestSkipsUnsupportedReasoningEffort(t *testing.T) {
 		t.Fatalf("unsupported effort must be skipped:\n%s", out)
 	}
 }
+
+func TestEmitsProviderHeadersInNameOrder(t *testing.T) {
+	cfg := exampleConfig()
+	arts, err := (Target{}).Emit(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := string(arts[0].Content)
+	if strings.Index(out, `"X-Gateway-Key"`) > strings.Index(out, `"X-Tenant"`) {
+		t.Fatalf("headers are not name-sorted:\n%s", out)
+	}
+}

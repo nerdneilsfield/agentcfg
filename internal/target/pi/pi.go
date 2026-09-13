@@ -3,6 +3,7 @@ package pi
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	"agentcfg/internal/artifact"
@@ -60,7 +61,8 @@ func (t Target) Emit(cfg ir.Config) ([]artifact.Artifact, error) {
 		}
 		if len(p.Headers) > 0 {
 			b.WriteString("    headers: {\n")
-			for name, v := range p.Headers {
+			for _, name := range sortedHeaderNames(p.Headers) {
+				v := p.Headers[name]
 				if v.FromEnv != "" {
 					fmt.Fprintf(&b, "      %q: \"$%s\",\n", name, v.FromEnv)
 				} else {
@@ -155,4 +157,13 @@ func containsEffort(efforts []ir.ReasoningEffort, wanted ir.ReasoningEffort) boo
 		}
 	}
 	return false
+}
+
+func sortedHeaderNames(headers map[string]ir.HeaderValue) []string {
+	names := make([]string, 0, len(headers))
+	for name := range headers {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return names
 }
