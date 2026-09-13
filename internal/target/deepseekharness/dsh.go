@@ -28,6 +28,16 @@ func (t Target) Validate(cfg ir.Config) []diag.Diagnostic {
 			diags = append(diags, diag.TargetErrorf(t.ID(), fmt.Sprintf("providers[%d].api_key", i), "deepseek-harness supports apiKeyEnv credential references only; literal API keys are not representable"))
 		}
 	}
+	for i, p := range cfg.Providers {
+		for j, m := range p.Models {
+			for _, effort := range m.Variants {
+				if !dshSupportsEffort(effort) {
+					diags = append(diags, diag.TargetErrorf(t.ID(), fmt.Sprintf("providers[%d].models[%d].variants", i, j),
+						"deepseek-harness reasoningEfforts does not support reasoning effort %q", effort))
+				}
+			}
+		}
+	}
 	for i, s := range cfg.MCP {
 		path := fmt.Sprintf("mcp[%d]", i)
 		if s.Transport != ir.TransportStdio {
@@ -56,6 +66,9 @@ func (t Target) Emit(cfg ir.Config) ([]artifact.Artifact, error) {
 			}
 			mm["input"] = modalStrings(m.Input)
 			mm["reasoning"] = m.Reasoning != nil && *m.Reasoning
+			if len(m.Variants) > 0 {
+				mm["reasoningEfforts"] = dshEffortMap(m.Variants)
+			}
 			mm["cost"] = map[string]any{"input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0}
 			if m.ContextWindow != nil {
 				mm["contextWindow"] = *m.ContextWindow
@@ -147,4 +160,31 @@ func orDefault(v, def string) string {
 		return def
 	}
 	return v
+}
+
+var dshEffortLevels = []ir.ReasoningEffort{"off", "minimal", "low", "medium", "high", "xhigh", "max"}
+
+func dshSupportsEffort(effort ir.ReasoningEffort) bool {
+	for _, level := range dshEffortLevels {
+		if effort == level {
+			return true
+		}
+	}
+	return false
+}
+
+func dshEffortMap(efforts []ir.ReasoningEffort) map[string]any {
+	declared := make(map[string]bool, len(efforts))
+	for _, effort := range efforts {
+		declared[string(effort)] = true
+	}
+	out := make(map[string]any, len(dshEffortLevels))
+	for _, level := range dshEffortLevels {
+		if declared[string(level)] {
+			out[string(level)] = string(level)
+		} else {
+			out[string(level)] = nil
+		}
+	}
+	return out
 }

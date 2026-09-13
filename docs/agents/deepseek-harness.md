@@ -32,6 +32,14 @@ llm-pi-ai:
 
 Verified protocols are `openai-completions`, `openai-responses`, and `anthropic-messages`. A custom provider needs one protocol, base URL, and a non-empty model list. DSH's guide documents additional route/model compatibility settings, headers, retries, reasoning-effort maps, and modalities. They are deliberately outside v1 because they are target-specific semantics.
 
+## Reasoning variants
+
+`models[].variants` maps to a model-local `reasoningEfforts` map. Listed DSH
+levels map to their own wire spelling and other documented levels are `null`.
+DSH only accepts `off`, `minimal`, `low`, `medium`, `high`, `xhigh`, and `max`;
+`ultra` and other unrecognized names are rejected instead of remapped. This
+never sets DSH's route-level active `reasoning` field or any thinking budget.
+
 DSH keeps default selected model in session/UI state, so `defaults.model` is not emitted.
 
 ## MCP
