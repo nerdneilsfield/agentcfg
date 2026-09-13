@@ -78,3 +78,9 @@ MiMo Code uses native `type` values `local` and `remote` (the `stdio`/`http` spe
 ## Defaults
 
 `defaults.model` maps to the top-level `"model": "provider/model"` string verbatim. MiMo Code's `small_model` / `vision_model` selectors have no IR equivalent and are not emitted.
+
+## Reasoning variants
+
+MiMo Code's generic `variants` and provider-option pass-through do not establish
+a verified reasoning-effort selector. `models[].variants` is rejected rather
+than emitted as guessed native options.

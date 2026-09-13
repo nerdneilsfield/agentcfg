@@ -119,3 +119,15 @@ func TestRejectsUnrepresentableFields(t *testing.T) {
 		})
 	}
 }
+
+func TestRejectsModelReasoningVariants(t *testing.T) {
+	cfg := exampleConfig()
+	cfg.Providers[0].Models = []ir.Model{{ID: "m", Reasoning: boolPtr(true), Variants: []ir.ReasoningEffort{"low", "ultra"}}}
+	diags := (Target{}).Validate(cfg)
+	for _, d := range diags {
+		if strings.Contains(d.Message, "separate catalog") {
+			return
+		}
+	}
+	t.Fatalf("missing reasoning variants diagnostic: %v", diags)
+}

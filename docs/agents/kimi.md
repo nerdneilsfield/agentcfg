@@ -67,3 +67,9 @@ MCP `env` and `headers` values are literal strings: IR `ENV:NAME` MCP env/header
 `defaults.model` maps to top-level `default_model = "<alias>"` (the model ID part after the provider prefix). Validation rejects a default that does not resolve to an emitted alias.
 
 When the IR has no MCP servers, the `mcp.json` artifact is omitted entirely.
+
+## Reasoning variants
+
+`models[].variants` maps to Kimi's `support_efforts`; it never writes
+`default_effort`. Kimi's documented selectable names are `low`, `high`, and
+`max`; other provider-specific names such as `ultra` are rejected, not remapped.

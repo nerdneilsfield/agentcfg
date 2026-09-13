@@ -55,3 +55,9 @@ Codex's top-level `model` selects a model string, but a custom provider also req
 - https://raw.githubusercontent.com/openai/codex/main/codex-rs/core/config.schema.json (`ModelProviderInfo.experimental_bearer_token`)
 - https://openai-codex.mintlify.app/configuration/reference
 - Local `codex mcp add --help` (0.153.4)
+
+## Reasoning variants
+
+Codex keeps per-model availability in a separate model catalog and active effort
+in a session/top-level setting, not in `model_providers`. Therefore a non-empty
+agentcfg `models[].variants` list is rejected rather than omitted.

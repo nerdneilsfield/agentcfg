@@ -168,3 +168,10 @@ func TestOmitsEmptyMCP(t *testing.T) {
 		t.Fatalf("empty MCP must not emit an mcp object:\n%s", arts[0].Content)
 	}
 }
+
+func TestRejectsModelReasoningVariants(t *testing.T) {
+	cfg := exampleConfig()
+	cfg.Providers[0].Models[0].Reasoning = b(true)
+	cfg.Providers[0].Models[0].Variants = []ir.ReasoningEffort{"low", "ultra"}
+	expectInvalid(t, cfg, "do not define a verified reasoning effort selector")
+}

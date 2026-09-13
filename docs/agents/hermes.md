@@ -46,3 +46,8 @@ providers:
 (`url`, `headers`), with `${VAR}` expansion native at connect time. IR
 `timeout_ms` is emitted as `timeout` in seconds (`ms/1000`). IR `enabled`
 maps to the native `enabled` flag.
+
+## Reasoning variants
+
+Hermes does not expose model-level reasoning-effort configuration.
+`models[].variants` is rejected.

@@ -167,3 +167,24 @@ func TestRejectsBearerOnNonAuthorizationHeader(t *testing.T) {
 	cfg.MCP[1].Headers["X-Token"] = ir.HeaderValue{BearerFromEnv: "SOME_TOKEN"}
 	expectInvalid(t, cfg, "Authorization only")
 }
+
+func TestEmitsSupportEfforts(t *testing.T) {
+	cfg := exampleConfig()
+	cfg.Providers[0].Models[0].Variants = []ir.ReasoningEffort{"low", "high", "max"}
+	arts, err := (Target{}).Emit(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := string(arts[0].Content)
+	if !strings.Contains(out, `support_efforts = ["low", "high", "max"]`) {
+		t.Fatalf("missing support efforts:\n%s", out)
+	}
+	if strings.Contains(out, `default_effort`) {
+		t.Fatalf("must not select a default effort:\n%s", out)
+	}
+}
+func TestRejectsUnsupportedReasoningEffort(t *testing.T) {
+	cfg := exampleConfig()
+	cfg.Providers[0].Models[0].Variants = []ir.ReasoningEffort{"ultra"}
+	expectInvalid(t, cfg, `does not support reasoning effort "ultra"`)
+}

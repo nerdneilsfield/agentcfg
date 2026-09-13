@@ -59,6 +59,16 @@ func (t Target) Validate(cfg ir.Config) []diag.Diagnostic {
 			}
 		}
 	}
+	for i, p := range cfg.Providers {
+		for j, m := range p.Models {
+			for _, effort := range m.Variants {
+				if !kimiSupportsEffort(effort) {
+					diags = append(diags, diag.TargetErrorf(t.ID(), fmt.Sprintf("providers[%d].models[%d].variants", i, j),
+						"kimi support_efforts does not support reasoning effort %q", effort))
+				}
+			}
+		}
+	}
 	for i, s := range cfg.MCP {
 		path := fmt.Sprintf("mcp[%d]", i)
 		if s.Transport == ir.TransportStdio {
@@ -123,6 +133,9 @@ func (t Target) Emit(cfg ir.Config) ([]artifact.Artifact, error) {
 				km.MaxOutputSize = m.MaxOutputTokens
 			}
 			km.Capabilities = capabilities(m)
+			if len(m.Variants) > 0 {
+				km.SupportEfforts = effortStrings(m.Variants)
+			}
 			doc.Models[m.ID] = km
 		}
 	}
@@ -251,6 +264,7 @@ type kimiModel struct {
 	MaxOutputSize  *int64   `toml:"max_output_size,omitempty"`
 	DisplayName    string   `toml:"display_name,omitempty"`
 	Capabilities   []string `toml:"capabilities,omitempty"`
+	SupportEfforts []string `toml:"support_efforts,omitempty"`
 }
 
 // kimiMCPServer is one entry in mcp.json. Field order is deliberate:
@@ -265,4 +279,22 @@ type kimiMCPServer struct {
 	Env               map[string]string `json:"env,omitempty"`
 	CWD               string            `json:"cwd,omitempty"`
 	Enabled           bool              `json:"enabled"`
+}
+
+var kimiEfforts = []ir.ReasoningEffort{"low", "high", "max"}
+
+func kimiSupportsEffort(effort ir.ReasoningEffort) bool {
+	for _, v := range kimiEfforts {
+		if effort == v {
+			return true
+		}
+	}
+	return false
+}
+func effortStrings(efforts []ir.ReasoningEffort) []string {
+	out := make([]string, len(efforts))
+	for i, effort := range efforts {
+		out[i] = string(effort)
+	}
+	return out
 }

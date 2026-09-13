@@ -75,22 +75,22 @@ Contracts: Render only the canonical availability list. Do not write defaults, v
 - [ ] Verify: affected package tests and a generated OpenCode fixture show distinct `low`, `high`, `max` variants.
 - [ ] Inspect the diff and commit `feat: emit model reasoning variants`.
 
-Evidence: OpenCode mapping plus Pi, Prime Agent, OpenClaw, Crush, and Grok mappings passed focused package tests on 2026-09-13. OpenCode, Crush, and Grok preserve `ultra`; fixed-map targets reject it rather than remapping it. Remaining exact mappings are pending.
+Evidence: OpenCode, Pi, Prime Agent, OpenClaw, Crush, Grok, and Kimi mappings passed focused package tests on 2026-09-13. OpenCode, Crush, and Grok preserve `ultra`; fixed-map targets reject it rather than remapping it. Zcode, Gajae, and DeepSeek Harness mappings remain pending.
 
 ### T3: Reject targets without model-level availability lists
 
-Status: pending
+Status: done
 Depends on: T1
 Acceptance: A2, A4
 Targets: `internal/target/{codex,cline,jcode,goose,hermes,mimocode}`, their tests and contracts.
 Contracts: a non-empty `variants` list must cause a target-scoped diagnostic; empty/absent lists preserve existing behavior.
 
-- [ ] Add target validation and focused rejection tests.
-- [ ] Document the exact native limitation in each target contract.
-- [ ] Verify: affected package tests pass.
+- [x] Add target validation and focused rejection tests.
+- [x] Document the exact native limitation in each target contract.
+- [x] Verified: package tests for Codex, Cline, Jcode, Goose, Hermes, and MiMo Code passed.
 - [ ] Inspect the diff and commit `fix: reject unsupported model reasoning variants`.
 
-Evidence: pending.
+Evidence: 2026-09-13 focused package tests passed. Codex catalog, Cline provider-wide setting, Jcode single effort, and the targets with no verified list all reject a populated `variants` list.
 
 ## Final acceptance
 

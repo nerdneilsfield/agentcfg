@@ -227,3 +227,10 @@ func TestOmitsMCPArtifactWhenEmpty(t *testing.T) {
 		t.Fatalf("expected 2 artifacts without MCP, got %d", len(arts))
 	}
 }
+
+func TestRejectsModelReasoningVariants(t *testing.T) {
+	cfg := exampleConfig()
+	cfg.Providers[0].Models[0].Reasoning = b(true)
+	cfg.Providers[0].Models[0].Variants = []ir.ReasoningEffort{"low", "ultra"}
+	expectInvalid(t, cfg, "no model-level reasoning effort list; settings.reasoning is provider-wide")
+}

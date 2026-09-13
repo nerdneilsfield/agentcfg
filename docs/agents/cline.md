@@ -54,3 +54,8 @@ only the bare default model id, and `defaults.model "provider/model"` maps to
 toward zero (e.g. 1500 ms becomes 1 s). MCP `env` and `headers` are literal
 strings, so IR `ENV:NAME` / `Bearer ENV:NAME` MCP values are rejected. When the
 IR has no MCP servers, the artifact is omitted.
+
+## Reasoning variants
+
+Cline has provider-wide `settings.reasoning` and model capability metadata, but
+no model-local selectable effort list. `models[].variants` is rejected.

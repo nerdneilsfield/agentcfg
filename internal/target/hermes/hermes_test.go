@@ -129,3 +129,10 @@ func TestRejectsUnresolvedDefault(t *testing.T) {
 	cfg.Defaults = &ir.Defaults{Model: "volcengine/nope"}
 	expectInvalid(t, cfg, "does not resolve")
 }
+
+func TestRejectsModelReasoningVariants(t *testing.T) {
+	cfg := exampleConfig()
+	cfg.Providers[0].Models[0].Reasoning = b(true)
+	cfg.Providers[0].Models[0].Variants = []ir.ReasoningEffort{"low", "ultra"}
+	expectInvalid(t, cfg, "no model-level reasoning effort list")
+}
