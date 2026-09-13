@@ -23,10 +23,13 @@ func TestEmitsReasoningEfforts(t *testing.T) {
 		t.Fatal(err)
 	}
 	out := string(arts[0].Content)
-	for _, want := range []string{"reasoningEfforts:", "low: low", "medium: null", "high: high", "max: max"} {
+	for _, want := range []string{"reasoningEfforts:", "low: low", "high: high", "max: max"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("missing %q in output:\n%s", want, out)
 		}
+	}
+	if strings.Contains(out, "medium:") {
+		t.Fatalf("undeclared level must not be emitted:\n%s", out)
 	}
 	if strings.Contains(out, "defaultReasoning") {
 		t.Fatalf("must not select a default effort:\n%s", out)
@@ -50,3 +53,52 @@ func TestSkipsUnsupportedReasoningEffort(t *testing.T) {
 		t.Fatalf("unsupported effort must be skipped:\n%s", out)
 	}
 }
+
+func TestEmitsNativeCordisMCPPatch(t *testing.T) {
+	cfg := variantConfig("low")
+	cfg.Defaults = &ir.Defaults{Model: "provider/model"}
+	disabled := false
+	cfg.MCP = []ir.MCPServer{
+		{ID: "local", Transport: ir.TransportStdio, Command: []string{"npx", "-y", "server"}, Env: map[string]ir.HeaderValue{"TOKEN": {FromEnv: "TOKEN"}}, TimeoutMS: i64(1500)},
+		{ID: "remote", Transport: ir.TransportHTTP, URL: "https://mcp.example", Headers: map[string]ir.HeaderValue{"Authorization": {BearerFromEnv: "TOKEN"}}, Enabled: &disabled},
+	}
+	arts, err := (Target{}).Emit(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(arts) != 2 || arts[1].Name != "cordis.patch.yml" {
+		t.Fatalf("unexpected artifacts: %#v", arts)
+	}
+	out := string(arts[1].Content)
+	for _, want := range []string{"@deepseek-ai/dsh-agent-default-model", "provider: provider", "@deepseek-ai/dsh-mcp-client", "transport: stdio", "toolCallTimeoutMs: 1500", "!!js process.env.TOKEN", "transport: streamable-http", "!!js `Bearer ${process.env.TOKEN}`", "disabled: true"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("missing %q:\n%s", want, out)
+		}
+	}
+}
+
+func TestDSHValidationAndProviderFields(t *testing.T) {
+	cfg := variantConfig("low")
+	cfg.Providers[0].Name = "Provider"
+	cfg.Providers[0].Headers = map[string]ir.HeaderValue{"X-Route": {Value: "stable"}}
+	arts, err := (Target{}).Emit(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := string(arts[0].Content)
+	for _, unwanted := range []string{"reasoning:", "cost:"} {
+		if strings.Contains(out, unwanted) {
+			t.Errorf("unexpected %q:\n%s", unwanted, out)
+		}
+	}
+	for _, want := range []string{"displayName: Provider", "headers:", "X-Route: stable"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("missing %q:\n%s", want, out)
+		}
+	}
+	cfg.Providers[0].Models[0].Input = []ir.Modality{ir.ModalityAudio}
+	if got := (Target{}).Validate(cfg); len(got) == 0 {
+		t.Fatal("expected input diagnostic")
+	}
+}
+func i64(v int64) *int64 { return &v }

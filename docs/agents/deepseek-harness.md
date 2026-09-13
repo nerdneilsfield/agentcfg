@@ -8,61 +8,84 @@
 ## Provider route
 
 IR `api_key: "ENV:NAME"` maps to native `apiKeyEnv: NAME`. The provider
-schema and credential resolver support only this environment-reference field,
-not a literal `apiKey` field. Literal IR API keys are rejected. agentcfg does
-not resolve the environment reference.
+credential resolver supports this reference rather than a literal key, so literal
+IR API keys are rejected. A provider `name` maps to `displayName`. Literal
+provider headers map to native `headers`; environment and bearer header
+references are rejected because this target's provider expression form is not
+verified here.
 
-DSH custom routes live under the `llm-pi-ai` plugin namespace:
+Custom routes are written to `$DSH_HOME/settings.yaml` under `llm-pi-ai`:
 
 ```yaml
 llm-pi-ai:
   providers:
     volcengine:
+      displayName: Volcengine
       apiKeyEnv: VOLC_API_KEY
       api: openai-completions
       baseURL: https://example.com/v1
+      headers:
+        X-Route: stable
       models:
         - id: glm-5.3
           name: GLM-5.3
           contextWindow: 128000
           maxTokens: 8192
           input: [text, image]
-          reasoning: true
 ```
 
-Verified protocols are `openai-completions`, `openai-responses`, and `anthropic-messages`. A custom provider needs one protocol, base URL, and a non-empty model list. DSH's guide documents additional route/model compatibility settings, headers, retries, reasoning-effort maps, and modalities. They are deliberately outside v1 because they are target-specific semantics.
+Verified protocols are `openai-completions`, `openai-responses`, and
+`anthropic-messages`. Model input is limited to `text` and `image`. The emitter
+does not write the obsolete model `reasoning` or `cost` fields.
 
 ## Reasoning variants
 
-`models[].variants` maps to a model-local `reasoningEfforts` map. Listed DSH
-levels map to their own wire spelling and other documented levels are `null`.
-DSH only accepts `off`, `minimal`, `low`, `medium`, `high`, `xhigh`, and `max`;
-`ultra` and other unrecognized names are omitted instead of remapped. This
-never sets DSH's route-level active `reasoning` field or any thinking budget.
+`models[].variants` maps to a model-local `reasoningEfforts` map. Only declared
+DSH levels are emitted: `off` maps to a null value, which means no effort field
+on the wire; other declared levels map to their own wire spelling. DSH supports
+`off`, `minimal`, `low`, `medium`, `high`, `xhigh`, and `max`; `ultra` and other
+unknown values are skipped. No route-level active effort/default is selected.
 
-DSH keeps default selected model in session/UI state, so `defaults.model` is not emitted.
+## Default model and MCP
 
-## MCP
-
-DSH connects MCP through the `@deepseek-ai/dsh-mcp-client` Cordis plugin in a patch list. A verified stdio example is:
+The target writes an optional `$DSH_HOME/cordis.patch.yml` overlay. A default
+model becomes the existing `agent-default-model` Cordis row:
 
 ```yaml
 - insert:
-    - id: context7
+    - id: agent-default-model
+      name: '@deepseek-ai/dsh-agent-default-model'
+      config:
+        provider: volcengine
+        model: glm-5.3
+```
+
+Each MCP server is an `@deepseek-ai/dsh-mcp-client` Cordis row, with an ID
+prefixed `mcp-`. Stdio maps command, args, environment, cwd, and `timeout_ms`
+to `toolCallTimeoutMs`. HTTP maps to native `streamable-http`, URL, headers,
+and the same tool-call timeout. `enabled: false` maps to the Cordis row's
+`disabled: true`. Environment values use the documented `!!js process.env.NAME`
+form; bearer values use the documented JavaScript template expression.
+
+```yaml
+- insert:
+    - id: mcp-context7
       name: '@deepseek-ai/dsh-mcp-client'
       config:
         serverName: context7
         transport: stdio
         command: npx
         args: [-y, '@upstash/context7-mcp']
+        env:
+          CONTEXT7_API_KEY: !!js process.env.CONTEXT7_API_KEY
+        toolCallTimeoutMs: 60000
 ```
-
-The public evidence confirms stdio plugin configuration and that plugin configuration replaces its `config` object as a whole. The exact HTTP and environment-variable fields were not found in the official schema during this research pass. Therefore v1 supports DSH **providers and stdio MCP only**; HTTP MCP must be rejected until the upstream MCP-client catalog/schema is captured and tested.
 
 ## Sources
 
-- https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/llm/llm-pi-ai/src/config.ts (`PiAiProviderProfile` and provider-profile schema)
-- https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/llm/llm-pi-ai/src/index.ts (`resolveApiKey`)
-- https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/user/guide/providers.md
-- https://github.com/deepseek-ai/deepseek-harness (official project)
-- DSH MCP-client example: https://github.com/sepinetam/mcp-for-stata/blob/75680cf849facd4464bec20e7d3a69e3bca592de/docs/agents/deepseek_harness.md (integration example, not official schema)
+- https://github.com/deepseek-ai/deepseek-harness/blob/c291e7961a515f6d7af9304e7fd1d257929aef26/packages/llm/llm-pi-ai/src/config.ts
+  (`PiAiProviderProfile` and model schema)
+- https://github.com/deepseek-ai/deepseek-harness/blob/c291e7961a515f6d7af9304e7fd1d257929aef26/docs/user/guide/providers.md
+- https://github.com/deepseek-ai/deepseek-harness/blob/c291e7961a515f6d7af9304e7fd1d257929aef26/packages/mcp/mcp-client/src/index.ts
+  and `README.md` (current MCP schema and examples)
+- https://github.com/deepseek-ai/deepseek-harness/blob/c291e7961a515f6d7af9304e7fd1d257929aef26/packages/core/agent-default-model/README.md

@@ -30,7 +30,7 @@ func (t Target) Validate(cfg ir.Config) []diag.Diagnostic {
 	var diags []diag.Diagnostic
 	for i, p := range cfg.Providers {
 		if hasCrushExpression(p.APIKey.Value) {
-			diags = append(diags, diag.TargetErrorf(t.ID(), fmt.Sprintf("providers[%d].api_key", i), "literal value contains Crush expression syntax and cannot be represented literally"))
+			diags = append(diags, diag.TargetErrorf(t.ID(), fmt.Sprintf("providers[%d].api_key", i), "literal API key contains native expression syntax and cannot be represented literally"))
 		}
 		if hasCrushExpression(p.BaseURL) {
 			diags = append(diags, diag.TargetErrorf(t.ID(), fmt.Sprintf("providers[%d].base_url", i), "literal value contains Crush expression syntax and cannot be represented literally"))

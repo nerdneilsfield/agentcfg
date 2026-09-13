@@ -3,8 +3,8 @@ package deepseekharness
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
+	"strings"
 
 	"go.yaml.in/yaml/v3"
 
@@ -24,21 +24,20 @@ func (Target) ID() string { return "deepseek-harness" }
 func (t Target) Validate(cfg ir.Config) []diag.Diagnostic {
 	var diags []diag.Diagnostic
 	for i, p := range cfg.Providers {
+		path := fmt.Sprintf("providers[%d]", i)
 		if p.APIKey.Value != "" {
-			diags = append(diags, diag.TargetErrorf(t.ID(), fmt.Sprintf("providers[%d].api_key", i), "deepseek-harness supports apiKeyEnv credential references only; literal API keys are not representable"))
+			diags = append(diags, diag.TargetErrorf(t.ID(), path+".api_key", "deepseek-harness supports apiKeyEnv credential references only; literal API keys are not representable"))
 		}
-	}
-	for i, s := range cfg.MCP {
-		path := fmt.Sprintf("mcp[%d]", i)
-		if s.Transport != ir.TransportStdio {
-			diags = append(diags, diag.TargetErrorf(t.ID(), path,
-				"deepseek-harness v1 maps stdio MCP servers through the Cordis dsh-mcp-client patch only; http is rejected"))
-			continue
+		for name, v := range p.Headers {
+			if v.FromEnv != "" || v.BearerFromEnv != "" {
+				diags = append(diags, diag.TargetErrorf(t.ID(), path+".headers."+name, "deepseek-harness provider headers support literal values only"))
+			}
 		}
-		for name, v := range s.Env {
-			if v.FromEnv == "" || v.FromEnv != name {
-				diags = append(diags, diag.TargetErrorf(t.ID(), path+".env."+name,
-					"deepseek-harness MCP env entries are same-name environment references only"))
+		for j, m := range p.Models {
+			for _, mod := range m.Input {
+				if mod != ir.ModalityText && mod != ir.ModalityImage {
+					diags = append(diags, diag.TargetErrorf(t.ID(), fmt.Sprintf("%s.models[%d].input", path, j), "deepseek-harness model input supports text and image only"))
+				}
 			}
 		}
 	}
@@ -55,11 +54,9 @@ func (t Target) Emit(cfg ir.Config) ([]artifact.Artifact, error) {
 				"name": orDefault(m.Name, m.ID),
 			}
 			mm["input"] = modalStrings(m.Input)
-			mm["reasoning"] = m.Reasoning != nil && *m.Reasoning
 			if hasDSHEfforts(m.Variants) {
 				mm["reasoningEfforts"] = dshEffortMap(m.Variants)
 			}
-			mm["cost"] = map[string]any{"input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0}
 			if m.ContextWindow != nil {
 				mm["contextWindow"] = *m.ContextWindow
 			}
@@ -72,6 +69,16 @@ func (t Target) Emit(cfg ir.Config) ([]artifact.Artifact, error) {
 			"baseURL": p.BaseURL,
 			"api":     string(p.Protocol),
 			"models":  ms,
+		}
+		if p.Name != "" {
+			prov["displayName"] = p.Name
+		}
+		if len(p.Headers) > 0 {
+			headers := map[string]string{}
+			for name, v := range p.Headers {
+				headers[name] = v.Value
+			}
+			prov["headers"] = headers
 		}
 		if p.APIKey.FromEnv != "" {
 			prov["apiKeyEnv"] = p.APIKey.FromEnv
@@ -89,49 +96,92 @@ func (t Target) Emit(cfg ir.Config) ([]artifact.Artifact, error) {
 		return nil, fmt.Errorf("encoding deepseek-harness provider patch: %w", err)
 	}
 
-	mcpServers := map[string]any{}
+	arts := []artifact.Artifact{{
+		Target: t.ID(), Name: "providers.patch.yaml", Format: "yaml",
+		SuggestedPath: "$DSH_HOME/settings.yaml (merge llm-pi-ai.providers)", Content: ybuf.Bytes(),
+	}}
+
+	patchRows := []any{}
+	if cfg.Defaults != nil && cfg.Defaults.Model != "" {
+		provider, model, ok := ir.SplitModelRef(cfg.Defaults.Model)
+		if ok {
+			patchRows = append(patchRows, map[string]any{
+				"id": "agent-default-model", "name": "@deepseek-ai/dsh-agent-default-model",
+				"config": map[string]string{"provider": provider, "model": model},
+			})
+		}
+	}
 	for _, s := range cfg.MCP {
-		entry := map[string]any{
-			"command": s.Command[0],
-			"args":    s.Command[1:],
+		config := map[string]any{"serverName": s.ID}
+		if s.TimeoutMS != nil {
+			config["toolCallTimeoutMs"] = *s.TimeoutMS
 		}
-		if s.CWD != "" {
-			entry["cwd"] = s.CWD
-		}
-		if len(s.Env) > 0 {
-			env := map[string]string{}
-			for name, v := range s.Env {
-				env[name] = v.FromEnv
+		if s.Transport == ir.TransportStdio {
+			config["transport"] = "stdio"
+			config["command"] = s.Command[0]
+			config["args"] = s.Command[1:]
+			if s.CWD != "" {
+				config["cwd"] = s.CWD
 			}
-			entry["env"] = env
+			if len(s.Env) > 0 {
+				env := map[string]any{}
+				for name, v := range s.Env {
+					env[name] = dshValue(v)
+				}
+				config["env"] = env
+			}
+		} else {
+			config["transport"] = "streamable-http"
+			config["url"] = s.URL
+			if len(s.Headers) > 0 {
+				headers := map[string]any{}
+				for name, v := range s.Headers {
+					headers[name] = dshValue(v)
+				}
+				config["headers"] = headers
+			}
 		}
-		mcpServers[s.ID] = entry
-	}
-	arts := []artifact.Artifact{
-		{
-			Target:        t.ID(),
-			Name:          "providers.patch.yaml",
-			Format:        "yaml",
-			SuggestedPath: "~/.dsh/settings.yaml (merge llm-pi-ai.providers)",
-			Content:       ybuf.Bytes(),
-		},
-	}
-	if len(mcpServers) > 0 {
-		var jbuf bytes.Buffer
-		jenc := json.NewEncoder(&jbuf)
-		jenc.SetIndent("", "  ")
-		if err := jenc.Encode(map[string]any{"mcpServers": mcpServers}); err != nil {
-			return nil, fmt.Errorf("encoding deepseek-harness MCP patch: %w", err)
+		row := map[string]any{"id": "mcp-" + s.ID, "name": "@deepseek-ai/dsh-mcp-client", "config": config}
+		if s.Enabled != nil && !*s.Enabled {
+			row["disabled"] = true
 		}
-		arts = append(arts, artifact.Artifact{
-			Target:        t.ID(),
-			Name:          "mcp.patch.json",
-			Format:        "json",
-			SuggestedPath: "~/.dsh/mcp.patch.json (Cordis patch for @deepseek-ai/dsh-mcp-client)",
-			Content:       jbuf.Bytes(),
-		})
+		patchRows = append(patchRows, row)
+	}
+	if len(patchRows) > 0 {
+		var pbuf bytes.Buffer
+		penc := yaml.NewEncoder(&pbuf)
+		penc.SetIndent(2)
+		if err := penc.Encode([]any{map[string]any{"insert": patchRows}}); err != nil {
+			return nil, fmt.Errorf("encoding deepseek-harness Cordis patch: %w", err)
+		}
+		if err := penc.Close(); err != nil {
+			return nil, fmt.Errorf("encoding deepseek-harness Cordis patch: %w", err)
+		}
+		arts = append(arts, artifact.Artifact{Target: t.ID(), Name: "cordis.patch.yml", Format: "yaml", SuggestedPath: "$DSH_HOME/cordis.patch.yml", Content: []byte(dshExpressions(pbuf.String()))})
 	}
 	return arts, nil
+}
+
+func dshValue(v ir.HeaderValue) string {
+	if v.BearerFromEnv != "" {
+		return "__DSH_JS__`Bearer ${process.env." + v.BearerFromEnv + "}`"
+	}
+	if v.FromEnv != "" {
+		return "__DSH_JS__process.env." + v.FromEnv
+	}
+	return v.Value
+}
+
+func dshExpressions(doc string) string {
+	lines := strings.Split(doc, "\n")
+	for i, line := range lines {
+		if pos := strings.Index(line, "__DSH_JS__"); pos >= 0 {
+			prefix := line[:pos]
+			expr := strings.TrimSuffix(line[pos+len("__DSH_JS__"):], "\"")
+			lines[i] = prefix + "!!js " + expr
+		}
+	}
+	return strings.Join(lines, "\n")
 }
 
 func modalStrings(in []ir.Modality) []string {
@@ -173,16 +223,15 @@ func hasDSHEfforts(efforts []ir.ReasoningEffort) bool {
 }
 
 func dshEffortMap(efforts []ir.ReasoningEffort) map[string]any {
-	declared := make(map[string]bool, len(efforts))
+	out := map[string]any{}
 	for _, effort := range efforts {
-		declared[string(effort)] = true
-	}
-	out := make(map[string]any, len(dshEffortLevels))
-	for _, level := range dshEffortLevels {
-		if declared[string(level)] {
-			out[string(level)] = string(level)
+		if !dshSupportsEffort(effort) {
+			continue
+		}
+		if effort == "off" {
+			out[string(effort)] = nil
 		} else {
-			out[string(level)] = nil
+			out[string(effort)] = string(effort)
 		}
 	}
 	return out
