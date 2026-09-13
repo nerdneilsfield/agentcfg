@@ -207,3 +207,17 @@ func TestSkipsUnsupportedReasoningEffort(t *testing.T) {
 		t.Fatalf("unsupported effort must be skipped:\n%s", out)
 	}
 }
+
+func TestEmitsRequiredModelNameAndRejectsPDF(t *testing.T) {
+	cfg := exampleConfig()
+	cfg.Providers[0].Models[0].Name = ""
+	arts, err := (Target{}).Emit(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(arts[0].Content), `"name": "glm-5.3"`) {
+		t.Fatalf("missing fallback name:\n%s", arts[0].Content)
+	}
+	cfg.Providers[0].Models[0].Input = []ir.Modality{ir.ModalityPDF}
+	expectInvalid(t, cfg, "does not support pdf")
+}

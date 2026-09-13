@@ -100,8 +100,9 @@ func (t Target) Emit(cfg ir.Config) ([]artifact.Artifact, error) {
 			if m.Reasoning != nil {
 				gm.Reasoning = m.Reasoning
 			}
-			if len(m.Variants) > 0 {
-				gm.Thinking = &gajaeThinking{Mode: "effort", Levels: effortStrings(m.Variants)}
+			if efforts := gajaeSupportedEfforts(m.Variants); len(efforts) > 0 {
+				gm.Thinking = gajaeThinkingFor(efforts)
+				gm.Compat = map[string]bool{"supportsReasoningEffort": true}
 			}
 			gp.Models = append(gp.Models, gm)
 		}
@@ -240,19 +241,22 @@ type gajaeProvider struct {
 }
 
 type gajaeModel struct {
-	ID            string         `yaml:"id"`
-	Name          string         `yaml:"name,omitempty"`
-	ContextWindow *int64         `yaml:"contextWindow,omitempty"`
-	MaxTokens     *int64         `yaml:"maxTokens,omitempty"`
-	Input         []string       `yaml:"input,omitempty"`
-	Output        []string       `yaml:"output,omitempty"`
-	Reasoning     *bool          `yaml:"reasoning,omitempty"`
-	Thinking      *gajaeThinking `yaml:"thinking,omitempty"`
+	ID            string          `yaml:"id"`
+	Name          string          `yaml:"name,omitempty"`
+	ContextWindow *int64          `yaml:"contextWindow,omitempty"`
+	MaxTokens     *int64          `yaml:"maxTokens,omitempty"`
+	Input         []string        `yaml:"input,omitempty"`
+	Output        []string        `yaml:"output,omitempty"`
+	Reasoning     *bool           `yaml:"reasoning,omitempty"`
+	Thinking      *gajaeThinking  `yaml:"thinking,omitempty"`
+	Compat        map[string]bool `yaml:"compat,omitempty"`
 }
 
 type gajaeThinking struct {
-	Mode   string   `yaml:"mode"`
-	Levels []string `yaml:"levels"`
+	Mode     string   `yaml:"mode"`
+	MinLevel string   `yaml:"minLevel"`
+	MaxLevel string   `yaml:"maxLevel"`
+	Levels   []string `yaml:"levels"`
 }
 
 type gajaeMCPServer struct {
@@ -273,4 +277,37 @@ func effortStrings(efforts []ir.ReasoningEffort) []string {
 		out[i] = string(effort)
 	}
 	return out
+}
+
+var gajaeEfforts = []ir.ReasoningEffort{"minimal", "low", "medium", "high", "xhigh", "max"}
+
+func gajaeKnownEffort(e ir.ReasoningEffort) bool { return gajaeEffortIndex(e) >= 0 }
+func gajaeEffortIndex(e ir.ReasoningEffort) int {
+	for i, v := range gajaeEfforts {
+		if v == e {
+			return i
+		}
+	}
+	return -1
+}
+func gajaeSupportedEfforts(efforts []ir.ReasoningEffort) []ir.ReasoningEffort {
+	out := []ir.ReasoningEffort{}
+	for _, e := range efforts {
+		if gajaeKnownEffort(e) {
+			out = append(out, e)
+		}
+	}
+	return out
+}
+func gajaeThinkingFor(efforts []ir.ReasoningEffort) *gajaeThinking {
+	min, max := efforts[0], efforts[0]
+	for _, e := range efforts {
+		if gajaeEffortIndex(e) < gajaeEffortIndex(min) {
+			min = e
+		}
+		if gajaeEffortIndex(e) > gajaeEffortIndex(max) {
+			max = e
+		}
+	}
+	return &gajaeThinking{Mode: "effort", MinLevel: string(min), MaxLevel: string(max), Levels: effortStrings(efforts)}
 }

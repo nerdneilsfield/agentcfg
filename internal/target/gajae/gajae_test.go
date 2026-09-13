@@ -162,18 +162,32 @@ func TestRejectsNonImageModality(t *testing.T) {
 
 func TestEmitsEffortThinkingLevels(t *testing.T) {
 	cfg := exampleConfig()
-	cfg.Providers[0].Models[0].Variants = []ir.ReasoningEffort{"low", "high", "ultra"}
+	cfg.Providers[0].Models[0].Variants = []ir.ReasoningEffort{"low", "high", "max"}
 	arts, err := (Target{}).Emit(cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
 	out := string(arts[0].Content)
-	for _, want := range []string{"thinking:", "mode: effort", "levels:", "- ultra"} {
+	for _, want := range []string{"thinking:", "mode: effort", "minLevel: low", "maxLevel: max", "supportsReasoningEffort: true", "levels:", "- max"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("missing %q:\n%s", want, out)
 		}
 	}
 	if strings.Contains(out, "defaultLevel") {
 		t.Fatalf("must not select default level:\n%s", out)
+	}
+}
+
+func TestSkipsUnsupportedReasoningEffort(t *testing.T) {
+	cfg := exampleConfig()
+	cfg.Providers[0].Models[0].Variants = []ir.ReasoningEffort{"low", "ultra"}
+	expectValid(t, cfg)
+	arts, err := (Target{}).Emit(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := string(arts[0].Content)
+	if !strings.Contains(out, "minLevel: low") || strings.Contains(out, "ultra") {
+		t.Fatalf("unsupported effort was not skipped:\n%s", out)
 	}
 }

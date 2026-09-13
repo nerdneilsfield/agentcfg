@@ -39,6 +39,13 @@ func (t Target) Validate(cfg ir.Config) []diag.Diagnostic {
 			diags = append(diags, diag.TargetErrorf(t.ID(), path+".protocol",
 				"openclaw api must be openai-completions, openai-responses, or anthropic-messages for custom providers; got %q", p.Protocol))
 		}
+		for j, m := range p.Models {
+			for _, mod := range m.Input {
+				if mod == ir.ModalityPDF {
+					diags = append(diags, diag.TargetErrorf(t.ID(), fmt.Sprintf("%s.models[%d].input", path, j), "openclaw model input does not support pdf"))
+				}
+			}
+		}
 	}
 	if cfg.Defaults != nil && cfg.Defaults.Model != "" {
 		pid, mid, ok := splitRef(cfg.Defaults.Model)
@@ -73,10 +80,7 @@ func (t Target) Emit(cfg ir.Config) ([]artifact.Artifact, error) {
 			op.Headers = headers
 		}
 		for _, m := range p.Models {
-			om := openclawModel{ID: m.ID}
-			if m.Name != "" {
-				om.Name = m.Name
-			}
+			om := openclawModel{ID: m.ID, Name: orDefault(m.Name, m.ID)}
 			if m.ContextWindow != nil {
 				om.ContextWindow = m.ContextWindow
 			}
@@ -177,6 +181,13 @@ func envInterp(v ir.HeaderValue) string {
 	return v.Value
 }
 
+func orDefault(v, def string) string {
+	if v == "" {
+		return def
+	}
+	return v
+}
+
 func hasModel(cfg ir.Config, pid, mid string) bool {
 	for _, p := range cfg.Providers {
 		if p.ID != pid {
@@ -232,7 +243,7 @@ type openclawProvider struct {
 
 type openclawModel struct {
 	ID               string          `json:"id"`
-	Name             string          `json:"name,omitempty"`
+	Name             string          `json:"name"`
 	ContextWindow    *int64          `json:"contextWindow,omitempty"`
 	MaxTokens        *int64          `json:"maxTokens,omitempty"`
 	Input            []string        `json:"input,omitempty"`

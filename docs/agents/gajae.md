@@ -54,6 +54,8 @@ maps 1:1 (no conversion).
 
 ## Reasoning variants
 
-`models[].variants` maps to `thinking: {mode: effort, levels: [...]}`. It does
-not use Gajae's budget, Google, or Anthropic-specific modes and does not set a
-default level. Provider-specific names such as `ultra` are preserved.
+`models[].variants` maps to `thinking` in `effort` mode with required
+`minLevel`, `maxLevel`, and `levels`, plus `compat.supportsReasoningEffort:
+true`. Gajae accepts `minimal`, `low`, `medium`, `high`, `xhigh`, and `max`;
+other names are skipped. It does not use budget/adaptive modes or set a default
+level.

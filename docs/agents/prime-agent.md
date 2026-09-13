@@ -11,7 +11,7 @@ An IR literal such as `api_key: "example-key"` is emitted in the native
 `apiKey` field. The example key is a placeholder; real literals also appear in
 generated output.
 
-The installed `~/.prime/agent/models.json` is Pi-compatible. It contains a `providers` map with `baseUrl`, `api`, `apiKey`, and an array of models. Model records use `id`, `name`, `input`, `reasoning`, `contextWindow`, `maxTokens`, and can use `thinkingLevelMap`.
+The installed `~/.prime/agent/models.json` is Pi-compatible. It contains a `providers` map with `baseUrl`, `api`, `apiKey`, optional `headers`, and an array of models. Model records use `id`, `name`, `input`, `reasoning`, `contextWindow`, `maxTokens`, and can use `thinkingLevelMap`.
 
 ```json
 {
@@ -19,7 +19,7 @@ The installed `~/.prime/agent/models.json` is Pi-compatible. It contains a `prov
     "volcengine": {
       "baseUrl": "https://example.com/v1",
       "api": "openai-completions",
-      "apiKey": "$VOLC_API_KEY",
+      "apiKey": "VOLC_API_KEY",
       "models": [{
         "id": "glm-5.3",
         "name": "GLM-5.3",
@@ -33,7 +33,11 @@ The installed `~/.prime/agent/models.json` is Pi-compatible. It contains a `prov
 }
 ```
 
-Unlike Pi's extension, the observed Prime registry accepts model records without Pi's required cost object. The v1 emitter maps all three IR protocols to the same Pi-AI names. Provider records have no `headers` field, so IR provider headers are rejected in v1 rather than silently dropped.
+Unlike Pi's extension, the observed Prime registry accepts model records without Pi's required cost object. The v1 emitter maps all three IR protocols to the same Pi-AI names. Provider headers map to the native `headers` record. Literal values remain
+literal; `ENV:NAME` maps to the bare environment-variable name expected by Prime
+Agent's resolver. `api_key: "ENV:NAME"` likewise maps to a bare `apiKey` name,
+not Pi's `$NAME` template. Model input is limited to `text` and `image`.
+
 
 ### Reasoning variants
 

@@ -134,3 +134,24 @@ func TestEmitsProviderHeadersInNameOrder(t *testing.T) {
 		t.Fatalf("headers are not name-sorted:\n%s", out)
 	}
 }
+
+func TestUsesCurrentProviderRegistrationOverload(t *testing.T) {
+	cfg := exampleConfig()
+	arts, err := (Target{}).Emit(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := string(arts[0].Content)
+	if !strings.Contains(out, `pi.registerProvider("volcengine", {`) {
+		t.Fatalf("missing named registration:\n%s", out)
+	}
+	if strings.Contains(out, `id: "volcengine"`) {
+		t.Fatalf("legacy registration object emitted:\n%s", out)
+	}
+}
+
+func TestRejectsUnsupportedModelInput(t *testing.T) {
+	cfg := exampleConfig()
+	cfg.Providers[0].Models[0].Input = []ir.Modality{ir.ModalityAudio}
+	expectInvalid(t, cfg, "text and image only")
+}

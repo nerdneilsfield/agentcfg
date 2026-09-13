@@ -28,9 +28,12 @@ func (t Target) Validate(cfg ir.Config) []diag.Diagnostic {
 		}
 	}
 	for i, p := range cfg.Providers {
-		if len(p.Headers) > 0 {
-			diags = append(diags, diag.TargetErrorf(t.ID(), fmt.Sprintf("providers[%d].headers", i),
-				"prime-agent models.json providers have no headers field; provider headers are not representable"))
+		for j, m := range p.Models {
+			for _, mod := range m.Input {
+				if mod != ir.ModalityText && mod != ir.ModalityImage {
+					diags = append(diags, diag.TargetErrorf(t.ID(), fmt.Sprintf("providers[%d].models[%d].input", i, j), "prime-agent model input supports text and image only"))
+				}
+			}
 		}
 	}
 	for i, s := range cfg.MCP {
@@ -90,11 +93,22 @@ func (t Target) Emit(cfg ir.Config) ([]artifact.Artifact, error) {
 			"models":  ms,
 		}
 		if p.APIKey.FromEnv != "" {
-			prov["apiKey"] = "$" + p.APIKey.FromEnv
+			prov["apiKey"] = p.APIKey.FromEnv
 		} else if p.APIKey.Value != "" {
 			prov["apiKey"] = p.APIKey.Value
 		} else {
 			prov["apiKey"] = ""
+		}
+		if len(p.Headers) > 0 {
+			headers := map[string]string{}
+			for name, v := range p.Headers {
+				if v.FromEnv != "" {
+					headers[name] = v.FromEnv
+				} else {
+					headers[name] = v.Value
+				}
+			}
+			prov["headers"] = headers
 		}
 		providers[p.ID] = prov
 	}

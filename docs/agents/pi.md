@@ -11,7 +11,7 @@ An IR literal such as `api_key: "example-key"` is emitted in the native
 `apiKey` field. The example key is a placeholder; real literals also appear in
 generated output.
 
-Pi does not use a static provider section in `settings.json`. A custom route is registered by a TypeScript extension through `pi.registerProvider()`:
+Pi does not use a static provider section in `settings.json`. A custom route is registered by a TypeScript extension through the current two-argument `pi.registerProvider(name, config)` overload:
 
 ```ts
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
@@ -44,6 +44,9 @@ Listed Pi levels map to themselves and every other Pi level is `null`, so the
 model picker exposes precisely that set. Pi only documents `off`, `minimal`,
 `low`, `medium`, `high`, `xhigh`, and `max`; unsupported names such as `ultra`
 are omitted. No default thinking level is emitted.
+Pi model `input` accepts only `text` and `image`; audio, video, and PDF inputs
+are rejected.
+
 The v1 Pi emitter supports all three IR protocols by mapping them to Pi's `openai-completions`, `openai-responses`, and `anthropic-messages` API names.
 
 `defaultProvider` and `defaultModel` are settings fields, but v1 emits no settings mutation or standalone settings fragment because the provider extension must be installed/loaded first. Defaults remain deferred for Pi.

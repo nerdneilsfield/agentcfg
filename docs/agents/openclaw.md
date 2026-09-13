@@ -39,7 +39,7 @@ generated output.
 
 - `api` is a protocol enum including `openai-completions`, `openai-responses`, and `anthropic-messages`; all three IR protocols map 1:1.
 - `apiKey` is a `SecretInput`: it accepts a `$VAR`/`${VAR}` env shorthand, so IR `api_key: "ENV:NAME"` maps to `"${VAR}"` without resolving the reference. Provider `headers` are also `SecretInput`-capable; IR `ENV:NAME` renders as `"${VAR}"` and `Authorization: "Bearer ENV:NAME"` as `"Bearer ${VAR}"`.
-- Model entries support `id`, `name`, `reasoning`, `input` (`text|image|video|audio`), `contextWindow`, `maxTokens`, and `compat` (including `supportsTools`). IR `tool_calling` maps to `compat.supportsTools`. IR output modalities have no OpenClaw field and are not emitted; non-text/image/audio/video inputs are rejected.
+- Model entries require `id` and a non-empty `name` (agentcfg falls back to `id`) and support `reasoning`, `input` (`text|image|video|audio`), `contextWindow`, `maxTokens`, and `compat` (including `supportsTools`). IR `tool_calling` maps to `compat.supportsTools`. IR output modalities have no OpenClaw field and are not emitted; `pdf` input is rejected because the native model input enum is limited to text, image, audio, and video.
 - Whole-config load-time `${VAR}` interpolation applies to MCP env/headers too (uppercase vars only).
 
 ## Reasoning variants
