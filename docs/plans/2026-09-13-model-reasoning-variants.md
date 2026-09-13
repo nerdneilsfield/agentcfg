@@ -75,7 +75,7 @@ Contracts: Render only the canonical availability list. Do not write defaults, v
 - [ ] Verify: affected package tests and a generated OpenCode fixture show distinct `low`, `high`, `max` variants.
 - [ ] Inspect the diff and commit `feat: emit model reasoning variants`.
 
-Evidence: OpenCode, Pi, Prime Agent, OpenClaw, Crush, Grok, and Kimi mappings passed focused package tests on 2026-09-13. OpenCode, Crush, and Grok preserve `ultra`; fixed-map targets reject it rather than remapping it. Zcode, Gajae, and DeepSeek Harness mappings remain pending.
+Evidence: OpenCode, Pi, Prime Agent, OpenClaw, Crush, Grok, and Kimi mappings passed focused package tests on 2026-09-13. OpenCode, Crush, and Grok preserve `ultra`; fixed-map targets reject it rather than remapping it. Zcode and Gajae mappings passed focused package tests on 2026-09-13; DeepSeek Harness mapping remains pending.
 
 ### T3: Reject targets without model-level availability lists
 

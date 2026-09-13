@@ -53,3 +53,9 @@ MCP `env` and `headers` values are literal strings with no documented expansion,
 ## Defaults
 
 `defaults.model` maps to `model.main` verbatim — ZCode's `"provider/model"` selector syntax matches the IR string 1:1.
+
+## Reasoning variants
+
+`models[].variants` emits Zcode's structured `reasoning` object with
+`enabled: true` and `levels`. It does not set `defaultLevel` or
+`providerOptionsByLevel`; provider-specific names such as `ultra` are preserved.

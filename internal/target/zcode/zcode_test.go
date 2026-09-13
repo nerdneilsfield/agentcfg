@@ -165,3 +165,21 @@ func TestOmitsEmptyMCP(t *testing.T) {
 		t.Fatalf("empty MCP must not emit an mcp object:\n%s", arts[0].Content)
 	}
 }
+
+func TestEmitsReasoningLevels(t *testing.T) {
+	cfg := exampleConfig()
+	cfg.Providers[0].Models[0].Variants = []ir.ReasoningEffort{"low", "high", "ultra"}
+	arts, err := (Target{}).Emit(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := string(arts[0].Content)
+	for _, want := range []string{`"reasoning": {`, `"enabled": true`, `"levels": [`, `"ultra"`} {
+		if !strings.Contains(out, want) {
+			t.Errorf("missing %q:\n%s", want, out)
+		}
+	}
+	if strings.Contains(out, `defaultLevel`) {
+		t.Fatalf("must not select a default effort:\n%s", out)
+	}
+}

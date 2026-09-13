@@ -107,8 +107,10 @@ func (t Target) Emit(cfg ir.Config) ([]artifact.Artifact, error) {
 				out = []ir.Modality{ir.ModalityText}
 			}
 			zm.Modalities = map[string][]ir.Modality{"input": in, "output": out}
-			if m.Reasoning != nil {
-				zm.Reasoning = m.Reasoning
+			if len(m.Variants) > 0 {
+				zm.Reasoning = map[string]any{"enabled": true, "levels": effortStrings(m.Variants)}
+			} else if m.Reasoning != nil {
+				zm.Reasoning = *m.Reasoning
 			}
 			if m.ToolCalling != nil {
 				zm.ToolCall = m.ToolCalling
@@ -211,6 +213,14 @@ type zcodeModel struct {
 	Name       string                   `json:"name,omitempty"`
 	Limit      map[string]int64         `json:"limit,omitempty"`
 	Modalities map[string][]ir.Modality `json:"modalities"`
-	Reasoning  *bool                    `json:"reasoning,omitempty"`
+	Reasoning  any                      `json:"reasoning,omitempty"`
 	ToolCall   *bool                    `json:"tool_call,omitempty"`
+}
+
+func effortStrings(efforts []ir.ReasoningEffort) []string {
+	out := make([]string, len(efforts))
+	for i, effort := range efforts {
+		out[i] = string(effort)
+	}
+	return out
 }

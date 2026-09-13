@@ -100,6 +100,9 @@ func (t Target) Emit(cfg ir.Config) ([]artifact.Artifact, error) {
 			if m.Reasoning != nil {
 				gm.Reasoning = m.Reasoning
 			}
+			if len(m.Variants) > 0 {
+				gm.Thinking = &gajaeThinking{Mode: "effort", Levels: effortStrings(m.Variants)}
+			}
 			gp.Models = append(gp.Models, gm)
 		}
 		providers[p.ID] = gp
@@ -237,13 +240,19 @@ type gajaeProvider struct {
 }
 
 type gajaeModel struct {
-	ID            string   `yaml:"id"`
-	Name          string   `yaml:"name,omitempty"`
-	ContextWindow *int64   `yaml:"contextWindow,omitempty"`
-	MaxTokens     *int64   `yaml:"maxTokens,omitempty"`
-	Input         []string `yaml:"input,omitempty"`
-	Output        []string `yaml:"output,omitempty"`
-	Reasoning     *bool    `yaml:"reasoning,omitempty"`
+	ID            string         `yaml:"id"`
+	Name          string         `yaml:"name,omitempty"`
+	ContextWindow *int64         `yaml:"contextWindow,omitempty"`
+	MaxTokens     *int64         `yaml:"maxTokens,omitempty"`
+	Input         []string       `yaml:"input,omitempty"`
+	Output        []string       `yaml:"output,omitempty"`
+	Reasoning     *bool          `yaml:"reasoning,omitempty"`
+	Thinking      *gajaeThinking `yaml:"thinking,omitempty"`
+}
+
+type gajaeThinking struct {
+	Mode   string   `yaml:"mode"`
+	Levels []string `yaml:"levels"`
 }
 
 type gajaeMCPServer struct {
@@ -256,4 +265,12 @@ type gajaeMCPServer struct {
 	Headers map[string]string `json:"headers,omitempty"`
 	Timeout *int64            `json:"timeout,omitempty"`
 	Enabled bool              `json:"enabled"`
+}
+
+func effortStrings(efforts []ir.ReasoningEffort) []string {
+	out := make([]string, len(efforts))
+	for i, effort := range efforts {
+		out[i] = string(effort)
+	}
+	return out
 }

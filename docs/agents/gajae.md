@@ -51,3 +51,9 @@ providers:
 discovery, so IR `ENV:NAME` renders as `"${VAR}"` and
 `Authorization: "Bearer ENV:NAME"` renders as `Bearer ${VAR}`. IR `timeout_ms`
 maps 1:1 (no conversion).
+
+## Reasoning variants
+
+`models[].variants` maps to `thinking: {mode: effort, levels: [...]}`. It does
+not use Gajae's budget, Google, or Anthropic-specific modes and does not set a
+default level. Provider-specific names such as `ultra` are preserved.
