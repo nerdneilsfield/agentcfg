@@ -52,12 +52,12 @@ Codex owns the active effort outside the provider model and needs a separate cat
 Status: done
 Depends on: none
 Acceptance: A1, A4
-Targets: `internal/ir/types.go`, `internal/ir/load.go`, `internal/ir/load_test.go`, `docs/protocol.md`. The existing all-target `example.yaml` remains variant-free because its declared targets include targets that correctly reject model-level variant lists.
+Targets: `internal/ir/types.go`, `internal/ir/load.go`, `internal/ir/load_test.go`, `docs/protocol.md`, `example.yaml`. The executable example selects only targets that faithfully represent its provider/model-supplied effort list.
 Contracts: `Model.Variants` is the ordered provider/model effort list. It does not select a default or carry native wire values.
 
 - [x] Add the IR field, validation, tests, and input documentation.
-- [x] Keep the all-target example variant-free; document the model-local YAML shape in the protocol.
-- [x] Verified: `go test ./internal/ir ./internal/example` and `go run ./cmd/agentcfg validate -c example.yaml` passed; the example remains valid for its all-target subset.
+- [x] Add a runnable `example.yaml` variant list and select targets that can faithfully represent it; document the model-local YAML shape in the protocol.
+- [x] Verified: `go test ./internal/ir ./internal/example` and `go run ./cmd/agentcfg validate -c example.yaml` pass; the example selects targets that preserve its listed effort names.
 - [x] Committed as `12e7caa feat: add model reasoning variants to IR` and `c88a4dd fix: preserve provider reasoning effort names`.
 
 Evidence: 2026-09-13 focused IR and embedded-example tests passed; `example.yaml: OK (2 providers, 2 MCP servers, 5 targets)`. Follow-up: names are provider/model-supplied rather than fixed canonical values; `low, medium, high, xhigh, max, ultra` was emitted unchanged for OpenCode.

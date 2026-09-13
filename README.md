@@ -117,6 +117,8 @@ providers:
         input: [text, image]
         output: [text]
         reasoning: true
+        # Selectable provider/model reasoning efforts. These are not defaults.
+        variants: [low, medium, high, xhigh, max, ultra]
         tool_calling: true
 
 mcp:
@@ -134,8 +136,16 @@ mcp:
 defaults:
   model: volcengine/glm-5.3
 
-targets: [crush, goose, codex]
+targets: [crush, gajae]
 ```
+
+`variants` is a model-local list of selectable reasoning efforts. It does not
+choose a default effort or configure verbosity, summaries, or token budgets.
+This example selects Crush and Gajae because they preserve provider/model names
+such as `ultra`. A target with a fixed native effort list, such as OpenClaw,
+rejects an unsupported name instead of silently changing it. See
+[`docs/protocol.md`](docs/protocol.md) and the relevant target contract for
+supported names.
 
 2. Validate the IR and every selected target:
 

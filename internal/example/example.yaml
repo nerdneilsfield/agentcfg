@@ -26,6 +26,8 @@ providers:
         input: [text, image]
         output: [text]
         reasoning: true
+        # Selectable provider/model reasoning efforts. These are not defaults.
+        variants: [low, medium, high, xhigh, max, ultra]
         tool_calling: true
 
   - id: anthropic-internal
@@ -58,4 +60,6 @@ mcp:
 defaults:
   model: volcengine/glm-5.3
 
-targets: [crush, gajae, hermes, openclaw, mimocode]
+# These targets preserve all listed effort names. Targets with fixed native
+# levels (for example OpenClaw) reject unsupported names such as "ultra".
+targets: [crush, gajae]

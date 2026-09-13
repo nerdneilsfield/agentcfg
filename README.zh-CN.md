@@ -114,6 +114,8 @@ providers:
         input: [text, image]
         output: [text]
         reasoning: true
+        # 可选的 provider/model 推理等级；它们不是默认值。
+        variants: [low, medium, high, xhigh, max, ultra]
         tool_calling: true
 
 mcp:
@@ -131,8 +133,14 @@ mcp:
 defaults:
   model: volcengine/glm-5.3
 
-targets: [crush, goose, codex]
+targets: [crush, gajae]
 ```
+
+`variants` 是 model-local 的可选推理等级列表。它不选择默认等级，也不配置
+verbosity、summary 或 token budget。本例选择 Crush 和 Gajae，因为它们会保留
+`ultra` 这类 provider/model 名称。原生等级固定的 target（如 OpenClaw）遇到
+不支持的名称会明确拒绝，而不会静默改写。支持的名称请参见
+[`docs/protocol.md`](docs/protocol.md) 和对应 target 的契约文档。
 
 2. 校验 IR 与所有选中的 target：
 
