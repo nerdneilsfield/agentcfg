@@ -29,8 +29,11 @@ var typeName = map[ir.Protocol]string{
 func (t Target) Validate(cfg ir.Config) []diag.Diagnostic {
 	var diags []diag.Diagnostic
 	for i, p := range cfg.Providers {
-		if strings.ContainsAny(p.APIKey.Value, "$`") {
-			diags = append(diags, diag.TargetErrorf(t.ID(), fmt.Sprintf("providers[%d].api_key", i), "literal API key contains native expression syntax and cannot be represented literally"))
+		if hasCrushExpression(p.APIKey.Value) {
+			diags = append(diags, diag.TargetErrorf(t.ID(), fmt.Sprintf("providers[%d].api_key", i), "literal value contains Crush expression syntax and cannot be represented literally"))
+		}
+		if hasCrushExpression(p.BaseURL) {
+			diags = append(diags, diag.TargetErrorf(t.ID(), fmt.Sprintf("providers[%d].base_url", i), "literal value contains Crush expression syntax and cannot be represented literally"))
 		}
 	}
 	for i, p := range cfg.Providers {
@@ -40,6 +43,10 @@ func (t Target) Validate(cfg ir.Config) []diag.Diagnostic {
 				"crush provider type must be openai-compat, openai, or anthropic; got %q", p.Protocol))
 		}
 		for name, v := range p.Headers {
+			if hasCrushExpression(v.Value) {
+				diags = append(diags, diag.TargetErrorf(t.ID(), path+".headers."+name,
+					"literal value contains Crush expression syntax and cannot be represented literally"))
+			}
 			if v.BearerFromEnv != "" && name != "Authorization" {
 				diags = append(diags, diag.TargetErrorf(t.ID(), path+".headers."+name,
 					"crush extra_headers are flat strings; Bearer ENV:NAME is only representable as Authorization: Bearer ${VAR}"))
@@ -78,6 +85,24 @@ func (t Target) Validate(cfg ir.Config) []diag.Diagnostic {
 		if srv.CWD != "" {
 			diags = append(diags, diag.TargetErrorf(t.ID(), path+".cwd",
 				"crush MCP has no cwd field"))
+		}
+		for j, value := range append(append([]string{}, srv.Command...), srv.URL) {
+			if hasCrushExpression(value) {
+				diags = append(diags, diag.TargetErrorf(t.ID(), fmt.Sprintf("%s.command[%d]", path, j),
+					"literal value contains Crush expression syntax and cannot be represented literally"))
+			}
+		}
+		for name, v := range srv.Env {
+			if hasCrushExpression(v.Value) {
+				diags = append(diags, diag.TargetErrorf(t.ID(), path+".env."+name,
+					"literal value contains Crush expression syntax and cannot be represented literally"))
+			}
+		}
+		for name, v := range srv.Headers {
+			if hasCrushExpression(v.Value) {
+				diags = append(diags, diag.TargetErrorf(t.ID(), path+".headers."+name,
+					"literal value contains Crush expression syntax and cannot be represented literally"))
+			}
 		}
 		if srv.TimeoutMS != nil && *srv.TimeoutMS%1000 != 0 {
 			diags = append(diags, diag.TargetErrorf(t.ID(), path+".timeout_ms",
@@ -198,6 +223,8 @@ func (t Target) Emit(cfg ir.Config) ([]artifact.Artifact, error) {
 		Content:       buf.Bytes(),
 	}}, nil
 }
+
+func hasCrushExpression(value string) bool { return strings.ContainsAny(value, "$`") }
 
 func envInterp(v ir.HeaderValue) string {
 	if v.BearerFromEnv != "" {

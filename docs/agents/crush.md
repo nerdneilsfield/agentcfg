@@ -42,6 +42,10 @@ Custom providers live under `providers.<id>` (`ProviderConfig`, `additionalPrope
 
 - `type` enum includes `openai` (Responses API), `openai-compat` (Chat Completions), `anthropic`, and several hosted backends. IR `openai-completions` maps to `openai-compat`; `openai-responses` maps to `openai`; `anthropic-messages` maps to `anthropic`. Crush `type=openai` always calls the Responses API, so a completions-only gateway should use `openai-completions` instead.
 - `api_key` is a string whose documented example is `"$OPENAI_API_KEY"`; IR `api_key: "ENV:NAME"` maps to `"$VAR"` without resolving the reference.
+- Crush evaluates shell-style expressions in these native configuration strings.
+  IR literals containing `$` or backticks are rejected for provider URLs,
+  provider headers, MCP commands, arguments, environment values, URLs, and
+  headers rather than being evaluated by Crush.
 - `extra_headers` is a flat `Record<string,string>`. IR `ENV:NAME` renders as `"$VAR"`; `Authorization: "Bearer ENV:NAME"` as `"Bearer ${VAR}"`. `Bearer ENV:NAME` on any other header name is rejected. Explicit model lists set `discover_models: false` so Catwalk cannot merge unexpected models.
 - Model schema **requires** `id`, `name`, `context_window`, `default_max_tokens`, `can_reason`, `supports_attachments`, and four cost fields. The emitter writes `cost_per_1m_*` as `0` (IR has no cost fields). Missing `context_window` or `max_output_tokens` is rejected. `can_reason` comes from IR `reasoning`; `supports_attachments` is true when IR input includes `image`. IR `tool_calling` and output modalities have no Crush field and are not emitted.
 

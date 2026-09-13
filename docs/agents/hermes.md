@@ -44,8 +44,8 @@ providers:
 
 `mcp_servers.<id>` supports stdio (`command`, `args`, `env`, `cwd`) and http
 (`url`, `headers`), with `${VAR}` expansion native at connect time. IR
-`timeout_ms` is emitted as `timeout` in seconds (`ms/1000`). IR `enabled`
-maps to the native `enabled` flag.
+`timeout_ms` is emitted as `timeout` in seconds (`ms/1000`) and must be
+positive. IR `enabled` maps to the native `enabled` flag.
 
 ## Reasoning variants
 

@@ -233,3 +233,23 @@ func TestEmitsReasoningLevels(t *testing.T) {
 		t.Fatalf("must not select default effort:\n%s", out)
 	}
 }
+
+func TestRejectsLiteralCrushExpressions(t *testing.T) {
+	cases := []struct {
+		name   string
+		mutate func(*ir.Config)
+	}{
+		{"provider base URL", func(c *ir.Config) { c.Providers[0].BaseURL = "https://$HOST/v1" }},
+		{"provider header", func(c *ir.Config) { c.Providers[0].Headers["X-Test"] = ir.HeaderValue{Value: "$(whoami)"} }},
+		{"MCP argument", func(c *ir.Config) { c.MCP[0].Command[1] = "`whoami`" }},
+		{"MCP environment", func(c *ir.Config) { c.MCP[0].Env["X"] = ir.HeaderValue{Value: "$HOME"} }},
+		{"MCP URL", func(c *ir.Config) { c.MCP[1].URL = "https://${HOST}/mcp" }},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			cfg := exampleConfig()
+			tc.mutate(&cfg)
+			expectInvalid(t, cfg, "expression syntax")
+		})
+	}
+}

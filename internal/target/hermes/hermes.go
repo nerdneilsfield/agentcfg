@@ -41,6 +41,12 @@ func (t Target) Validate(cfg ir.Config) []diag.Diagnostic {
 				"hermes api_mode must be chat_completions, codex_responses, or anthropic_messages; got %q", p.Protocol))
 		}
 	}
+	for i, s := range cfg.MCP {
+		if s.TimeoutMS != nil && *s.TimeoutMS <= 0 {
+			diags = append(diags, diag.TargetErrorf(t.ID(), fmt.Sprintf("mcp[%d].timeout_ms", i),
+				"hermes MCP timeout must be positive"))
+		}
+	}
 	if cfg.Defaults != nil && cfg.Defaults.Model != "" {
 		pid, mid, ok := splitRef(cfg.Defaults.Model)
 		if !ok {

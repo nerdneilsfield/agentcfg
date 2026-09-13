@@ -221,3 +221,11 @@ func TestRejectsRenamedStdioEnvReference(t *testing.T) {
 	cfg.MCP[0].Env["DEST"] = ir.HeaderValue{FromEnv: "SOURCE"}
 	expectInvalid(t, cfg, "renamed environment references")
 }
+
+func TestRejectsNonPositiveTimeout(t *testing.T) {
+	for _, timeout := range []int64{0, -1000} {
+		cfg := exampleConfig()
+		cfg.MCP[0].TimeoutMS = i64(timeout)
+		expectInvalid(t, cfg, "must be positive")
+	}
+}

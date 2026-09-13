@@ -77,7 +77,10 @@ func (t Target) Validate(cfg ir.Config) []diag.Diagnostic {
 	}
 	for i, s := range cfg.MCP {
 		path := fmt.Sprintf("mcp[%d]", i)
-		if s.TimeoutMS != nil && *s.TimeoutMS%1000 != 0 {
+		if s.TimeoutMS != nil && *s.TimeoutMS <= 0 {
+			diags = append(diags, diag.TargetErrorf(t.ID(), path+".timeout_ms",
+				"goose extension timeout must be positive"))
+		} else if s.TimeoutMS != nil && *s.TimeoutMS%1000 != 0 {
 			diags = append(diags, diag.TargetErrorf(t.ID(), path+".timeout_ms",
 				"goose extension timeout is whole seconds; %d ms is not divisible by 1000", *s.TimeoutMS))
 		}

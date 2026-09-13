@@ -145,3 +145,11 @@ func TestIgnoresModelReasoningVariants(t *testing.T) {
 		}
 	}
 }
+
+func TestRejectsNonPositiveTimeout(t *testing.T) {
+	for _, timeout := range []int64{0, -1000} {
+		cfg := exampleConfig()
+		cfg.MCP[0].TimeoutMS = i64(timeout)
+		expectInvalid(t, cfg, "must be positive")
+	}
+}
