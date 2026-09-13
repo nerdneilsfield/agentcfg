@@ -47,7 +47,7 @@ generated output.
 `models[].variants` emits the model `thinkingLevelMap`. Listed OpenClaw levels
 map to themselves; every other documented level is `null`. Its native map has
 the fixed names `off`, `minimal`, `low`, `medium`, `high`, `xhigh`, and `max`.
-An unrecognized model/provider-specific name such as `ultra` is rejected rather
+An unrecognized model/provider-specific name such as `ultra` is omitted rather
 than remapped. No default thinking level or request parameters are generated.
 
 ## Defaults

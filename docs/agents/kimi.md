@@ -72,4 +72,4 @@ When the IR has no MCP servers, the `mcp.json` artifact is omitted entirely.
 
 `models[].variants` maps to Kimi's `support_efforts`; it never writes
 `default_effort`. Kimi's documented selectable names are `low`, `high`, and
-`max`; other provider-specific names such as `ultra` are rejected, not remapped.
+`max`; other provider-specific names such as `ultra` are omitted, not remapped.

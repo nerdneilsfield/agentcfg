@@ -81,6 +81,7 @@ MiMo Code uses native `type` values `local` and `remote` (the `stdio`/`http` spe
 
 ## Reasoning variants
 
-MiMo Code's generic `variants` and provider-option pass-through do not establish
-a verified reasoning-effort selector. `models[].variants` is rejected rather
-than emitted as guessed native options.
+MiMo Code directly supports `models.<id>.variants`. agentcfg emits one native
+variant per source name with only `reasoningEffort` set to that name. It does
+not copy unrelated native fields such as `textVerbosity`, `reasoningSummary`,
+or `include`. Provider/model names such as `ultra` are preserved.

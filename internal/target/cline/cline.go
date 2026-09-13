@@ -83,14 +83,6 @@ func (t Target) Validate(cfg ir.Config) []diag.Diagnostic {
 				"cline default %q does not resolve to an emitted provider model", cfg.Defaults.Model))
 		}
 	}
-	for i, p := range cfg.Providers {
-		for j, m := range p.Models {
-			if len(m.Variants) > 0 {
-				diags = append(diags, diag.TargetErrorf(t.ID(), fmt.Sprintf("providers[%d].models[%d].variants", i, j),
-					"cline has no model-level reasoning effort list; settings.reasoning is provider-wide"))
-			}
-		}
-	}
 	return diags
 }
 

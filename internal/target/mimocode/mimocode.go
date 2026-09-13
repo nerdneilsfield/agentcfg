@@ -42,14 +42,6 @@ func (t Target) Validate(cfg ir.Config) []diag.Diagnostic {
 				"mimocode has no native mapping for protocol %q", p.Protocol))
 		}
 	}
-	for i, p := range cfg.Providers {
-		for j, m := range p.Models {
-			if len(m.Variants) > 0 {
-				diags = append(diags, diag.TargetErrorf(t.ID(), fmt.Sprintf("providers[%d].models[%d].variants", i, j),
-					"mimocode variants/options do not define a verified reasoning effort selector"))
-			}
-		}
-	}
 	return diags
 }
 
@@ -100,6 +92,9 @@ func (t Target) Emit(cfg ir.Config) ([]artifact.Artifact, error) {
 			mm.Modalities = map[string][]ir.Modality{"input": in, "output": out}
 			if m.Reasoning != nil && *m.Reasoning {
 				mm.Reasoning = true
+			}
+			if len(m.Variants) > 0 {
+				mm.Variants = reasoningVariants(m.Variants)
 			}
 			if m.ToolCalling != nil && *m.ToolCalling {
 				mm.ToolCall = true
@@ -197,4 +192,17 @@ type mimoModel struct {
 	Modalities map[string][]ir.Modality `json:"modalities"`
 	Reasoning  bool                     `json:"reasoning,omitempty"`
 	ToolCall   bool                     `json:"tool_call,omitempty"`
+	Variants   map[string]mimoVariant   `json:"variants,omitempty"`
+}
+
+type mimoVariant struct {
+	ReasoningEffort string `json:"reasoningEffort"`
+}
+
+func reasoningVariants(efforts []ir.ReasoningEffort) map[string]mimoVariant {
+	out := make(map[string]mimoVariant, len(efforts))
+	for _, effort := range efforts {
+		out[string(effort)] = mimoVariant{ReasoningEffort: string(effort)}
+	}
+	return out
 }

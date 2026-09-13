@@ -50,5 +50,7 @@ provider's first model.
 
 ## Reasoning variants
 
-Jcode can set one `reasoning_effort`, but cannot declare a model's selectable
-effort list. `models[].variants` is rejected rather than reduced to a default.
+Jcode has one model `reasoning_effort` and provider/model-specific effort
+ladders, but not a model selectable-list field. `models[].variants` is omitted
+rather than reduced to one selected effort. In particular, agentcfg does not
+map `ultra` to Jcode's `max` or expose Jcode-only swarm values.

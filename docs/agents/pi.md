@@ -42,8 +42,8 @@ Pi's declarative custom-provider API requires `api`, model `input`, `cost`, `con
 For `models[].variants`, the extension emits a full model `thinkingLevelMap`.
 Listed Pi levels map to themselves and every other Pi level is `null`, so the
 model picker exposes precisely that set. Pi only documents `off`, `minimal`,
-`low`, `medium`, `high`, `xhigh`, and `max`; a provider-specific name such as
-`ultra` is rejected rather than coerced. No default thinking level is emitted.
+`low`, `medium`, `high`, `xhigh`, and `max`; unsupported names such as `ultra`
+are omitted. No default thinking level is emitted.
 The v1 Pi emitter supports all three IR protocols by mapping them to Pi's `openai-completions`, `openai-responses`, and `anthropic-messages` API names.
 
 `defaultProvider` and `defaultModel` are settings fields, but v1 emits no settings mutation or standalone settings fragment because the provider extension must be installed/loaded first. Defaults remain deferred for Pi.

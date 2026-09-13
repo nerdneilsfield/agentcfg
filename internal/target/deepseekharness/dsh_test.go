@@ -4,7 +4,6 @@ import (
 	"strings"
 	"testing"
 
-	"agentcfg/internal/diag"
 	"agentcfg/internal/ir"
 )
 
@@ -34,12 +33,20 @@ func TestEmitsReasoningEfforts(t *testing.T) {
 	}
 }
 
-func TestRejectsUnsupportedReasoningEffort(t *testing.T) {
-	diags := (Target{}).Validate(variantConfig("ultra"))
-	for _, d := range diags {
-		if d.Severity == diag.SeverityError && strings.Contains(d.Message, `does not support reasoning effort "ultra"`) {
-			return
-		}
+func TestSkipsUnsupportedReasoningEffort(t *testing.T) {
+	cfg := variantConfig("low", "ultra")
+	if diags := (Target{}).Validate(cfg); len(diags) > 0 {
+		t.Fatalf("unexpected diagnostics: %v", diags)
 	}
-	t.Fatalf("missing unsupported effort diagnostic: %v", diags)
+	arts, err := (Target{}).Emit(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := string(arts[0].Content)
+	if !strings.Contains(out, "low: low") {
+		t.Fatalf("missing supported effort:\n%s", out)
+	}
+	if strings.Contains(out, "ultra") {
+		t.Fatalf("unsupported effort must be skipped:\n%s", out)
+	}
 }

@@ -143,7 +143,8 @@ targets: [crush, gajae]
 choose a default effort or configure verbosity, summaries, or token budgets.
 This example selects Crush and Gajae because they preserve provider/model names
 such as `ultra`. A target with a fixed native effort list, such as OpenClaw,
-rejects an unsupported name instead of silently changing it. See
+omits an unsupported name instead of silently changing it. A target with no
+model-level variants field omits the list and still generates its artifact. See
 [`docs/protocol.md`](docs/protocol.md) and the relevant target contract for
 supported names.
 

@@ -169,9 +169,23 @@ func TestOmitsEmptyMCP(t *testing.T) {
 	}
 }
 
-func TestRejectsModelReasoningVariants(t *testing.T) {
+func TestEmitsReasoningVariants(t *testing.T) {
 	cfg := exampleConfig()
-	cfg.Providers[0].Models[0].Reasoning = b(true)
-	cfg.Providers[0].Models[0].Variants = []ir.ReasoningEffort{"low", "ultra"}
-	expectInvalid(t, cfg, "do not define a verified reasoning effort selector")
+	cfg.Providers[0].Models[0].Variants = []ir.ReasoningEffort{"low", "high", "ultra"}
+	expectValid(t, cfg)
+	arts, err := (Target{}).Emit(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := string(arts[0].Content)
+	for _, want := range []string{`"variants": {`, `"low": {`, `"reasoningEffort": "low"`, `"ultra": {`, `"reasoningEffort": "ultra"`} {
+		if !strings.Contains(out, want) {
+			t.Errorf("missing %q in output:\n%s", want, out)
+		}
+	}
+	for _, forbidden := range []string{`"textVerbosity"`, `"reasoningSummary"`, `"include"`} {
+		if strings.Contains(out, forbidden) {
+			t.Errorf("unexpected %q in output:\n%s", forbidden, out)
+		}
+	}
 }

@@ -21,20 +21,20 @@ Existing changes: none in the agentcfg worktree. Authorization: implementation i
 
 ## Design and constraints
 
-`ir.Model.Variants` is a model-local ordered list of provider/model-supplied reasoning efforts. Validation owns its syntax, duplication, and `reasoning: true` invariant. Emitters must treat a populated list as required configuration: render the documented native model-level availability structure or diagnose that the target cannot faithfully represent it. No target may reduce it to the existing boolean `reasoning` flag.
+`ir.Model.Variants` is a model-local ordered list of provider/model-supplied reasoning efforts. Validation owns its syntax, duplication, and `reasoning: true` invariant. Emitters render the documented native model-level availability structure when possible. A fixed-level target skips unknown names; a target without a faithful list skips `variants` and still emits its remaining configuration. No target may reduce a list to the existing boolean `reasoning` flag or a selected default.
 
 Exact native mapping is:
 
 - OpenCode: `models.<id>.variants.<effort>.reasoningEffort`.
-- Pi, Prime Agent, OpenClaw: `thinkingLevelMap` only when every configured variant name is a documented native level; unsupported names are target diagnostics, never remapped.
+- Pi, Prime Agent, OpenClaw: `thinkingLevelMap` for documented native levels; unsupported names are skipped, never remapped.
 - Kimi: `support_efforts` only; leave its unrelated `default_effort` unset.
 - Crush: `reasoning_levels` only; leave `default_reasoning_effort` unset.
 - Grok Build: `supports_reasoning_effort = true` plus `reasoning_efforts` records; no generated labels/descriptions/default selection beyond the canonical identifier.
 - Zcode: structured `reasoning` object with `enabled: true` and `levels`; no target-specific default or per-level request options.
 - Gajae: `thinking` in `effort` mode with `levels`; do not add its budget/adaptive mode fields.
-- DeepSeek Harness: `reasoningEfforts` same-name map when every configured variant name is a documented native level. It does not include the route's active/default reasoning setting.
+- DeepSeek Harness: `reasoningEfforts` same-name map for documented native levels. It does not include the route's active/default reasoning setting; unsupported names are skipped.
 
-Codex owns the active effort outside the provider model and needs a separate catalog artifact. Cline and Jcode only have one selected/provider default effort. Goose and Hermes have no model-level availability list. MiMo Code's generic pass-through variants/options do not establish a reasoning-effort selector. Those targets reject a non-empty `variants` list with a target diagnostic.
+Codex needs a complete replacement catalog that agentcfg cannot safely construct from the common IR. Cline's custom-model persistence drops its in-memory `reasoningOptions`. Jcode has one selected effort, Goose has no model-level list, and Hermes has a per-model selected override. Those targets skip a non-empty `variants` list. MiMo Code directly supports model variants and maps each source name to `reasoningEffort`.
 
 ## Acceptance map
 
@@ -83,14 +83,14 @@ Status: done
 Depends on: T1
 Acceptance: A2, A4
 Targets: `internal/target/{codex,cline,jcode,goose,hermes,mimocode}`, their tests and contracts.
-Contracts: a non-empty `variants` list must cause a target-scoped diagnostic; empty/absent lists preserve existing behavior.
+Contracts: a non-empty `variants` list is skipped when the target has no faithful model-level availability list; empty/absent lists preserve existing behavior.
 
-- [x] Add target validation and focused rejection tests.
-- [x] Document the exact native limitation in each target contract.
-- [x] Verified: package tests for Codex, Cline, Jcode, Goose, Hermes, and MiMo Code passed.
-- [x] Committed as `c8c06f9 fix: reject unsupported model reasoning variants`.
+- [x] Skip unsupported variants and add focused generation tests.
+- [x] Document each native limitation in its target contract.
+- [x] Verified: package tests for affected targets pass.
+- [x] Correct prior blocking behavior in a follow-up commit.
 
-Evidence: 2026-09-13 focused package tests passed. Codex catalog, Cline provider-wide setting, Jcode single effort, and the targets with no verified list all reject a populated `variants` list.
+Evidence: Current-source revalidation showed MiMo Code has a native model variants map. Codex's replacement catalog and Cline's nonpersistent `reasoningOptions` cannot safely represent this IR. Jcode, Goose, and Hermes use only selected/default controls or no list. These targets skip a populated `variants` list.
 
 ## Final acceptance
 

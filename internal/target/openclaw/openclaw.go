@@ -40,16 +40,6 @@ func (t Target) Validate(cfg ir.Config) []diag.Diagnostic {
 				"openclaw api must be openai-completions, openai-responses, or anthropic-messages for custom providers; got %q", p.Protocol))
 		}
 	}
-	for i, p := range cfg.Providers {
-		for j, m := range p.Models {
-			for _, effort := range m.Variants {
-				if !openclawThinkingLevel(effort) {
-					diags = append(diags, diag.TargetErrorf(t.ID(), fmt.Sprintf("providers[%d].models[%d].variants", i, j),
-						"openclaw thinkingLevelMap does not support reasoning effort %q", effort))
-				}
-			}
-		}
-	}
 	if cfg.Defaults != nil && cfg.Defaults.Model != "" {
 		pid, mid, ok := splitRef(cfg.Defaults.Model)
 		if !ok {
@@ -103,7 +93,7 @@ func (t Target) Emit(cfg ir.Config) ([]artifact.Artifact, error) {
 			if m.Reasoning != nil {
 				om.Reasoning = m.Reasoning
 			}
-			if len(m.Variants) > 0 {
+			if hasOpenclawThinkingLevels(m.Variants) {
 				om.ThinkingLevelMap = openclawThinkingLevelMap(m.Variants)
 			}
 			if m.ToolCalling != nil {
@@ -268,6 +258,15 @@ var openclawThinkingLevels = []ir.ReasoningEffort{"off", "minimal", "low", "medi
 
 func openclawThinkingLevel(effort ir.ReasoningEffort) bool {
 	return openclawContainsEffort(openclawThinkingLevels, effort)
+}
+
+func hasOpenclawThinkingLevels(efforts []ir.ReasoningEffort) bool {
+	for _, effort := range efforts {
+		if openclawThinkingLevel(effort) {
+			return true
+		}
+	}
+	return false
 }
 
 func openclawThinkingLevelMap(efforts []ir.ReasoningEffort) map[string]any {

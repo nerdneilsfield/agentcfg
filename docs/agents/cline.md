@@ -58,4 +58,6 @@ IR has no MCP servers, the artifact is omitted.
 ## Reasoning variants
 
 Cline has provider-wide `settings.reasoning` and model capability metadata, but
-no model-local selectable effort list. `models[].variants` is rejected.
+no persisted model-local selectable effort list in its custom-model registry.
+`models[].variants` is omitted; agentcfg does not reduce the list to the
+provider-wide selected effort.

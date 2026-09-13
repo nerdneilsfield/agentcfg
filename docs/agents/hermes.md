@@ -49,5 +49,6 @@ maps to the native `enabled` flag.
 
 ## Reasoning variants
 
-Hermes does not expose model-level reasoning-effort configuration.
-`models[].variants` is rejected.
+Hermes exposes one active effort per model through `agent.reasoning_overrides`,
+not a selectable effort list. `models[].variants` is omitted rather than being
+reduced to a selected override.

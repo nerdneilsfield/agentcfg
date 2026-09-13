@@ -142,7 +142,9 @@ The list must be non-empty when present, cannot repeat an identifier, and
 requires `reasoning: true`. A variant's only IR meaning is its reasoning effort.
 It does not carry output verbosity, reasoning summaries, token budgets, or
 arbitrary native request options. Targets render this model-level availability
-where their documented contract supports it, or reject it with a diagnostic.
+where their documented contract supports it. A target with a fixed native set
+skips unrecognized effort names; a target with no faithful model-level field
+skips `variants` and still emits its remaining configuration.
 
 The v1 IR intentionally excludes costs, per-level provider wire-value overrides,
 per-model provider options, and compatibility toggles. These differ too much by

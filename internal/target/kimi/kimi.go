@@ -59,16 +59,6 @@ func (t Target) Validate(cfg ir.Config) []diag.Diagnostic {
 			}
 		}
 	}
-	for i, p := range cfg.Providers {
-		for j, m := range p.Models {
-			for _, effort := range m.Variants {
-				if !kimiSupportsEffort(effort) {
-					diags = append(diags, diag.TargetErrorf(t.ID(), fmt.Sprintf("providers[%d].models[%d].variants", i, j),
-						"kimi support_efforts does not support reasoning effort %q", effort))
-				}
-			}
-		}
-	}
 	for i, s := range cfg.MCP {
 		path := fmt.Sprintf("mcp[%d]", i)
 		if s.Transport == ir.TransportStdio {
@@ -133,8 +123,8 @@ func (t Target) Emit(cfg ir.Config) ([]artifact.Artifact, error) {
 				km.MaxOutputSize = m.MaxOutputTokens
 			}
 			km.Capabilities = capabilities(m)
-			if len(m.Variants) > 0 {
-				km.SupportEfforts = effortStrings(m.Variants)
+			if efforts := kimiSupportedEfforts(m.Variants); len(efforts) > 0 {
+				km.SupportEfforts = effortStrings(efforts)
 			}
 			doc.Models[m.ID] = km
 		}
@@ -290,6 +280,16 @@ func kimiSupportsEffort(effort ir.ReasoningEffort) bool {
 		}
 	}
 	return false
+}
+
+func kimiSupportedEfforts(efforts []ir.ReasoningEffort) []ir.ReasoningEffort {
+	out := []ir.ReasoningEffort{}
+	for _, effort := range efforts {
+		if kimiSupportsEffort(effort) {
+			out = append(out, effort)
+		}
+	}
+	return out
 }
 
 func effortStrings(efforts []ir.ReasoningEffort) []string {

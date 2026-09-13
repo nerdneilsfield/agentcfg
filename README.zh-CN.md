@@ -138,8 +138,9 @@ targets: [crush, gajae]
 
 `variants` 是 model-local 的可选推理等级列表。它不选择默认等级，也不配置
 verbosity、summary 或 token budget。本例选择 Crush 和 Gajae，因为它们会保留
-`ultra` 这类 provider/model 名称。原生等级固定的 target（如 OpenClaw）遇到
-不支持的名称会明确拒绝，而不会静默改写。支持的名称请参见
+`ultra` 这类 provider/model 名称。原生等级固定的 target（如 OpenClaw）会跳过
+不支持的名称，而不会静默改写。没有 model-level variants 字段的 target 会跳过整个
+列表，但仍生成其产物。支持的名称请参见
 [`docs/protocol.md`](docs/protocol.md) 和对应 target 的契约文档。
 
 2. 校验 IR 与所有选中的 target：

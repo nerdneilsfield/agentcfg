@@ -168,9 +168,18 @@ func TestOmitsMCPArtifactWhenEmpty(t *testing.T) {
 	}
 }
 
-func TestRejectsModelReasoningVariants(t *testing.T) {
+func TestIgnoresModelReasoningVariants(t *testing.T) {
 	cfg := exampleConfig()
 	cfg.Providers[0].Models[0].Reasoning = b(true)
 	cfg.Providers[0].Models[0].Variants = []ir.ReasoningEffort{"low", "ultra"}
-	expectInvalid(t, cfg, "only one model reasoning_effort")
+	expectValid(t, cfg)
+	arts, err := (Target{}).Emit(cfg)
+	if err != nil {
+		t.Fatalf("Emit: %v", err)
+	}
+	for _, art := range arts {
+		if strings.Contains(string(art.Content), `"variants"`) {
+			t.Fatalf("variants must be skipped:\n%s", art.Content)
+		}
+	}
 }

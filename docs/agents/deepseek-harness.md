@@ -37,7 +37,7 @@ Verified protocols are `openai-completions`, `openai-responses`, and `anthropic-
 `models[].variants` maps to a model-local `reasoningEfforts` map. Listed DSH
 levels map to their own wire spelling and other documented levels are `null`.
 DSH only accepts `off`, `minimal`, `low`, `medium`, `high`, `xhigh`, and `max`;
-`ultra` and other unrecognized names are rejected instead of remapped. This
+`ultra` and other unrecognized names are omitted instead of remapped. This
 never sets DSH's route-level active `reasoning` field or any thinking budget.
 
 DSH keeps default selected model in session/UI state, so `defaults.model` is not emitted.

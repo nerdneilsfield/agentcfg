@@ -58,5 +58,7 @@ Goose MCP servers are `extensions.<id>` in `config.yaml`:
 
 ## Reasoning variants
 
-Goose exposes only the boolean model `reasoning` capability. It has no
-model-local effort availability list, so `models[].variants` is rejected.
+Goose has an active `GOOSE_THINKING_EFFORT` setting and a fixed parser ladder,
+but not a model-local effort availability list. `models[].variants` is omitted
+rather than selected as a global effort. In particular, it does not apply
+Goose's lossy `xhigh` to `max` normalization to the source list.

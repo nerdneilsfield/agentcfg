@@ -60,4 +60,7 @@ Codex's top-level `model` selects a model string, but a custom provider also req
 
 Codex keeps per-model availability in a separate model catalog and active effort
 in a session/top-level setting, not in `model_providers`. Therefore a non-empty
-agentcfg `models[].variants` list is rejected rather than omitted.
+agentcfg `models[].variants` list is omitted. A complete catalog would carry
+`supported_reasoning_levels`, but generating it from the common IR would discard
+required catalog metadata and replace Codex's built-in catalog, so agentcfg
+does not attempt it.
