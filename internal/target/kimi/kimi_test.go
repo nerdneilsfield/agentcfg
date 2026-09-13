@@ -183,6 +183,7 @@ func TestEmitsSupportEfforts(t *testing.T) {
 		t.Fatalf("must not select a default effort:\n%s", out)
 	}
 }
+
 func TestRejectsUnsupportedReasoningEffort(t *testing.T) {
 	cfg := exampleConfig()
 	cfg.Providers[0].Models[0].Variants = []ir.ReasoningEffort{"ultra"}

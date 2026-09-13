@@ -291,6 +291,7 @@ func kimiSupportsEffort(effort ir.ReasoningEffort) bool {
 	}
 	return false
 }
+
 func effortStrings(efforts []ir.ReasoningEffort) []string {
 	out := make([]string, len(efforts))
 	for i, effort := range efforts {
