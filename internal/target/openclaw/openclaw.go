@@ -40,6 +40,16 @@ func (t Target) Validate(cfg ir.Config) []diag.Diagnostic {
 				"openclaw api must be openai-completions, openai-responses, or anthropic-messages for custom providers; got %q", p.Protocol))
 		}
 	}
+	for i, p := range cfg.Providers {
+		for j, m := range p.Models {
+			for _, effort := range m.Variants {
+				if !openclawThinkingLevel(effort) {
+					diags = append(diags, diag.TargetErrorf(t.ID(), fmt.Sprintf("providers[%d].models[%d].variants", i, j),
+						"openclaw thinkingLevelMap does not support reasoning effort %q", effort))
+				}
+			}
+		}
+	}
 	if cfg.Defaults != nil && cfg.Defaults.Model != "" {
 		pid, mid, ok := splitRef(cfg.Defaults.Model)
 		if !ok {
@@ -92,6 +102,9 @@ func (t Target) Emit(cfg ir.Config) ([]artifact.Artifact, error) {
 			}
 			if m.Reasoning != nil {
 				om.Reasoning = m.Reasoning
+			}
+			if len(m.Variants) > 0 {
+				om.ThinkingLevelMap = openclawThinkingLevelMap(m.Variants)
 			}
 			if m.ToolCalling != nil {
 				om.Compat = map[string]bool{"supportsTools": *m.ToolCalling}
@@ -228,13 +241,14 @@ type openclawProvider struct {
 }
 
 type openclawModel struct {
-	ID            string          `json:"id"`
-	Name          string          `json:"name,omitempty"`
-	ContextWindow *int64          `json:"contextWindow,omitempty"`
-	MaxTokens     *int64          `json:"maxTokens,omitempty"`
-	Input         []string        `json:"input,omitempty"`
-	Reasoning     *bool           `json:"reasoning,omitempty"`
-	Compat        map[string]bool `json:"compat,omitempty"`
+	ID               string          `json:"id"`
+	Name             string          `json:"name,omitempty"`
+	ContextWindow    *int64          `json:"contextWindow,omitempty"`
+	MaxTokens        *int64          `json:"maxTokens,omitempty"`
+	Input            []string        `json:"input,omitempty"`
+	Reasoning        *bool           `json:"reasoning,omitempty"`
+	ThinkingLevelMap map[string]any  `json:"thinkingLevelMap,omitempty"`
+	Compat           map[string]bool `json:"compat,omitempty"`
 }
 
 type openclawMCPServer struct {
@@ -248,4 +262,31 @@ type openclawMCPServer struct {
 	Headers             map[string]string `json:"headers,omitempty"`
 	ConnectionTimeoutMs *int64            `json:"connectionTimeoutMs,omitempty"`
 	RequestTimeoutMs    *int64            `json:"requestTimeoutMs,omitempty"`
+}
+
+var openclawThinkingLevels = []ir.ReasoningEffort{"off", "minimal", "low", "medium", "high", "xhigh", "max"}
+
+func openclawThinkingLevel(effort ir.ReasoningEffort) bool {
+	return openclawContainsEffort(openclawThinkingLevels, effort)
+}
+
+func openclawThinkingLevelMap(efforts []ir.ReasoningEffort) map[string]any {
+	levels := make(map[string]any, len(openclawThinkingLevels))
+	for _, level := range openclawThinkingLevels {
+		if openclawContainsEffort(efforts, level) {
+			levels[string(level)] = string(level)
+		} else {
+			levels[string(level)] = nil
+		}
+	}
+	return levels
+}
+
+func openclawContainsEffort(efforts []ir.ReasoningEffort, wanted ir.ReasoningEffort) bool {
+	for _, effort := range efforts {
+		if effort == wanted {
+			return true
+		}
+	}
+	return false
 }

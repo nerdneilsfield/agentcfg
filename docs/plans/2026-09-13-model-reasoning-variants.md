@@ -75,7 +75,7 @@ Contracts: Render only the canonical availability list. Do not write defaults, v
 - [ ] Verify: affected package tests and a generated OpenCode fixture show distinct `low`, `high`, `max` variants.
 - [ ] Inspect the diff and commit `feat: emit model reasoning variants`.
 
-Evidence: OpenCode mapping and focused emitter test passed on 2026-09-13; remaining exact mappings are pending.
+Evidence: OpenCode mapping plus Pi, Prime Agent, and OpenClaw fixed-level-map mappings passed focused package tests on 2026-09-13. The fixed-map targets reject `ultra` rather than remapping it; remaining exact mappings are pending.
 
 ### T3: Reject targets without model-level availability lists
 

@@ -33,6 +33,16 @@ func (t Target) Validate(cfg ir.Config) []diag.Diagnostic {
 				"prime-agent models.json providers have no headers field; provider headers are not representable"))
 		}
 	}
+	for i, p := range cfg.Providers {
+		for j, m := range p.Models {
+			for _, effort := range m.Variants {
+				if !primeThinkingLevel(effort) {
+					diags = append(diags, diag.TargetErrorf(t.ID(), fmt.Sprintf("providers[%d].models[%d].variants", i, j),
+						"prime-agent thinkingLevelMap does not support reasoning effort %q", effort))
+				}
+			}
+		}
+	}
 	for i, s := range cfg.MCP {
 		path := fmt.Sprintf("mcp[%d]", i)
 		if s.Transport == ir.TransportStdio {
@@ -73,6 +83,9 @@ func (t Target) Emit(cfg ir.Config) ([]artifact.Artifact, error) {
 				"cost":  map[string]any{"input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0},
 			}
 			mm["reasoning"] = m.Reasoning != nil && *m.Reasoning
+			if len(m.Variants) > 0 {
+				mm["thinkingLevelMap"] = primeThinkingLevelMap(m.Variants)
+			}
 			if m.ContextWindow != nil {
 				mm["contextWindow"] = *m.ContextWindow
 			}
@@ -207,4 +220,31 @@ func orDefault(v, def string) string {
 		return def
 	}
 	return v
+}
+
+var primeThinkingLevels = []ir.ReasoningEffort{"off", "minimal", "low", "medium", "high", "xhigh", "max"}
+
+func primeThinkingLevel(effort ir.ReasoningEffort) bool {
+	return primeContainsEffort(primeThinkingLevels, effort)
+}
+
+func primeThinkingLevelMap(efforts []ir.ReasoningEffort) map[string]any {
+	levels := make(map[string]any, len(primeThinkingLevels))
+	for _, level := range primeThinkingLevels {
+		if primeContainsEffort(efforts, level) {
+			levels[string(level)] = string(level)
+		} else {
+			levels[string(level)] = nil
+		}
+	}
+	return levels
+}
+
+func primeContainsEffort(efforts []ir.ReasoningEffort, wanted ir.ReasoningEffort) bool {
+	for _, effort := range efforts {
+		if effort == wanted {
+			return true
+		}
+	}
+	return false
 }

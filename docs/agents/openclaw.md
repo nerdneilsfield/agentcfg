@@ -42,6 +42,14 @@ generated output.
 - Model entries support `id`, `name`, `reasoning`, `input` (`text|image|video|audio`), `contextWindow`, `maxTokens`, and `compat` (including `supportsTools`). IR `tool_calling` maps to `compat.supportsTools`. IR output modalities have no OpenClaw field and are not emitted; non-text/image/audio/video inputs are rejected.
 - Whole-config load-time `${VAR}` interpolation applies to MCP env/headers too (uppercase vars only).
 
+## Reasoning variants
+
+`models[].variants` emits the model `thinkingLevelMap`. Listed OpenClaw levels
+map to themselves; every other documented level is `null`. Its native map has
+the fixed names `off`, `minimal`, `low`, `medium`, `high`, `xhigh`, and `max`.
+An unrecognized model/provider-specific name such as `ultra` is rejected rather
+than remapped. No default thinking level or request parameters are generated.
+
 ## Defaults
 
 `defaults.model "provider/model"` maps to `agents.defaults.model` verbatim.

@@ -37,6 +37,13 @@ export default function (pi: ExtensionAPI) {
 
 Pi's declarative custom-provider API requires `api`, model `input`, `cost`, `contextWindow`, and `maxTokens`; agentcfg supplies zero costs because source configuration has no pricing scope. `tool_calling` has no corresponding Pi model field. Provider header values use Pi's `$NAME` expression syntax: IR literal headers are emitted as constants and `ENV:NAME` headers as `$NAME`. IR `Bearer ENV:NAME` has no verified Pi bearer expansion and is rejected.
 
+### Reasoning variants
+
+For `models[].variants`, the extension emits a full model `thinkingLevelMap`.
+Listed Pi levels map to themselves and every other Pi level is `null`, so the
+model picker exposes precisely that set. Pi only documents `off`, `minimal`,
+`low`, `medium`, `high`, `xhigh`, and `max`; a provider-specific name such as
+`ultra` is rejected rather than coerced. No default thinking level is emitted.
 The v1 Pi emitter supports all three IR protocols by mapping them to Pi's `openai-completions`, `openai-responses`, and `anthropic-messages` API names.
 
 `defaultProvider` and `defaultModel` are settings fields, but v1 emits no settings mutation or standalone settings fragment because the provider extension must be installed/loaded first. Defaults remain deferred for Pi.

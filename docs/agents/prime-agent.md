@@ -35,6 +35,14 @@ The installed `~/.prime/agent/models.json` is Pi-compatible. It contains a `prov
 
 Unlike Pi's extension, the observed Prime registry accepts model records without Pi's required cost object. The v1 emitter maps all three IR protocols to the same Pi-AI names. Provider records have no `headers` field, so IR provider headers are rejected in v1 rather than silently dropped.
 
+### Reasoning variants
+
+`models[].variants` emits a model-local `thinkingLevelMap`: listed Prime Agent
+levels map to the same provider value, and all other documented levels are
+`null`. Prime Agent's fixed names are `off`, `minimal`, `low`, `medium`,
+`high`, `xhigh`, and `max`; other names, including `ultra`, are rejected rather
+than silently mapped. This does not set global `defaultThinkingLevel`.
+
 `~/.prime/agent/settings.json` has `defaultProvider` and `defaultModel`. The v1 emitter writes a `settings.json` fragment containing `mcpServers` (below) and, when `defaults.model` is present, `defaultProvider`/`defaultModel`. Automatic merge into an existing settings file is deliberately deferred, so the fragment is copied manually.
 
 ## MCP

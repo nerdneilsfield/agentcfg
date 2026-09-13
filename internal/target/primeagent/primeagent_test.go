@@ -108,3 +108,28 @@ func TestValidationRules(t *testing.T) {
 	nonAuthBearer.MCP[1].Headers = map[string]ir.HeaderValue{"X-Api-Key": {BearerFromEnv: "API_KEY"}}
 	expectInvalid(t, nonAuthBearer, "Authorization only")
 }
+
+func TestEmitsThinkingLevelMap(t *testing.T) {
+	cfg := exampleConfig()
+	cfg.Providers[0].Models[0].Reasoning = boolp(true)
+	cfg.Providers[0].Models[0].Variants = []ir.ReasoningEffort{"low", "high", "max"}
+	arts, err := (Target{}).Emit(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := string(arts[0].Content)
+	for _, want := range []string{`"thinkingLevelMap"`, `"low": "low"`, `"medium": null`, `"high": "high"`, `"max": "max"`} {
+		if !strings.Contains(out, want) {
+			t.Errorf("missing %q in output:\n%s", want, out)
+		}
+	}
+}
+
+func TestRejectsUnsupportedReasoningEffort(t *testing.T) {
+	cfg := exampleConfig()
+	cfg.Providers[0].Models[0].Reasoning = boolp(true)
+	cfg.Providers[0].Models[0].Variants = []ir.ReasoningEffort{"ultra"}
+	expectInvalid(t, cfg, `does not support reasoning effort "ultra"`)
+}
+
+func boolp(v bool) *bool { return &v }
