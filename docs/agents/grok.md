@@ -46,3 +46,10 @@ Upstream documents `${VAR}` expansion for MCP string fields, so the emitter rend
 ## Defaults
 
 `defaults.model` maps to `[models] default = "<model-id>"` (the model ID part after the provider prefix). Validation rejects a default that does not resolve to an emitted model table.
+
+## Reasoning variants
+
+`models[].variants` emits `supports_reasoning_effort = true` and one
+`[[model.<id>.reasoning_efforts]]` record per name, with identical `id` and
+`value`. It does not generate a selected/default `reasoning_effort`, labels, or
+descriptions. Provider-specific names such as `ultra` are preserved.

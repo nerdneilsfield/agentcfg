@@ -156,3 +156,22 @@ func TestOmitsEmptyMCPServers(t *testing.T) {
 		t.Fatalf("empty MCP must not emit an [mcp_servers] table:\n%s", arts[0].Content)
 	}
 }
+
+func TestEmitsReasoningEfforts(t *testing.T) {
+	cfg := exampleConfig()
+	cfg.Providers[0].Models[0].Variants = []ir.ReasoningEffort{"low", "high", "ultra"}
+	arts, err := (Target{}).Emit(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := string(arts[0].Content)
+	for _, want := range []string{`supports_reasoning_effort = true`, `[[model."glm-5.3".reasoning_efforts]]`, `id = "ultra"`, `value = "ultra"`} {
+		if !strings.Contains(out, want) {
+			t.Errorf("missing %q:\n%s", want, out)
+		}
+	}
+	if strings.Contains(out, `
+  reasoning_effort =`) {
+		t.Fatalf("must not select default effort:\n%s", out)
+	}
+}

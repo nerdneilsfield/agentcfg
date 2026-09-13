@@ -129,6 +129,9 @@ func (t Target) Emit(cfg ir.Config) ([]artifact.Artifact, error) {
 			if m.Reasoning != nil {
 				cm.CanReason = *m.Reasoning
 			}
+			if len(m.Variants) > 0 {
+				cm.ReasoningLevels = effortStrings(m.Variants)
+			}
 			cm.SupportsAttachments = hasImage(m)
 			cp.Models = append(cp.Models, cm)
 		}
@@ -268,16 +271,17 @@ type crushProvider struct {
 }
 
 type crushModel struct {
-	ID                  string `json:"id"`
-	Name                string `json:"name"`
-	CostPer1mIn         int    `json:"cost_per_1m_in"`
-	CostPer1mOut        int    `json:"cost_per_1m_out"`
-	CostPer1mInCached   int    `json:"cost_per_1m_in_cached"`
-	CostPer1mOutCached  int    `json:"cost_per_1m_out_cached"`
-	ContextWindow       int64  `json:"context_window"`
-	DefaultMaxTokens    int64  `json:"default_max_tokens"`
-	CanReason           bool   `json:"can_reason"`
-	SupportsAttachments bool   `json:"supports_attachments"`
+	ID                  string   `json:"id"`
+	Name                string   `json:"name"`
+	CostPer1mIn         int      `json:"cost_per_1m_in"`
+	CostPer1mOut        int      `json:"cost_per_1m_out"`
+	CostPer1mInCached   int      `json:"cost_per_1m_in_cached"`
+	CostPer1mOutCached  int      `json:"cost_per_1m_out_cached"`
+	ContextWindow       int64    `json:"context_window"`
+	DefaultMaxTokens    int64    `json:"default_max_tokens"`
+	CanReason           bool     `json:"can_reason"`
+	ReasoningLevels     []string `json:"reasoning_levels,omitempty"`
+	SupportsAttachments bool     `json:"supports_attachments"`
 }
 
 type crushMCP struct {
@@ -289,4 +293,12 @@ type crushMCP struct {
 	Headers  map[string]string `json:"headers,omitempty"`
 	Disabled bool              `json:"disabled,omitempty"`
 	Timeout  int64             `json:"timeout,omitempty"`
+}
+
+func effortStrings(efforts []ir.ReasoningEffort) []string {
+	out := make([]string, len(efforts))
+	for i, effort := range efforts {
+		out[i] = string(effort)
+	}
+	return out
 }

@@ -102,6 +102,10 @@ func (t Target) Emit(cfg ir.Config) ([]artifact.Artifact, error) {
 			if len(headers) > 0 {
 				gm.ExtraHeaders = headers
 			}
+			if len(m.Variants) > 0 {
+				gm.SupportsReasoningEffort = true
+				gm.ReasoningEfforts = grokEfforts(m.Variants)
+			}
 			doc.Model[m.ID] = gm
 		}
 	}
@@ -190,15 +194,22 @@ type grokModels struct {
 }
 
 type grokModel struct {
-	APIKey              string            `toml:"api_key,omitempty"`
-	Model               string            `toml:"model"`
-	BaseURL             string            `toml:"base_url"`
-	Name                string            `toml:"name,omitempty"`
-	EnvKey              string            `toml:"env_key,omitempty"`
-	APIBackend          string            `toml:"api_backend"`
-	ContextWindow       *int64            `toml:"context_window,omitempty"`
-	MaxCompletionTokens *int64            `toml:"max_completion_tokens,omitempty"`
-	ExtraHeaders        map[string]string `toml:"extra_headers,omitempty"`
+	APIKey                  string                `toml:"api_key,omitempty"`
+	Model                   string                `toml:"model"`
+	BaseURL                 string                `toml:"base_url"`
+	Name                    string                `toml:"name,omitempty"`
+	EnvKey                  string                `toml:"env_key,omitempty"`
+	APIBackend              string                `toml:"api_backend"`
+	ContextWindow           *int64                `toml:"context_window,omitempty"`
+	MaxCompletionTokens     *int64                `toml:"max_completion_tokens,omitempty"`
+	ExtraHeaders            map[string]string     `toml:"extra_headers,omitempty"`
+	SupportsReasoningEffort bool                  `toml:"supports_reasoning_effort,omitempty"`
+	ReasoningEfforts        []grokReasoningEffort `toml:"reasoning_efforts,omitempty"`
+}
+
+type grokReasoningEffort struct {
+	ID    string `toml:"id"`
+	Value string `toml:"value"`
 }
 
 type grokMCPServer struct {
@@ -213,3 +224,11 @@ type grokMCPServer struct {
 }
 
 func boolPtr(b bool) *bool { return &b }
+
+func grokEfforts(efforts []ir.ReasoningEffort) []grokReasoningEffort {
+	out := make([]grokReasoningEffort, 0, len(efforts))
+	for _, effort := range efforts {
+		out = append(out, grokReasoningEffort{ID: string(effort), Value: string(effort)})
+	}
+	return out
+}

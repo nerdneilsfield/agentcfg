@@ -52,3 +52,9 @@ Custom providers live under `providers.<id>` (`ProviderConfig`, `additionalPrope
 ## MCP
 
 `mcp.<id>` (`MCPConfig`) requires `type` in `stdio|sse|http`. IR `http` maps to `http` (not `sse`). stdio uses `command`/`args`/`env`; http uses `url`/`headers`. `enabled: false` maps to `disabled: true`. `timeout` is whole seconds (`timeout_ms / 1000`); values not divisible by 1000 are rejected. IR `cwd` has no Crush MCP field and is rejected. Env/header interpolation uses the same `$VAR` / `Bearer ${VAR}` rendering as providers. When the IR has no MCP servers, the `mcp` object is omitted.
+
+## Reasoning variants
+
+`models[].variants` maps to the model catalog's `reasoning_levels` array without
+setting `default_reasoning_effort` or the selected-model `reasoning_effort`. Names
+including provider-specific `ultra` are preserved unchanged.
