@@ -45,16 +45,31 @@ type HeaderValue struct {
 	BearerFromEnv string `yaml:"-"`
 }
 
+// ReasoningEffort is one portable, selectable model reasoning level.
+// It is a model variant, not a model identifier or output setting.
+type ReasoningEffort string
+
+const (
+	ReasoningEffortOff     ReasoningEffort = "off"
+	ReasoningEffortMinimal ReasoningEffort = "minimal"
+	ReasoningEffortLow     ReasoningEffort = "low"
+	ReasoningEffortMedium  ReasoningEffort = "medium"
+	ReasoningEffortHigh    ReasoningEffort = "high"
+	ReasoningEffortXHigh   ReasoningEffort = "xhigh"
+	ReasoningEffortMax     ReasoningEffort = "max"
+)
+
 // Model describes one model served by a provider.
 type Model struct {
-	ID              string     `yaml:"id"`
-	Name            string     `yaml:"name"`
-	ContextWindow   *int64     `yaml:"context_window"`
-	MaxOutputTokens *int64     `yaml:"max_output_tokens"`
-	Input           []Modality `yaml:"input"`
-	Output          []Modality `yaml:"output"`
-	Reasoning       *bool      `yaml:"reasoning"`
-	ToolCalling     *bool      `yaml:"tool_calling"`
+	ID              string            `yaml:"id"`
+	Name            string            `yaml:"name"`
+	ContextWindow   *int64            `yaml:"context_window"`
+	MaxOutputTokens *int64            `yaml:"max_output_tokens"`
+	Input           []Modality        `yaml:"input"`
+	Output          []Modality        `yaml:"output"`
+	Reasoning       *bool             `yaml:"reasoning"`
+	Variants        []ReasoningEffort `yaml:"variants"`
+	ToolCalling     *bool             `yaml:"tool_calling"`
 }
 
 // Provider is one model provider route.

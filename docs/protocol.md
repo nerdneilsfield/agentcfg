@@ -33,6 +33,7 @@ providers:
         input: [text, image]
         output: [text]
         reasoning: true
+        variants: [low, high, max]
         tool_calling: true
 
 mcp:
@@ -119,9 +120,34 @@ not this IR.
 | `input` | no | Accepted input modalities: `text`, `image`, `audio`, `video`, `pdf`. Default: `[text]`. |
 | `output` | no | Produced modalities. Default: `[text]`. |
 | `reasoning` | no | Model supports a reasoning/thinking mode. |
+| `variants` | no | Ordered, selectable reasoning-effort variants for this model. Requires `reasoning: true`. |
 | `tool_calling` | no | Model supports tool calls. |
 
-The v1 IR intentionally excludes costs, thinking-level mappings, per-model provider options, and compatibility toggles. These differ too much by runtime. A target needing one must reject the route or a later version must add a named, cross-target semantic field; there is no arbitrary native-config escape hatch.
+### Reasoning variants
+
+`variants` belongs to a model. It declares the reasoning efforts that a user can
+select for that same model; it does not create more model IDs and it does not
+select a default effort. The portable identifiers are `off`, `minimal`, `low`,
+`medium`, `high`, `xhigh`, and `max`:
+
+```yaml
+models:
+  - id: glm-5.3
+    reasoning: true
+    variants: [low, high, max]
+```
+
+The list must be non-empty when present, cannot repeat an identifier, and
+requires `reasoning: true`. A variant's only IR meaning is its reasoning effort.
+It does not carry output verbosity, reasoning summaries, token budgets, or
+arbitrary native request options. Targets render this model-level availability
+where their documented contract supports it, or reject it with a diagnostic.
+
+The v1 IR intentionally excludes costs, per-level provider wire-value overrides,
+per-model provider options, and compatibility toggles. These differ too much by
+runtime. A target needing one must reject the route or a later version must add
+a named, cross-target semantic field; there is no arbitrary native-config escape
+hatch.
 
 ## MCP
 

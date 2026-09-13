@@ -106,6 +106,9 @@ func TestValidateFindings(t *testing.T) {
 		{"http with command", "version: 1\nproviders: []\nmcp:\n  - id: s\n    transport: http\n    url: https://e.com\n    command: [npx]\n", "command is invalid for http"},
 		{"dup mcp id", "version: 1\nproviders: []\nmcp:\n  - id: s\n    transport: stdio\n    command: [npx]\n  - id: s\n    transport: stdio\n    command: [npx]\n", "duplicate MCP server id"},
 		{"bad modality", "version: 1\nproviders:\n  - id: a\n    protocol: openai-responses\n    base_url: https://e.com\n    models:\n      - id: m\n        input: [smell]\n", "unknown modality"},
+		{"variants require reasoning", "version: 1\nproviders:\n  - id: a\n    protocol: openai-responses\n    base_url: https://e.com\n    models: [{id: m, variants: [low]}]\n", "requires reasoning: true"},
+		{"duplicate reasoning variant", "version: 1\nproviders:\n  - id: a\n    protocol: openai-responses\n    base_url: https://e.com\n    models: [{id: m, reasoning: true, variants: [low, low]}]\n", "duplicate reasoning effort"},
+		{"unknown reasoning variant", "version: 1\nproviders:\n  - id: a\n    protocol: openai-responses\n    base_url: https://e.com\n    models: [{id: m, reasoning: true, variants: [turbo]}]\n", "unknown reasoning effort"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -175,5 +178,31 @@ func TestRejectsLegacyAndInvalidScalars(t *testing.T) {
 				t.Fatal("expected scalar decode error")
 			}
 		})
+	}
+}
+
+func TestLoadModelReasoningVariants(t *testing.T) {
+	cfg, ds, err := Load([]byte(`version: 1
+providers:
+  - id: opencode-go
+    protocol: openai-completions
+    base_url: https://example.com/v1
+    models:
+      - id: glm-5.3
+        reasoning: true
+        variants: [low, high, max]
+`))
+	if err != nil || diag.HasErrors(ds) {
+		t.Fatalf("Load: %v %v", err, ds)
+	}
+	got := cfg.Providers[0].Models[0].Variants
+	want := []ReasoningEffort{ReasoningEffortLow, ReasoningEffortHigh, ReasoningEffortMax}
+	if len(got) != len(want) {
+		t.Fatalf("variants = %v, want %v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("variants = %v, want %v", got, want)
+		}
 	}
 }

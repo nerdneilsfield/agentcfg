@@ -79,6 +79,7 @@ func Validate(cfg Config) []diag.Diagnostic {
 			modelIDs[m.ID] = true
 			diags = append(diags, validateModalities(mpath+".input", m.Input)...)
 			diags = append(diags, validateModalities(mpath+".output", m.Output)...)
+			diags = append(diags, validateReasoningVariants(mpath+".variants", m)...)
 		}
 	}
 
@@ -163,6 +164,37 @@ func validateHeaderValues(path string, headers map[string]HeaderValue) []diag.Di
 		}
 	}
 	return diags
+}
+
+func validateReasoningVariants(path string, m Model) []diag.Diagnostic {
+	if len(m.Variants) == 0 {
+		return nil
+	}
+	var diags []diag.Diagnostic
+	if m.Reasoning == nil || !*m.Reasoning {
+		diags = append(diags, diag.Errorf(path, "requires reasoning: true"))
+	}
+	seen := map[ReasoningEffort]bool{}
+	for _, effort := range m.Variants {
+		if !validReasoningEffort(effort) {
+			diags = append(diags, diag.Errorf(path, "unknown reasoning effort %q", effort))
+			continue
+		}
+		if seen[effort] {
+			diags = append(diags, diag.Errorf(path, "duplicate reasoning effort %q", effort))
+		}
+		seen[effort] = true
+	}
+	return diags
+}
+
+func validReasoningEffort(effort ReasoningEffort) bool {
+	switch effort {
+	case ReasoningEffortOff, ReasoningEffortMinimal, ReasoningEffortLow, ReasoningEffortMedium, ReasoningEffortHigh, ReasoningEffortXHigh, ReasoningEffortMax:
+		return true
+	default:
+		return false
+	}
 }
 
 func validateModalities(path string, mods []Modality) []diag.Diagnostic {
