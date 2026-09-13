@@ -124,3 +124,19 @@ func TestEmitsModelReasoningVariants(t *testing.T) {
 		}
 	}
 }
+
+func TestEmitsModelToolCall(t *testing.T) {
+	cfg := exampleConfig()
+	cfg.Providers[0].Models[0].ToolCalling = boolp(true)
+	arts, err := (Target{}).Emit(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := string(arts[0].Content)
+	if !strings.Contains(out, `"tool_call": true`) {
+		t.Fatalf("missing native model tool_call:\n%s", out)
+	}
+	if strings.Contains(out, `"tools": true`) {
+		t.Fatalf("must not emit non-model tools field:\n%s", out)
+	}
+}

@@ -88,7 +88,7 @@ func (t Target) Emit(cfg ir.Config) ([]artifact.Artifact, error) {
 				}
 			}
 			if m.ToolCalling != nil && *m.ToolCalling {
-				om.Tools = true
+				om.ToolCall = true
 			}
 			op.Models[m.ID] = om
 		}
@@ -184,7 +184,7 @@ type opencodeModel struct {
 	Limit      map[string]int64           `json:"limit,omitempty"`
 	Modalities map[string][]ir.Modality   `json:"modalities"`
 	Reasoning  bool                       `json:"reasoning,omitempty"`
-	Tools      bool                       `json:"tools,omitempty"`
+	ToolCall   bool                       `json:"tool_call,omitempty"`
 	Variants   map[string]opencodeVariant `json:"variants,omitempty"`
 }
 

@@ -38,7 +38,7 @@ For OpenAI-compatible routes OpenCode uses the AI SDK adapter package:
 }
 ```
 
-The v1 emitter supports `openai-completions` only. It maps request headers to `options.headers`, using OpenCode's `{env:NAME}` interpolation. `openai-responses` and `anthropic-messages` need a verified adapter package and are rejected rather than guessed.
+The v1 emitter supports `openai-completions` only. It maps request headers to `options.headers`, using OpenCode's `{env:NAME}` interpolation. `tool_calling: true` maps to the native model `tool_call: true`; the schema's separate top-level/agent `tools` field is not emitted for a model. `openai-responses` and `anthropic-messages` need a verified adapter package and are rejected rather than guessed.
 
 ### Reasoning variants
 
