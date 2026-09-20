@@ -3,6 +3,7 @@ package ir
 import (
 	"bytes"
 	"fmt"
+	"io"
 
 	"go.yaml.in/yaml/v3"
 
@@ -26,6 +27,13 @@ func Load(src []byte) (Config, []diag.Diagnostic, error) {
 	dec := yaml.NewDecoder(bytes.NewReader(src))
 	dec.KnownFields(true)
 	if err := dec.Decode(&cfg); err != nil {
+		return cfg, nil, fmt.Errorf("decoding agentcfg.yaml: %w", err)
+	}
+	var extra yaml.Node
+	if err := dec.Decode(&extra); err != io.EOF {
+		if err == nil {
+			return cfg, nil, fmt.Errorf("agentcfg.yaml must contain a single document")
+		}
 		return cfg, nil, fmt.Errorf("decoding agentcfg.yaml: %w", err)
 	}
 

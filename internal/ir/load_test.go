@@ -88,6 +88,16 @@ func TestLoadRejectsEmpty(t *testing.T) {
 	}
 }
 
+func TestLoadRejectsExtraDocuments(t *testing.T) {
+	_, _, err := Load([]byte("version: 1\nproviders: []\n---\nversion: 99\n"))
+	if err == nil {
+		t.Fatal("expected error for a second YAML document")
+	}
+	if !strings.Contains(err.Error(), "single document") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func TestValidateFindings(t *testing.T) {
 	cases := []struct {
 		name string
