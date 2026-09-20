@@ -13,6 +13,7 @@ import (
 	_ "agentcfg/internal/target/jcode"
 	_ "agentcfg/internal/target/kimi"
 	_ "agentcfg/internal/target/mimocode"
+	_ "agentcfg/internal/target/omp"
 	_ "agentcfg/internal/target/openclaw"
 	_ "agentcfg/internal/target/opencode"
 	_ "agentcfg/internal/target/pi"

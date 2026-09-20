@@ -10,6 +10,8 @@ import (
 	"fmt"
 	"strings"
 
+	"go.yaml.in/yaml/v3"
+
 	"agentcfg/internal/diag"
 	"agentcfg/internal/ir"
 )
@@ -35,6 +37,12 @@ type Options struct {
 	// Levels lists the thinking levels this fork documents, in output order.
 	// A level the model does not declare is written as null.
 	Levels []ir.ReasoningEffort
+	// Bearer renders an Authorization bearer header value. A nil Bearer means
+	// the fork cannot represent one, and its Validate rejects it first.
+	Bearer func(name string) string
+	// ModelFields adds fork-specific model fields. They run after the shared
+	// fields and may override them.
+	ModelFields func(m ir.Model) map[string]any
 }
 
 // Providers builds the providers object of the models document.
@@ -63,9 +71,12 @@ func Providers(cfg ir.Config, opts Options) map[string]any {
 		if len(p.Headers) > 0 {
 			headers := make(map[string]string, len(p.Headers))
 			for name, v := range p.Headers {
-				if v.FromEnv != "" {
+				switch {
+				case v.BearerFromEnv != "" && opts.Bearer != nil:
+					headers[name] = opts.Bearer(v.BearerFromEnv)
+				case v.FromEnv != "":
 					headers[name] = EnvRef(opts.Syntax, v.FromEnv)
-				} else {
+				default:
 					headers[name] = v.Value
 				}
 			}
@@ -93,6 +104,11 @@ func model(m ir.Model, opts Options) map[string]any {
 	if m.MaxOutputTokens != nil {
 		out["maxTokens"] = *m.MaxOutputTokens
 	}
+	if opts.ModelFields != nil {
+		for key, value := range opts.ModelFields(m) {
+			out[key] = value
+		}
+	}
 	return out
 }
 
@@ -113,6 +129,15 @@ func EncodeJSON(v any) ([]byte, error) {
 		return nil, fmt.Errorf("encoding models document: %w", err)
 	}
 	return buf.Bytes(), nil
+}
+
+// EncodeYAML renders a document for the forks that read YAML.
+func EncodeYAML(v any) ([]byte, error) {
+	out, err := yaml.Marshal(v)
+	if err != nil {
+		return nil, fmt.Errorf("encoding models document: %w", err)
+	}
+	return out, nil
 }
 
 // ValidateAuthTypes reports auth_type values these forks cannot map: their

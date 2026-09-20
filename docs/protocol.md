@@ -375,7 +375,7 @@ If both `--to` and `targets:` are omitted, agentcfg exits with `no targets: pass
 
 Listing every compiled-in id in YAML is almost never useful. One document rarely represents faithfully on Codex (Responses only), OpenCode (Completions only), Cline/ZCode (literal keys), Kimi (literal provider headers), and Pi (no MCP) at the same time. Put the CLIs you actually generate for in `targets:`, and use `--to` to override.
 
-Current compiled-in ids: `cline`, `codex`, `crush`, `deepseek-harness`, `gajae`, `goose`, `grok`, `hermes`, `jcode`, `kimi`, `mimocode`, `openclaw`, `opencode`, `pi`, `prime-agent`, `zcode`.
+Current compiled-in ids: `cline`, `codex`, `crush`, `deepseek-harness`, `gajae`, `goose`, `grok`, `hermes`, `jcode`, `kimi`, `mimocode`, `omp`, `openclaw`, `opencode`, `pi`, `prime-agent`, `zcode`.
 
 ## IR validation
 
