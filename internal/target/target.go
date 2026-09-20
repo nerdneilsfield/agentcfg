@@ -52,8 +52,8 @@ func Lookup(id string) (Target, bool) {
 }
 
 // Select resolves the target list using the CLI --to value first, then
-// the IR targets list. An empty --to value of "all" selects every
-// registered target.
+// the IR targets list. --to all selects every registered target; the IR
+// targets list does not treat "all" as a wildcard.
 func Select(toFlag string, cfgTargets []string) ([]Target, error) {
 	var ids []string
 	switch {
@@ -69,10 +69,16 @@ func Select(toFlag string, cfgTargets []string) ([]Target, error) {
 	for _, raw := range ids {
 		id := strings.TrimSpace(raw)
 		if id == "" {
-			return nil, fmt.Errorf("empty target id in %q", toFlag)
+			if toFlag != "" {
+				return nil, fmt.Errorf("empty target id in --to %q", toFlag)
+			}
+			return nil, fmt.Errorf("empty target id in the IR targets list")
 		}
-		if id == "all" && toFlag != "" {
-			return allTargets(), nil
+		if id == "all" {
+			if toFlag != "" {
+				return allTargets(), nil
+			}
+			return nil, fmt.Errorf(`unknown target "all" (pass --to all to select every compiled-in target; available: %s)`, strings.Join(IDs(), ", "))
 		}
 		t, ok := Lookup(id)
 		if !ok {
