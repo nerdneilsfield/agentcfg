@@ -2,15 +2,13 @@
 package primeagent
 
 import (
-	"bytes"
-	"encoding/json"
 	"fmt"
-	"strings"
 
 	"agentcfg/internal/artifact"
 	"agentcfg/internal/diag"
 	"agentcfg/internal/ir"
 	"agentcfg/internal/target"
+	"agentcfg/internal/target/pifamily"
 )
 
 func init() { target.Register(Target{}) }
@@ -20,26 +18,22 @@ type Target struct{}
 
 func (Target) ID() string { return "prime-agent" }
 
+// primeThinkingLevels are the thinking levels Prime Agent documents, in output order.
+var primeThinkingLevels = []ir.ReasoningEffort{"off", "minimal", "low", "medium", "high", "xhigh", "max"}
+
+func primeOptions() pifamily.Options {
+	return pifamily.Options{ID: Target{}.ID(), Syntax: pifamily.BareEnv, Levels: primeThinkingLevels}
+}
+
 func (t Target) Validate(cfg ir.Config) []diag.Diagnostic {
-	var diags []diag.Diagnostic
+	diags := pifamily.ValidateLiteralAPIKeys(t.ID(), cfg)
+	diags = append(diags, pifamily.ValidateModelInput(t.ID(), cfg)...)
 	for i, p := range cfg.Providers {
 		path := fmt.Sprintf("providers[%d]", i)
-		if strings.HasPrefix(p.APIKey.Value, "$") || strings.HasPrefix(p.APIKey.Value, "!") {
-			diags = append(diags, diag.TargetErrorf(t.ID(), path+".api_key", "literal API key contains native expression syntax and cannot be represented literally"))
-		}
 		for name, v := range p.Headers {
 			if v.BearerFromEnv != "" {
 				diags = append(diags, diag.TargetErrorf(t.ID(), path+".headers."+name,
-					"prime-agent provider headers are static strings or environment names; Bearer ENV:NAME is not representable"))
-			}
-		}
-	}
-	for i, p := range cfg.Providers {
-		for j, m := range p.Models {
-			for _, mod := range m.Input {
-				if mod != ir.ModalityText && mod != ir.ModalityImage {
-					diags = append(diags, diag.TargetErrorf(t.ID(), fmt.Sprintf("providers[%d].models[%d].input", i, j), "prime-agent model input supports text and image only"))
-				}
+					"prime-agent provider headers are static strings or environment names; Bearer ENV:NAME is not representable; use auth_type: bearer instead"))
 			}
 		}
 	}
@@ -72,56 +66,17 @@ func (t Target) Validate(cfg ir.Config) []diag.Diagnostic {
 	return diags
 }
 
+// ValidateAuthTypes maps auth_type for prime-agent.
+func (t Target) ValidateAuthTypes(cfg ir.Config) []diag.Diagnostic {
+	return pifamily.ValidateAuthTypes(t.ID(), cfg)
+}
+
 func (t Target) Emit(cfg ir.Config) ([]artifact.Artifact, error) {
-	models := map[string]any{
-		"providers": map[string]any{},
-	}
-	providers := models["providers"].(map[string]any)
-	for _, p := range cfg.Providers {
-		ms := []any{}
-		for _, m := range p.Models {
-			mm := map[string]any{
-				"id":    m.ID,
-				"name":  orDefault(m.Name, m.ID),
-				"input": modalities(m.Input),
-				"cost":  map[string]any{"input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0},
-			}
-			mm["reasoning"] = m.Reasoning != nil && *m.Reasoning
-			if hasPrimeThinkingLevels(m.Variants) {
-				mm["thinkingLevelMap"] = primeThinkingLevelMap(m.Variants)
-			}
-			if m.ContextWindow != nil {
-				mm["contextWindow"] = *m.ContextWindow
-			}
-			if m.MaxOutputTokens != nil {
-				mm["maxTokens"] = *m.MaxOutputTokens
-			}
-			ms = append(ms, mm)
-		}
-		prov := map[string]any{
-			"baseUrl": p.BaseURL,
-			"api":     string(p.Protocol),
-			"models":  ms,
-		}
-		if p.APIKey.FromEnv != "" {
-			prov["apiKey"] = p.APIKey.FromEnv
-		} else if p.APIKey.Value != "" {
-			prov["apiKey"] = p.APIKey.Value
-		} else {
-			prov["apiKey"] = ""
-		}
-		if len(p.Headers) > 0 {
-			headers := map[string]string{}
-			for name, v := range p.Headers {
-				if v.FromEnv != "" {
-					headers[name] = v.FromEnv
-				} else {
-					headers[name] = v.Value
-				}
-			}
-			prov["headers"] = headers
-		}
-		providers[p.ID] = prov
+	modelsJSON, err := pifamily.EncodeJSON(map[string]any{
+		"providers": pifamily.Providers(cfg, primeOptions()),
+	})
+	if err != nil {
+		return nil, err
 	}
 
 	settings := map[string]any{}
@@ -186,11 +141,7 @@ func (t Target) Emit(cfg ir.Config) ([]artifact.Artifact, error) {
 		settings["mcpServers"] = mcp
 	}
 
-	modelsJSON, err := marshal(models)
-	if err != nil {
-		return nil, err
-	}
-	settingsJSON, err := marshal(settings)
+	settingsJSON, err := pifamily.EncodeJSON(settings)
 	if err != nil {
 		return nil, err
 	}
@@ -210,68 +161,4 @@ func (t Target) Emit(cfg ir.Config) ([]artifact.Artifact, error) {
 			Content:       settingsJSON,
 		},
 	}, nil
-}
-
-func modalities(in []ir.Modality) []string {
-	if len(in) == 0 {
-		return []string{string(ir.ModalityText)}
-	}
-	out := make([]string, 0, len(in))
-	for _, m := range in {
-		out = append(out, string(m))
-	}
-	return out
-}
-
-func marshal(v any) ([]byte, error) {
-	var buf bytes.Buffer
-	enc := json.NewEncoder(&buf)
-	enc.SetIndent("", "  ")
-	if err := enc.Encode(v); err != nil {
-		return nil, fmt.Errorf("encoding prime-agent config: %w", err)
-	}
-	return buf.Bytes(), nil
-}
-
-func orDefault(v, def string) string {
-	if v == "" {
-		return def
-	}
-	return v
-}
-
-var primeThinkingLevels = []ir.ReasoningEffort{"off", "minimal", "low", "medium", "high", "xhigh", "max"}
-
-func primeThinkingLevel(effort ir.ReasoningEffort) bool {
-	return primeContainsEffort(primeThinkingLevels, effort)
-}
-
-func hasPrimeThinkingLevels(efforts []ir.ReasoningEffort) bool {
-	for _, effort := range efforts {
-		if primeThinkingLevel(effort) {
-			return true
-		}
-	}
-	return false
-}
-
-func primeThinkingLevelMap(efforts []ir.ReasoningEffort) map[string]any {
-	levels := make(map[string]any, len(primeThinkingLevels))
-	for _, level := range primeThinkingLevels {
-		if primeContainsEffort(efforts, level) {
-			levels[string(level)] = string(level)
-		} else {
-			levels[string(level)] = nil
-		}
-	}
-	return levels
-}
-
-func primeContainsEffort(efforts []ir.ReasoningEffort, wanted ir.ReasoningEffort) bool {
-	for _, effort := range efforts {
-		if effort == wanted {
-			return true
-		}
-	}
-	return false
 }

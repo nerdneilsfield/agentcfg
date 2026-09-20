@@ -135,18 +135,23 @@ func TestEmitsProviderHeadersInNameOrder(t *testing.T) {
 	}
 }
 
-func TestUsesCurrentProviderRegistrationOverload(t *testing.T) {
+func TestEmitsModelsDocument(t *testing.T) {
 	cfg := exampleConfig()
 	arts, err := (Target{}).Emit(cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
-	out := string(arts[0].Content)
-	if !strings.Contains(out, `pi.registerProvider("volcengine", {`) {
-		t.Fatalf("missing named registration:\n%s", out)
+	if len(arts) != 1 {
+		t.Fatalf("expected 1 artifact, got %d", len(arts))
 	}
-	if strings.Contains(out, `id: "volcengine"`) {
-		t.Fatalf("legacy registration object emitted:\n%s", out)
+	if arts[0].Name != "models.json" || arts[0].SuggestedPath != "~/.pi/agent/models.json" {
+		t.Fatalf("artifact = %+v", arts[0])
+	}
+	out := string(arts[0].Content)
+	for _, want := range []string{`"providers"`, `"volcengine"`, `"api": "openai-completions"`, `"baseUrl": "https://example.com/v1"`} {
+		if !strings.Contains(out, want) {
+			t.Errorf("missing %q in output:\n%s", want, out)
+		}
 	}
 }
 
@@ -154,4 +159,48 @@ func TestRejectsUnsupportedModelInput(t *testing.T) {
 	cfg := exampleConfig()
 	cfg.Providers[0].Models[0].Input = []ir.Modality{ir.ModalityAudio}
 	expectInvalid(t, cfg, "text and image only")
+}
+
+func TestEmitsAuthHeaderForBearerAuthType(t *testing.T) {
+	cfg := exampleConfig()
+	cfg.Providers[0].AuthType = ir.AuthTypeBearer
+	arts, err := (Target{}).Emit(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := string(arts[0].Content)
+	for _, want := range []string{`"apiKey": "$VOLC_API_KEY"`, `"authHeader": true`} {
+		if !strings.Contains(out, want) {
+			t.Errorf("missing %q in output:\n%s", want, out)
+		}
+	}
+}
+
+func TestOmitsAPIKeyWithoutCredential(t *testing.T) {
+	for _, authType := range []ir.AuthType{"", ir.AuthTypeNone} {
+		t.Run("auth_type="+string(authType), func(t *testing.T) {
+			cfg := exampleConfig()
+			cfg.Providers[0].AuthType = authType
+			cfg.Providers[0].APIKey = ir.HeaderValue{}
+			arts, err := (Target{}).Emit(cfg)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if out := string(arts[0].Content); strings.Contains(out, "apiKey") {
+				t.Fatalf("keyless provider must not emit apiKey:\n%s", out)
+			}
+		})
+	}
+}
+
+func TestAuthTypeXAPIKeyOnlyOnAnthropicMessages(t *testing.T) {
+	cfg := exampleConfig()
+	cfg.Providers[0].AuthType = ir.AuthTypeXAPIKey
+	if diags := (Target{}).ValidateAuthTypes(cfg); !diag.HasErrors(diags) {
+		t.Fatal("expected a diagnostic for x-api-key on an OpenAI protocol")
+	}
+	cfg.Providers[0].Protocol = ir.ProtocolAnthropicMessages
+	if diags := (Target{}).ValidateAuthTypes(cfg); diag.HasErrors(diags) {
+		t.Fatalf("anthropic-messages accepts x-api-key: %v", diags)
+	}
 }

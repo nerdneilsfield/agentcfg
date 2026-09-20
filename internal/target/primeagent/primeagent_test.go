@@ -176,3 +176,49 @@ func TestOmitsAuthorizationHeaderWhenBearerEnvVarIsSet(t *testing.T) {
 		t.Fatalf("Authorization header must not be emitted alongside bearerTokenEnvVar:\n%s", settings)
 	}
 }
+
+func TestEmitsAuthHeaderForBearerAuthType(t *testing.T) {
+	cfg := exampleConfig()
+	cfg.MCP = nil
+	cfg.Providers[0].AuthType = ir.AuthTypeBearer
+	arts, err := (Target{}).Emit(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := string(arts[0].Content)
+	for _, want := range []string{`"apiKey": "VOLC_API_KEY"`, `"authHeader": true`} {
+		if !strings.Contains(out, want) {
+			t.Errorf("missing %q in models.json:\n%s", want, out)
+		}
+	}
+}
+
+func TestOmitsAPIKeyWithoutCredential(t *testing.T) {
+	for _, authType := range []ir.AuthType{"", ir.AuthTypeNone} {
+		t.Run("auth_type="+string(authType), func(t *testing.T) {
+			cfg := exampleConfig()
+			cfg.MCP = nil
+			cfg.Providers[0].AuthType = authType
+			cfg.Providers[0].APIKey = ir.HeaderValue{}
+			arts, err := (Target{}).Emit(cfg)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if out := string(arts[0].Content); strings.Contains(out, "apiKey") {
+				t.Fatalf("keyless provider must not emit apiKey:\n%s", out)
+			}
+		})
+	}
+}
+
+func TestAuthTypeXAPIKeyOnlyOnAnthropicMessages(t *testing.T) {
+	cfg := exampleConfig()
+	cfg.Providers[0].AuthType = ir.AuthTypeXAPIKey
+	if diags := (Target{}).ValidateAuthTypes(cfg); !diag.HasErrors(diags) {
+		t.Fatal("expected a diagnostic for x-api-key on an OpenAI protocol")
+	}
+	cfg.Providers[0].Protocol = ir.ProtocolAnthropicMessages
+	if diags := (Target{}).ValidateAuthTypes(cfg); diag.HasErrors(diags) {
+		t.Fatalf("anthropic-messages accepts x-api-key: %v", diags)
+	}
+}

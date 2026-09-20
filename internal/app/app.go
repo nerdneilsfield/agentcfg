@@ -132,6 +132,7 @@ func runTargetValidation(cfg ir.Config, targets []target.Target) []diag.Diagnost
 	var diags []diag.Diagnostic
 	for _, t := range targets {
 		diags = append(diags, t.Validate(cfg)...)
+		diags = append(diags, target.AuthTypeDiagnostics(t, cfg)...)
 	}
 	return diags
 }

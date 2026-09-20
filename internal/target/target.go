@@ -24,6 +24,29 @@ type Target interface {
 	Emit(cfg ir.Config) ([]artifact.Artifact, error)
 }
 
+// AuthTypeValidator is implemented by targets that map auth_type values to
+// native fields. A target that does not implement it maps only "official".
+type AuthTypeValidator interface {
+	ValidateAuthTypes(cfg ir.Config) []diag.Diagnostic
+}
+
+// AuthTypeDiagnostics reports auth_type values the target does not map, so a
+// non-official value is never silently ignored.
+func AuthTypeDiagnostics(t Target, cfg ir.Config) []diag.Diagnostic {
+	if v, ok := t.(AuthTypeValidator); ok {
+		return v.ValidateAuthTypes(cfg)
+	}
+	var diags []diag.Diagnostic
+	for i, p := range cfg.Providers {
+		if p.EffectiveAuthType() == ir.AuthTypeOfficial {
+			continue
+		}
+		diags = append(diags, diag.TargetErrorf(t.ID(), fmt.Sprintf("providers[%d].auth_type", i),
+			"target %s does not implement auth_type: %s", t.ID(), p.EffectiveAuthType()))
+	}
+	return diags
+}
+
 // registry maps target IDs to emitters.
 var registry = map[string]Target{}
 
