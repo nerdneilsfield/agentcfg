@@ -38,15 +38,14 @@ func run(args []string) int {
 	root.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "log at info level to stderr")
 	root.PersistentFlags().BoolVarP(&debug, "debug", "d", false, "log at debug level to stderr")
 
-	level := logging.LevelWarn
-	if verbose {
-		level = logging.LevelInfo
-	}
-	if debug {
-		level = logging.LevelDebug
-	}
-
 	newRequest := func() app.Request {
+		level := logging.LevelWarn
+		if verbose {
+			level = logging.LevelInfo
+		}
+		if debug {
+			level = logging.LevelDebug
+		}
 		return app.Request{
 			ConfigPath: configPath,
 			To:         to,

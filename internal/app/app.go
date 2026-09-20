@@ -29,15 +29,12 @@ type Request struct {
 func Validate(req Request) error {
 	cfg, targets, err := loadAndSelect(req)
 	if err != nil {
-		_, _ = fmt.Fprintln(req.Stderr, "error:", err)
 		return err
 	}
 	req.Log.InfoW("validation started", "command", "validate", "source", req.ConfigPath, "targets", len(targets))
 	if diags := runTargetValidation(cfg, targets); len(diags) > 0 {
 		printDiagnostics(req.Stderr, diags)
-		err := fmt.Errorf("validation failed with %d diagnostic(s)", len(diags))
-		_, _ = fmt.Fprintln(req.Stderr, "error:", err)
-		return err
+		return fmt.Errorf("validation failed with %d diagnostic(s)", len(diags))
 	}
 	_, _ = fmt.Fprintf(req.Stderr, "%s: OK (%d providers, %d MCP servers, %d targets)\n",
 		req.ConfigPath, len(cfg.Providers), len(cfg.MCP), len(targets))
@@ -53,7 +50,6 @@ func GenExample(req Request, path string) error {
 	}
 	if path == "" {
 		if _, err := req.Stdout.Write([]byte(example.IR)); err != nil {
-			_, _ = fmt.Fprintln(req.Stderr, "error:", err)
 			return err
 		}
 		return nil
@@ -61,16 +57,12 @@ func GenExample(req Request, path string) error {
 	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o644)
 	if err != nil {
 		if os.IsExist(err) {
-			err = fmt.Errorf("%s already exists; refusing to overwrite it", path)
-		} else {
-			err = fmt.Errorf("creating %s: %w", path, err)
+			return fmt.Errorf("%s already exists; refusing to overwrite it", path)
 		}
-		_, _ = fmt.Fprintln(req.Stderr, "error:", err)
-		return err
+		return fmt.Errorf("creating %s: %w", path, err)
 	}
 	defer func() { _ = f.Close() }()
 	if _, err := f.WriteString(example.IR); err != nil {
-		_, _ = fmt.Fprintln(req.Stderr, "error:", err)
 		return err
 	}
 	_, _ = fmt.Fprintf(req.Stderr, "wrote %s\n", path)
@@ -82,23 +74,18 @@ func GenExample(req Request, path string) error {
 func Generate(req Request) error {
 	cfg, targets, err := loadAndSelect(req)
 	if err != nil {
-		_, _ = fmt.Fprintln(req.Stderr, "error:", err)
 		return err
 	}
 	if diags := runTargetValidation(cfg, targets); len(diags) > 0 {
 		printDiagnostics(req.Stderr, diags)
-		err := fmt.Errorf("validation failed with %d diagnostic(s)", len(diags))
-		_, _ = fmt.Fprintln(req.Stderr, "error:", err)
-		return err
+		return fmt.Errorf("validation failed with %d diagnostic(s)", len(diags))
 	}
 
 	var arts []artifact.Artifact
 	for _, t := range targets {
 		emitted, err := t.Emit(cfg)
 		if err != nil {
-			err = fmt.Errorf("emitting %s: %w", t.ID(), err)
-			_, _ = fmt.Fprintln(req.Stderr, "error:", err)
-			return err
+			return fmt.Errorf("emitting %s: %w", t.ID(), err)
 		}
 		req.Log.InfoW("emitted artifacts", "command", "gen", "target", t.ID(), "artifacts", len(emitted))
 		arts = append(arts, emitted...)
@@ -107,11 +94,9 @@ func Generate(req Request) error {
 
 	var buf bytesBuf
 	if err := artifact.Render(&buf, len(targets), arts); err != nil {
-		_, _ = fmt.Fprintln(req.Stderr, "error:", err)
 		return err
 	}
 	if _, err := req.Stdout.Write(buf.Bytes()); err != nil {
-		_, _ = fmt.Fprintln(req.Stderr, "error:", err)
 		return err
 	}
 	return nil

@@ -130,8 +130,11 @@ func TestValidateRejectsUnknownTarget(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected unknown target error")
 	}
-	if !strings.Contains(stderr.String(), `unknown target "nope"`) {
-		t.Fatalf("unexpected stderr: %q", stderr.String())
+	if !strings.Contains(err.Error(), `unknown target "nope"`) {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if strings.Contains(stderr.String(), "error:") {
+		t.Fatalf("app must not print error: itself: %q", stderr.String())
 	}
 }
 
