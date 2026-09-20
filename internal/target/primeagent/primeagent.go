@@ -2,8 +2,6 @@
 package primeagent
 
 import (
-	"fmt"
-
 	"agentcfg/internal/artifact"
 	"agentcfg/internal/diag"
 	"agentcfg/internal/ir"
@@ -28,41 +26,6 @@ func primeOptions() pifamily.Options {
 func (t Target) Validate(cfg ir.Config) []diag.Diagnostic {
 	diags := pifamily.ValidateLiteralAPIKeys(t.ID(), cfg)
 	diags = append(diags, pifamily.ValidateModelInput(t.ID(), cfg)...)
-	for i, p := range cfg.Providers {
-		path := fmt.Sprintf("providers[%d]", i)
-		for name, v := range p.Headers {
-			if v.BearerFromEnv != "" {
-				diags = append(diags, diag.TargetErrorf(t.ID(), path+".headers."+name,
-					"prime-agent provider headers are static strings or environment names; Bearer ENV:NAME is not representable; use auth_type: bearer instead"))
-			}
-		}
-	}
-	for i, s := range cfg.MCP {
-		path := fmt.Sprintf("mcp[%d]", i)
-		if s.TimeoutMS != nil {
-			diags = append(diags, diag.TargetErrorf(t.ID(), path+".timeout_ms",
-				"prime-agent v1 does not map MCP timeout_ms; the native start/call timeout policy is not finalized"))
-		}
-		if s.Transport == ir.TransportStdio {
-			for name, v := range s.Env {
-				if v.FromEnv == "" {
-					diags = append(diags, diag.TargetErrorf(t.ID(), path+".env."+name,
-						"prime-agent stdio env entries are environment references only (prime-agent mcp add --env CHILD=SOURCE)"))
-				}
-			}
-			continue
-		}
-		for name, v := range s.Headers {
-			if v.BearerFromEnv != "" && name != "Authorization" {
-				diags = append(diags, diag.TargetErrorf(t.ID(), path+".headers."+name,
-					"prime-agent bearerTokenEnvVar applies to Authorization only; use a constant value for other headers"))
-			}
-			if v.FromEnv != "" {
-				diags = append(diags, diag.TargetErrorf(t.ID(), path+".headers."+name,
-					"prime-agent http headers are static strings; environment interpolation is not verified for MCP headers"))
-			}
-		}
-	}
 	return diags
 }
 
@@ -102,8 +65,6 @@ func (t Target) Emit(cfg ir.Config) ([]artifact.Artifact, error) {
 					for name, v := range s.Env {
 						if v.FromEnv != "" {
 							env[name] = map[string]string{"env": v.FromEnv}
-						} else {
-							env[name] = map[string]string{"value": v.Value}
 						}
 					}
 					entry["env"] = env

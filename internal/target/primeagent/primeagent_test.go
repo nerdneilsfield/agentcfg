@@ -150,16 +150,20 @@ func TestSkipsUnsupportedReasoningEffort(t *testing.T) {
 	}
 }
 
-func TestRejectsProviderBearerHeader(t *testing.T) {
+func TestSkipsUnsupportedOptionalFields(t *testing.T) {
 	cfg := exampleConfig()
 	cfg.Providers[0].Headers = map[string]ir.HeaderValue{"Authorization": {BearerFromEnv: "TOK"}}
-	expectInvalid(t, cfg, "Bearer ENV:NAME is not representable")
-}
-
-func TestRejectsMCPTimeout(t *testing.T) {
-	cfg := exampleConfig()
 	cfg.MCP[0].TimeoutMS = i64(5000)
-	expectInvalid(t, cfg, "does not map MCP timeout_ms")
+	cfg.MCP[0].Env["LITERAL"] = ir.HeaderValue{Value: "skip-me"}
+	expectValid(t, cfg)
+	arts, err := (Target{}).Emit(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	settings := string(arts[1].Content)
+	if strings.Contains(settings, "skip-me") || strings.Contains(settings, "LITERAL") {
+		t.Fatalf("unsupported optional fields must be skipped:\n%s", settings)
+	}
 }
 
 func TestOmitsAuthorizationHeaderWhenBearerEnvVarIsSet(t *testing.T) {
