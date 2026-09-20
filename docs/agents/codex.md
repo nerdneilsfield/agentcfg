@@ -65,7 +65,9 @@ bearer_token_env_var = "GITHUB_TOKEN"
 ```
 
 The reference documents `command`, `args`, `url`, `enabled`, `required`, `env`, `env_vars`, `cwd`, `bearer_token_env_var`, `http_headers`, `env_http_headers`, `startup_timeout_ms`, `startup_timeout_sec`, and `tool_timeout_sec`. IR
-`timeout_ms` maps losslessly to `startup_timeout_ms`. v1 maps a same-name environment reference through `env_vars`, a literal child value through `env`; a renamed environment reference is rejected because `env_vars` inherits only same-name variables. It maps `Authorization: "Bearer ENV:NAME"` through `bearer_token_env_var`; other static and environment-derived HTTP headers map to `http_headers` and `env_http_headers`. Literal values are rendered as supplied; environment references are not resolved by agentcfg.
+`timeout_ms` maps losslessly to `startup_timeout_ms`. v1 maps a same-name environment reference through `env_vars` as a string name (`source = "local"`), a literal child value through `env`; a renamed environment reference is rejected because `env_vars` inherits only same-name variables. It maps `Authorization: "Bearer ENV:NAME"` through `bearer_token_env_var`; other static and environment-derived HTTP headers map to `http_headers` and `env_http_headers`. Literal values are rendered as supplied; environment references are not resolved by agentcfg.
+
+v1 does not emit `startup_timeout_sec`, `tool_timeout_sec`, MCP `auth` (`oauth` | `chatgpt`), `http_headers_helper`, `experimental_environment`, or OAuth callback/store keys. Those are runtime enrollment, a second unit for the same timeout, or have no IR field.
 
 ## Defaults
 
@@ -80,7 +82,7 @@ generate from the common model IR.
 - https://raw.githubusercontent.com/openai/codex/main/codex-rs/core/config.schema.json (`WireApi` is `responses` only; `ModelProviderInfo.experimental_bearer_token`; `RawMcpServerConfig`)
 - Local `codex mcp add --help` (0.153.4)
 
-The schema also documents provider `auth.command` (command-backed bearer tokens) and MCP `auth` (`oauth` | `chatgpt` | `ema_auth`). Those are runtime enrollment, not IR fields, and are not emitted.
+The schema also documents provider `auth.command` (command-backed bearer tokens; mutually exclusive with `env_key`, `experimental_bearer_token`, and `requires_openai_auth`), `query_params`, AWS signing helpers, websocket flags, and MCP `auth` (`oauth` | `chatgpt`). Those are runtime enrollment or have no IR field, and are not emitted.
 
 ## Reasoning variants
 
