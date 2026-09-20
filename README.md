@@ -28,8 +28,8 @@ Design principles:
 |---|---|---|---|---|
 | `codex` | [openai/codex](https://github.com/openai/codex) | Responses only | stdio + HTTP | `[model_providers]` TOML fragment; `ENV:NAME` → `env_key`; MCP `timeout_ms` → `startup_timeout_ms` |
 | `opencode` | [sst/opencode](https://github.com/sst/opencode) | OpenAI-compatible only | stdio + HTTP | `provider` + `mcp` in `opencode.json`; Anthropic/Responses providers rejected in v1 |
-| `pi` | [earendil-works/pi](https://github.com/earendil-works/pi) | any (TypeScript extension) | rejected in v1 (no built-in MCP) | emits a provider extension; header values use Pi `$NAME` syntax; defaults stay deferred until it is loaded |
-| `prime-agent` | [contract](docs/agents/prime-agent.md) | any (`models.json`) | stdio + HTTP | `models.json` + `settings.json` `mcpServers` fragments; `Bearer ENV:NAME` provider headers rejected |
+| `pi` | [earendil-works/pi](https://github.com/earendil-works/pi) | any (`models.json`) | rejected in v1 (no built-in MCP) | `~/.pi/agent/models.json`; `ENV:NAME` → `"$NAME"`; `auth_type: bearer` → `authHeader: true`; unset limits are omitted so Pi's defaults apply |
+| `prime-agent` | [contract](docs/agents/prime-agent.md) | any (`models.json`) | stdio + HTTP | `models.json` + `settings.json` `mcpServers` fragments; `ENV:NAME` → bare environment-variable names; `auth_type: bearer` → `authHeader: true` |
 | `deepseek-harness` | [deepseek-ai/deepseek-harness](https://github.com/deepseek-ai/deepseek-harness) | any (`api` route field) | stdio + HTTP (Cordis patch) | YAML provider route + `@deepseek-ai/dsh-mcp-client` patch; literal API keys rejected |
 | `grok` | [xai-org/grok-build](https://github.com/xai-org/grok-build) | Chat · Responses · Anthropic | stdio + HTTP | per-model TOML tables; duplicate model ids rejected; `ENV:NAME` headers → `env_http_headers` |
 | `kimi` | [MoonshotAI/kimi-code](https://github.com/MoonshotAI/kimi-code) | Chat · Responses · Anthropic | stdio + HTTP | flat `[models]` aliases; duplicate model ids rejected; `ENV:NAME` API keys → `api_key_env`; MCP `timeout_ms` → `startupTimeoutMs`; provider headers stay literal |

@@ -16,7 +16,7 @@ Write the IR against the protocol. Open the contract for a target before putting
 |---|---|---|---|
 | [Codex](codex.md) | TOML provider table | TOML MCP table | developers.openai.com/codex/config-reference + config.schema.json |
 | [OpenCode](opencode.md) | JSON `provider` | JSON `mcp` | [`opencode.config.schema.json`](opencode.config.schema.json) |
-| [Pi](pi.md) | TypeScript extension | external adapter only | upstream docs |
+| [Pi](pi.md) | JSON `models.json` | external adapter only | upstream docs |
 | [Prime Agent](prime-agent.md) | JSON `models.json` | JSON `settings.json.mcpServers` | installed 0.9.3 source contract |
 | [DeepSeek Harness](deepseek-harness.md) | YAML `llm-pi-ai` route | Cordis MCP-client patch | provider guide; MCP partial |
 | [Grok Build](grok.md) | TOML `[model."<id>"]` | TOML `[mcp_servers]` | local install + upstream docs |

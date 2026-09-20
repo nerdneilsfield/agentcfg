@@ -1,64 +1,112 @@
 # Pi Coding Agent
 
 - **Target id:** `pi`
-- **Verified against:** local `@earendil-works/pi-coding-agent 0.84.4`; upstream `packages/coding-agent/docs/custom-provider.md` re-fetched 2026-09-20. The two-argument `pi.registerProvider(name, config)` form, `$ENV_VAR` interpolation, and `thinkingLevelMap` are still the documented custom-provider contract. MCP is still not built in.
-- **Native locations:** `~/.pi/agent/` globally; `.pi/` per project.
-- **v1 artifacts:** a TypeScript provider extension and, if MCP support is requested, a standard `mcpServers` JSON document for the third-party `pi-mcp-adapter`.
+- **Verified against:** upstream `packages/coding-agent/docs/models.md` and
+  `packages/coding-agent/src/core/provider-composer.ts` (`authHeader`), both
+  inspected 2026-09-20.
+- **Native locations:** `~/.pi/agent/models.json` (global); `.pi/` per project.
+- **v1 artifact:** one JSON document containing `providers`.
+
+This document and `docs/agents/prime-agent.md` describe forks of the same
+codebase. Their provider and model field names match, but their credential value
+syntax does not; see [Value syntax](#value-syntax).
 
 ## Provider route
 
-An IR literal such as `api_key: "example-key"` is emitted in the native
-`apiKey` field. The example key is a placeholder; real literals also appear in
-generated output.
+Pi reads custom providers and models from `~/.pi/agent/models.json`. Custom
+entries merge over the built-in catalog: built-in models stay, and a custom
+model with the same id replaces the built-in entry for that provider.
 
-Pi does not use a static provider section in `settings.json`. A custom route is registered by a TypeScript extension through the current two-argument `pi.registerProvider(name, config)` overload:
-
-```ts
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-
-export default function (pi: ExtensionAPI) {
-  pi.registerProvider("volcengine", {
-    name: "Volcengine",
-    baseUrl: "https://example.com/v1",
-    apiKey: "$VOLC_API_KEY",
-    api: "openai-completions",
-    models: [{
-      id: "glm-5.3",
-      name: "GLM-5.3",
-      input: ["text", "image"],
-      reasoning: true,
-      cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-      contextWindow: 128000,
-      maxTokens: 8192,
-    }],
-  });
+```json
+{
+  "providers": {
+    "volcengine": {
+      "baseUrl": "https://example.com/v1",
+      "api": "openai-completions",
+      "apiKey": "$VOLC_API_KEY",
+      "headers": { "X-Tenant": "engineering" },
+      "models": [
+        {
+          "id": "glm-5.3",
+          "name": "GLM-5.3",
+          "input": ["text", "image"],
+          "reasoning": true,
+          "contextWindow": 128000,
+          "maxTokens": 8192,
+          "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 }
+        }
+      ]
+    }
+  }
 }
 ```
 
-Pi's declarative custom-provider API requires `api`, model `input`, `cost`, `contextWindow`, and `maxTokens`; agentcfg supplies zero costs because source configuration has no pricing scope. `tool_calling` has no corresponding Pi model field. Provider header values use Pi's `$NAME` expression syntax: IR literal headers are emitted as constants and `ENV:NAME` headers as `$NAME`. IR `Bearer ENV:NAME` has no verified Pi bearer expansion and is rejected.
+All three IR protocols map 1:1 to Pi's `api` values: `openai-completions`,
+`openai-responses`, and `anthropic-messages`.
+
+Model `input` accepts `text` and `image` only; other modalities are rejected.
+`cost` is emitted as zeros because the IR has no pricing scope. `contextWindow`
+and `maxTokens` are emitted only when the IR sets them, so Pi's own defaults
+(128000 and 16384) stay in place when a model omits them — writing a zero would
+replace that default with a zero-token cap. `thinkingLevelMap` is emitted only
+for a model that declares `variants`.
+
+### Value syntax
+
+`apiKey` and header values use Pi's value syntax:
+
+- `"!command"` runs a command and uses its stdout,
+- `"$NAME"` and `"${NAME}"` interpolate an environment variable,
+- `"$$"` and `"$!"` escape a leading `$` or `!`,
+- any other string is a literal.
+
+IR `ENV:NAME` therefore renders as `"$NAME"`. A literal API key that starts with
+`$` or `!` would be read as that syntax rather than as a token, so it is
+rejected.
+
+An IR `Authorization: "Bearer ENV:NAME"` provider header stays rejected for this
+target. Pi has no bearer form for an arbitrary header, and the equivalent route
+is `api_key` plus `auth_type: bearer`.
+
+### Authentication
+
+Which header Pi sends depends on the protocol, so `auth_type` overrides it
+instead of being inferred:
+
+| `auth_type` | Emitted | Effect |
+|---|---|---|
+| `official` (default) | nothing extra | the protocol's native header: `Authorization: Bearer` for the OpenAI transports, `x-api-key` for `anthropic-messages` |
+| `bearer` | `"authHeader": true` | Pi sends `Authorization: Bearer <resolved apiKey>` for this provider |
+| `none` | `apiKey` omitted | no credential, for keyless local endpoints |
+| `x-api-key` | nothing extra | accepted with `anthropic-messages` only, where it is already native |
+
+`x-api-key` with `openai-completions` or `openai-responses` is rejected: those
+transports always authenticate with Bearer, so accepting the value would send a
+different header than the document asked for.
 
 ### Reasoning variants
 
-For `models[].variants`, the extension emits a full model `thinkingLevelMap`.
-Listed Pi levels map to themselves and every other Pi level is `null`, so the
-model picker exposes precisely that set. Pi only documents `off`, `minimal`,
-`low`, `medium`, `high`, `xhigh`, and `max`; unsupported names such as `ultra`
-are omitted. No default thinking level is emitted.
-Pi model `input` accepts only `text` and `image`; audio, video, and PDF inputs
-are rejected.
-
-The v1 Pi emitter supports all three IR protocols by mapping them to Pi's `openai-completions`, `openai-responses`, and `anthropic-messages` API names.
-
-`defaultProvider` and `defaultModel` are settings fields, but v1 emits no settings mutation or standalone settings fragment because the provider extension must be installed/loaded first. Defaults remain deferred for Pi.
+`models[].variants` emits a model `thinkingLevelMap`. Declared Pi levels map to
+themselves and every other documented Pi level is `null`, which marks it
+unsupported and hides it. Pi documents `off`, `minimal`, `low`, `medium`,
+`high`, `xhigh`, and `max`; names such as `ultra` are skipped. No default
+thinking level is emitted.
 
 ## MCP
 
-Pi intentionally ships without built-in MCP support. The common `pi-mcp-adapter` package reads standard `mcpServers` JSON from `~/.config/mcp/mcp.json`, `~/.pi/agent/mcp.json`, `.mcp.json`, or `.pi/mcp.json` (precedence depends on the adapter version).
+Pi ships without built-in MCP support. The third-party `pi-mcp-adapter` reads a
+standard `mcpServers` document from its own search paths, but it is not part of
+Pi and its schema is not vendored here. `gen --to pi` therefore fails when the
+IR declares MCP servers rather than emitting a document Pi would ignore.
 
-The adapter is an external dependency, not part of Pi. Thus `agentcfg gen --to pi` must fail MCP generation unless the user explicitly enables the adapter-backed target mode in a future CLI option. The artifact schema is not vendored as authoritative Pi schema.
+## Defaults
+
+`defaultProvider` and `defaultModel` are settings fields rather than part of this
+document, and v1 emits no settings mutation, so defaults stay deferred until the
+provider is loaded.
 
 ## Sources
 
-- Installed `docs/custom-provider.md`, `docs/providers.md`, `docs/settings.md` from Pi 0.84.4
-- https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/custom-provider.md (re-fetched 2026-09-20)
-- Third-party `pi-mcp-adapter` remains out of v1; it is not Pi's built-in MCP surface
+- `https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/models.md`
+- `packages/coding-agent/src/core/provider-composer.ts` (`withConfiguredAuth`)
+- `packages/ai/src/api/openai-completions.ts`, `api/anthropic-messages.ts` (client construction)

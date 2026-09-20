@@ -139,6 +139,7 @@ Prefer `ENV:NAME` when the selected target supports environment references. Use 
 | `protocol` | yes | `openai-completions`, `openai-responses`, or `anthropic-messages`. |
 | `base_url` | yes | Provider endpoint base URL, including the path the CLI should call (often `/v1`). |
 | `api_key` | no | String literal or `ENV:NAME`. `Bearer ENV:NAME` is invalid here. |
+| `auth_type` | no | How the credential is presented: `official` (default), `bearer`, `x-api-key`, or `none`. See [Choosing `auth_type`](#choosing-auth_type). |
 | `headers` | no | Extra HTTP headers for provider requests. Same scalar forms as above. |
 | `models` | yes | Non-empty list of models this route serves. Model `id` values must be unique inside the provider. |
 
@@ -173,6 +174,59 @@ providers:
 ```
 
 Not every target accepts every protocol. Codex accepts `openai-responses` only. OpenCode accepts `openai-completions` only. ZCode, MiMo Code, and jcode reject `openai-responses` on custom providers. The other compiled-in targets accept all three. See [`docs/agents/README.md`](agents/README.md).
+
+### Choosing `auth_type`
+
+`auth_type` is orthogonal to `protocol`. The protocol chooses the request shape,
+and with it the header its transport sends by default; `auth_type` overrides that
+choice. Omitting it means `official`.
+
+| `auth_type` | Credential presentation | Requires `api_key` |
+|---|---|---|
+| `official` | Whatever the protocol's transport sends natively | no |
+| `bearer` | `Authorization: Bearer <credential>` | yes |
+| `x-api-key` | `x-api-key: <credential>` | yes |
+| `none` | No credential at all | no, and `api_key` must be absent |
+
+The protocols do not agree on their default, which is what makes the override
+necessary:
+
+| `protocol` | Default credential header |
+|---|---|
+| `openai-completions`, `openai-responses` | `Authorization: Bearer <key>` (the OpenAI client is built with the key) |
+| `anthropic-messages` | `x-api-key: <key>`; `Bearer` is reserved for built-in OAuth and GitHub Copilot routes |
+
+Which value a given upstream wants:
+
+| Upstream | `protocol` | Default | Use |
+|---|---|---|---|
+| Anthropic | `anthropic-messages` | `x-api-key` | `official` |
+| OpenAI | `openai-completions` | `Authorization: Bearer` | `official` |
+| OpenRouter | `openai-completions` | `Authorization: Bearer` | `official` |
+| new-api / one-api relaying Claude | `anthropic-messages` | gateway wants `Authorization: Bearer` | `bearer` |
+| new-api / one-api relaying GPT | `openai-completions` | `Authorization: Bearer` | `official` |
+| LiteLLM, Vercel AI Gateway | `openai-completions` | `Authorization: Bearer` | `official` |
+| Ollama, LM Studio, llama.cpp, vLLM | any | none | `none` |
+
+`bearer` is needed only when the wire shape and the gateway's expected header
+disagree. A relay that fronts an Anthropic-shaped route is the common case:
+
+```yaml
+providers:
+  - id: relay-anthropic
+    protocol: anthropic-messages
+    base_url: https://relay.example
+    api_key: "ENV:RELAY_TOKEN"
+    auth_type: bearer
+    models:
+      - id: claude-sonnet-4-5
+        context_window: 200000
+```
+
+Not every target implements every value, and a target may accept a value only
+for some protocols. A target that cannot present the credential as asked reports
+a diagnostic instead of emitting a different header, so `validate` and `gen`
+fail until the document is changed.
 
 ## Model
 
@@ -325,7 +379,7 @@ Current compiled-in ids: `cline`, `codex`, `crush`, `deepseek-harness`, `gajae`,
 
 ## IR validation
 
-IR validation checks document version, field types, identifiers, scalar value and environment-reference forms, duplicate IDs, provider/model references, protocol names, and transport constraints. It does not read environment-variable values, contact endpoints, or decide whether a target can represent a field.
+IR validation checks document version, field types, identifiers, scalar value and environment-reference forms, `auth_type` values and their `api_key` requirement, duplicate IDs, provider/model references, protocol names, and transport constraints. It does not read environment-variable values, contact endpoints, or decide whether a target can represent a field.
 
 Target validation runs after IR validation, once per selected target. A field that is legal in the IR can still be rejected for a target. Diagnostics name the target, the IR path, and the reason:
 

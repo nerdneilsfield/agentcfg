@@ -33,7 +33,22 @@ The installed `~/.prime/agent/models.json` is Pi-compatible. It contains a `prov
 }
 ```
 
-Unlike Pi's extension, the observed Prime registry accepts model records without Pi's required cost object. The v1 emitter maps all three IR protocols to the same Pi-AI names. Literal provider headers map to the native `headers` record; `ENV:NAME` maps to the bare environment-variable name expected by Prime Agent's resolver. `Bearer ENV:NAME` provider headers are rejected: Prime has no bearer expansion on provider headers, and emitting an empty string would look like a valid Authorization value. `api_key: "ENV:NAME"` likewise maps to a bare `apiKey` name, not Pi's `$NAME` template. Model input is limited to `text` and `image`.
+Unlike Pi's extension, the observed Prime registry accepts model records without Pi's required cost object. The v1 emitter maps all three IR protocols to the same Pi-AI names. Literal provider headers map to the native `headers` record; `ENV:NAME` maps to the bare environment-variable name expected by Prime Agent's resolver. `Bearer ENV:NAME` provider headers are rejected: Prime has no bearer expansion on provider headers, and emitting an empty string would look like a valid Authorization value. Use `api_key` with `auth_type: bearer` instead. `api_key: "ENV:NAME"` likewise maps to a bare `apiKey` name, not Pi's `$NAME` template. Model input is limited to `text` and `image`.
+
+### Authentication
+
+`auth_type` selects the credential header instead of leaving it to the protocol:
+
+| `auth_type` | Emitted | Effect |
+|---|---|---|
+| `official` (default) | nothing extra | the protocol's native header |
+| `bearer` | `"authHeader": true` | Prime Agent sends `Authorization: Bearer <resolved apiKey>`; an unresolved key fails the request rather than sending an empty header |
+| `none` | `apiKey` omitted | no credential, for keyless local endpoints |
+| `x-api-key` | nothing extra | accepted with `anthropic-messages` only, where it is already native |
+
+`x-api-key` with the OpenAI protocols is rejected: those transports always authenticate with Bearer, so accepting it would send a different header than the document asked for.
+
+`apiKey` is omitted rather than written empty when a provider has no credential. The models.json schema declares `apiKey` as a non-empty string when present, so `"apiKey": ""` invalidates the whole document and takes every custom provider with it.
 
 
 ### Reasoning variants
