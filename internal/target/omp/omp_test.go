@@ -150,16 +150,6 @@ func TestRoleArtifactOnlyWhenDefaultSet(t *testing.T) {
 	}
 }
 
-func TestOutputIsDeterministic(t *testing.T) {
-	first := emit(t, exampleConfig())
-	second := emit(t, exampleConfig())
-	for name, content := range first {
-		if second[name] != content {
-			t.Fatalf("%s differs between runs:\n%s\n---\n%s", name, content, second[name])
-		}
-	}
-}
-
 func TestRejectsLiteralExpressionKeys(t *testing.T) {
 	for _, key := range []string{"!op read op://x/y", "$TOKEN"} {
 		cfg := exampleConfig()

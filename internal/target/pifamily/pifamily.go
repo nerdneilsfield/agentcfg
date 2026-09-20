@@ -60,7 +60,7 @@ func Providers(cfg ir.Config, opts Options) map[string]any {
 		}
 		if p.EffectiveAuthType() != ir.AuthTypeNone {
 			if p.APIKey.FromEnv != "" {
-				entry["apiKey"] = EnvRef(opts.Syntax, p.APIKey.FromEnv)
+				entry["apiKey"] = envRef(opts.Syntax, p.APIKey.FromEnv)
 			} else if p.APIKey.Value != "" {
 				entry["apiKey"] = p.APIKey.Value
 			}
@@ -75,7 +75,7 @@ func Providers(cfg ir.Config, opts Options) map[string]any {
 				case v.BearerFromEnv != "" && opts.Bearer != nil:
 					headers[name] = opts.Bearer(v.BearerFromEnv)
 				case v.FromEnv != "":
-					headers[name] = EnvRef(opts.Syntax, v.FromEnv)
+					headers[name] = envRef(opts.Syntax, v.FromEnv)
 				default:
 					headers[name] = v.Value
 				}
@@ -112,8 +112,8 @@ func model(m ir.Model, opts Options) map[string]any {
 	return out
 }
 
-// EnvRef renders one environment variable reference in the fork's syntax.
-func EnvRef(syntax Syntax, name string) string {
+// envRef renders one environment variable reference in the fork's syntax.
+func envRef(syntax Syntax, name string) string {
 	if syntax == BareEnv {
 		return name
 	}

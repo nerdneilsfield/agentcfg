@@ -112,15 +112,6 @@ The schema supports `cwd`, `enabled`, and `timeout` (milliseconds, default 5000)
 
 OpenCode documents root `model` as `provider/model`. `defaults.model` can therefore emit the root `model` field after the provider/model reference passes validation.
 
-## Related distribution: oh-my-openagent
-
-Oh My OpenAgent (OmO) does not have a provider configuration of its own. Its
-OpenCode edition installs as a plugin entry in `opencode.json` and reads
-providers and MCP servers from OpenCode's configuration, so this target already
-covers that surface. OmO's own `~/.omo/omo.jsonc` carries agent-to-model
-assignments, hooks, permissions, and orchestration settings, none of which the
-IR models, so there is no separate OmO target.
-
 ## Sources
 
 - https://opencode.ai/docs/providers/
