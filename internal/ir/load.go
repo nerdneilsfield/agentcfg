@@ -74,6 +74,19 @@ func Validate(cfg Config) []diag.Diagnostic {
 		if p.APIKey.BearerFromEnv != "" {
 			diags = append(diags, diag.Errorf(path+".api_key", "Bearer ENV: is only valid for HTTP Authorization headers"))
 		}
+		switch p.EffectiveAuthType() {
+		case AuthTypeOfficial:
+		case AuthTypeBearer, AuthTypeXAPIKey:
+			if p.APIKey.Value == "" && p.APIKey.FromEnv == "" {
+				diags = append(diags, diag.Errorf(path+".auth_type", "%s requires api_key", p.AuthType))
+			}
+		case AuthTypeNone:
+			if p.APIKey.Value != "" || p.APIKey.FromEnv != "" {
+				diags = append(diags, diag.Errorf(path+".auth_type", "none forbids api_key"))
+			}
+		default:
+			diags = append(diags, diag.Errorf(path+".auth_type", "unknown auth_type %q", p.AuthType))
+		}
 		diags = append(diags, validateHeaderValues(path+".headers", p.Headers)...)
 
 		modelIDs := map[string]bool{}

@@ -18,6 +18,18 @@ const (
 	ProtocolAnthropicMessages Protocol = "anthropic-messages"
 )
 
+// AuthType is how a provider credential is presented to the upstream. It
+// overrides the credential injection the selected protocol uses natively.
+// The empty value means AuthTypeOfficial.
+type AuthType string
+
+const (
+	AuthTypeOfficial AuthType = "official"
+	AuthTypeBearer   AuthType = "bearer"
+	AuthTypeXAPIKey  AuthType = "x-api-key"
+	AuthTypeNone     AuthType = "none"
+)
+
 // Transport is an MCP server transport.
 type Transport string
 
@@ -69,8 +81,17 @@ type Provider struct {
 	Protocol Protocol               `yaml:"protocol"`
 	BaseURL  string                 `yaml:"base_url"`
 	APIKey   HeaderValue            `yaml:"api_key"`
+	AuthType AuthType               `yaml:"auth_type"`
 	Headers  map[string]HeaderValue `yaml:"headers"`
 	Models   []Model                `yaml:"models"`
+}
+
+// EffectiveAuthType returns the provider auth type, defaulting to official.
+func (p Provider) EffectiveAuthType() AuthType {
+	if p.AuthType == "" {
+		return AuthTypeOfficial
+	}
+	return p.AuthType
 }
 
 // MCPServer is one MCP server.

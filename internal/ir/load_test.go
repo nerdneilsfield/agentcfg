@@ -119,6 +119,10 @@ func TestValidateFindings(t *testing.T) {
 		{"variants require reasoning", "version: 1\nproviders:\n  - id: a\n    protocol: openai-responses\n    base_url: https://e.com\n    models: [{id: m, variants: [low]}]\n", "requires reasoning: true"},
 		{"duplicate reasoning variant", "version: 1\nproviders:\n  - id: a\n    protocol: openai-responses\n    base_url: https://e.com\n    models: [{id: m, reasoning: true, variants: [low, low]}]\n", "duplicate reasoning effort"},
 		{"invalid reasoning variant", "version: 1\nproviders:\n  - id: a\n    protocol: openai-responses\n    base_url: https://e.com\n    models: [{id: m, reasoning: true, variants: [Ultra]}]\n", "unknown reasoning effort"},
+		{"unknown auth_type", "version: 1\nproviders:\n  - id: a\n    protocol: openai-responses\n    base_url: https://e.com\n    auth_type: basic\n    models: [{id: m}]\n", `unknown auth_type "basic"`},
+		{"bearer without api_key", "version: 1\nproviders:\n  - id: a\n    protocol: openai-responses\n    base_url: https://e.com\n    auth_type: bearer\n    models: [{id: m}]\n", "bearer requires api_key"},
+		{"x-api-key without api_key", "version: 1\nproviders:\n  - id: a\n    protocol: openai-responses\n    base_url: https://e.com\n    auth_type: x-api-key\n    models: [{id: m}]\n", "x-api-key requires api_key"},
+		{"none with api_key", "version: 1\nproviders:\n  - id: a\n    protocol: openai-responses\n    base_url: https://e.com\n    api_key: ENV:T\n    auth_type: none\n    models: [{id: m}]\n", "none forbids api_key"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
