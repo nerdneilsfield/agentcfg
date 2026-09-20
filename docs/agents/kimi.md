@@ -1,7 +1,7 @@
 # Kimi Code
 
 - **Target id:** `kimi`
-- **Verified against:** official `@moonshot-ai/kimi-code` repository zod schemas and docs (research report `.research/kimi.md`, fetched 2026-09-07; npm `@moonshot-ai/kimi-code` v0.41.0).
+- **Verified against:** official Kimi Code docs and `MoonshotAI/kimi-code` repository (config-files + MCP pages fetched 2026-09-20; npm `@moonshot-ai/kimi-code`). The 2026-09-07 research snapshot is superseded for credentials and MCP timeouts.
 - **Native files:** `~/.kimi-code/config.toml` and `~/.kimi-code/mcp.json` (relocatable via `KIMI_CODE_HOME`).
 - **v1 artifacts:** two artifacts — TOML fragment + JSON `mcp.json` fragment.
 
@@ -30,7 +30,9 @@ capabilities = ["thinking", "tool_use", "image_in"]
 
 All three IR protocols map 1:1 (`openai`, `openai_responses`, `anthropic`).
 
-Kimi reads literal `api_key` values only and has **no** environment-variable fallback anywhere in `config.toml`. The IR `api_key: "ENV:NAME"` is therefore rejected for this target. `custom_headers` values are literal strings with no interpolation, so `ENV:NAME`/`Bearer ENV:NAME` provider headers are rejected.
+Official Kimi Code docs (2026-09-20) document `api_key` and `api_key_env` as mutually exclusive provider credentials. `api_key_env` is the name of a shell variable re-read on every request; it is not an automatic fallback from `export KIMI_API_KEY`. The v1 emitter still rejects `api_key: "ENV:NAME"` and writes only a literal `api_key`. Use a quoted literal for this target.
+
+`custom_headers` values remain literal strings with no interpolation, so `ENV:NAME`/`Bearer ENV:NAME` provider headers are still rejected.
 
 `max_context_size` is required for every model; an IR model without `context_window` is rejected. `capabilities` is emitted natively: `thinking` (IR `reasoning`), `tool_use` (IR `tool_calling`), `image_in`/`video_in`/`audio_in` (IR `input` modalities).
 
@@ -60,7 +62,9 @@ Kimi reads MCP servers from a separate `mcp.json`:
 }
 ```
 
-MCP `env` and `headers` values are literal strings: IR `ENV:NAME` MCP env/header references are rejected. `Authorization: "Bearer ENV:NAME"` maps to the native `bearerTokenEnvVar`. IR `timeout_ms` is rejected: kimi `mcp.json` has no timeout field. Omit `timeout_ms` when `--to` includes `kimi`.
+MCP `env` and `headers` values are literal strings: IR `ENV:NAME` MCP env/header references are rejected. `Authorization: "Bearer ENV:NAME"` maps to the native `bearerTokenEnvVar`. Stdio `cwd` is documented and emitted.
+
+Official MCP docs also list per-server `startupTimeoutMs` and `toolTimeoutMs` (milliseconds; default startup timeout 30000), plus global `[mcp]` defaults in `config.toml`. The v1 emitter still rejects IR `timeout_ms` because it does not choose between those two native fields. Omit `timeout_ms` when `--to` includes `kimi`.
 
 A Kimi-valid MCP pair uses a literal stdio env value and a bearer env var on HTTP:
 
@@ -88,3 +92,9 @@ When the IR has no MCP servers, the `mcp.json` artifact is omitted entirely.
 
 `models[].variants` maps to Kimi's string-list `support_efforts` and preserves
 provider/model names such as `ultra`. It never writes `default_effort`.
+
+## Sources
+
+- https://moonshotai.github.io/kimi-code/en/configuration/config-files.html (`api_key` / `api_key_env`)
+- https://github.com/MoonshotAI/kimi-code/blob/master/docs/en/configuration/providers.md
+- https://github.com/MoonshotAI/kimi-code/blob/master/docs/en/customization/mcp.md (`mcp.json` fields including `cwd`, `bearerTokenEnvVar`, `startupTimeoutMs`, `toolTimeoutMs`)

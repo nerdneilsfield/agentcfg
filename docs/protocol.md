@@ -128,7 +128,7 @@ Literal API keys are also rejected when the target would treat the text as a nat
 
 Gajae uses native environment-name-or-literal semantics: a literal that equals a set environment variable's name can be resolved by Gajae at runtime. agentcfg does not inspect the runtime environment to disambiguate it.
 
-Prefer `ENV:NAME` when the selected target supports environment references. Use a quoted literal only when the target has no reference form (Cline, Kimi, and ZCode store inline API keys).
+Prefer `ENV:NAME` when the selected target supports environment references. Use a quoted literal when the selected target has no implemented reference form (Cline and ZCode store inline API keys; the v1 Kimi emitter still rejects `ENV:NAME` even though native `api_key_env` now exists).
 
 ## Provider
 
@@ -251,7 +251,7 @@ mcp:
 
 - Codex `env_vars` and Goose `env_keys` inherit `NAME` from the host. `CHILD: "ENV:SOURCE"` with `CHILD != SOURCE` is rejected.
 - Prime Agent stdio `env` entries are environment references only; a literal child value is rejected.
-- Cline, Kimi, and ZCode MCP env values are literals; `ENV:NAME` is rejected.
+- Cline, Kimi, and ZCode MCP env values are literals; `ENV:NAME` is rejected. Kimi HTTP MCP still maps `Authorization: "Bearer ENV:NAME"` to `bearerTokenEnvVar`.
 
 ### HTTP
 
@@ -278,7 +278,7 @@ The IR unit is always milliseconds. Emitters do not guess a field that the nativ
 |---|---|
 | Milliseconds unchanged | OpenCode `timeout`, MiMo Code `timeout`, Gajae `timeout`, ZCode `timeoutMs`, DeepSeek Harness `toolCallTimeoutMs`, OpenClaw `connectionTimeoutMs` and `requestTimeoutMs` (same value on both), Codex `startup_timeout_ms` |
 | Converted to seconds (`ms / 1000`) | Crush (integer seconds; not divisible by 1000 is rejected), Goose (positive integer seconds), jcode `timeout_secs` (integer seconds), Hermes `timeout` (positive; fractional seconds allowed), Cline `timeout` (fractional seconds allowed, so `1500` becomes `1.5`) |
-| Rejected | Grok, Kimi, Prime Agent |
+| Rejected | Grok, Prime Agent, and Kimi (Kimi's `mcp.json` now has `startupTimeoutMs` / `toolTimeoutMs`; v1 still rejects because it does not pick one) |
 
 Omit `timeout_ms` unless every selected target can represent it.
 
@@ -411,7 +411,7 @@ Do not send this document to OpenCode, Codex, or a Completions-only adapter. The
 
 ### Literal API keys (Cline, Kimi, ZCode)
 
-Those three CLIs store inline key strings and have no custom-provider environment fallback. `ENV:NAME` is rejected:
+Cline and ZCode store inline key strings and have no custom-provider environment fallback. Kimi's native `config.toml` now documents `api_key_env`, but the v1 emitter still rejects `ENV:NAME` and writes only `api_key`. For all three, `ENV:NAME` is rejected:
 
 ```yaml
 version: 1
@@ -455,7 +455,7 @@ mcp:
 targets: [opencode, gajae]
 ```
 
-`timeout_ms: 30000` is 30 seconds. Crush would accept the timeout (integer seconds) but reject `cwd`. Grok, Kimi, and Prime Agent would reject the timeout. Omit those fields when the selected target cannot represent them.
+`timeout_ms: 30000` is 30 seconds. Crush would accept the timeout (integer seconds) but reject `cwd`. Grok, Prime Agent, and the v1 Kimi emitter would reject the timeout. Omit those fields when the selected target cannot represent them.
 
 ### HTTP MCP with a bearer token
 

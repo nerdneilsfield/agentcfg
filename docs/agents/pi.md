@@ -1,7 +1,7 @@
 # Pi Coding Agent
 
 - **Target id:** `pi`
-- **Verified against:** local `@earendil-works/pi-coding-agent 0.84.4`; installed documentation and current upstream documentation fetched 2026-09-07.
+- **Verified against:** local `@earendil-works/pi-coding-agent 0.84.4`; upstream `packages/coding-agent/docs/custom-provider.md` re-fetched 2026-09-20. The two-argument `pi.registerProvider(name, config)` form, `$ENV_VAR` interpolation, and `thinkingLevelMap` are still the documented custom-provider contract. MCP is still not built in.
 - **Native locations:** `~/.pi/agent/` globally; `.pi/` per project.
 - **v1 artifacts:** a TypeScript provider extension and, if MCP support is requested, a standard `mcpServers` JSON document for the third-party `pi-mcp-adapter`.
 
@@ -60,5 +60,5 @@ The adapter is an external dependency, not part of Pi. Thus `agentcfg gen --to p
 ## Sources
 
 - Installed `docs/custom-provider.md`, `docs/providers.md`, `docs/settings.md` from Pi 0.84.4
-- https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/custom-provider.md
-- https://nicobailon-pi-mcp-adapter.mintlify.app/introduction (third-party adapter)
+- https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/custom-provider.md (re-fetched 2026-09-20)
+- Third-party `pi-mcp-adapter` remains out of v1; it is not Pi's built-in MCP surface

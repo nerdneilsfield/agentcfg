@@ -1,7 +1,7 @@
 # OpenCode
 
 - **Target id:** `opencode`
-- **Verified against:** local `opencode 1.18.20`; official schema downloaded 2026-09-07.
+- **Verified against:** local `opencode 1.18.20`; official schema `https://opencode.ai/config.json` re-fetched 2026-09-20 (byte-identical to the vendored snapshot).
 - **Native file:** `opencode.json` / `opencode.jsonc` according to OpenCode configuration discovery.
 - **v1 artifact:** JSON fragment containing `provider` and `mcp`. v1 does not edit this file.
 - **Schema snapshot:** [`opencode.config.schema.json`](opencode.config.schema.json), downloaded from `https://opencode.ai/config.json`.
@@ -56,9 +56,10 @@ The v1 emitter supports `openai-completions` only. It maps request headers to `o
 It does not emit `reasoningSummary`, `textVerbosity`, token budgets, or other
 provider options. Those are not part of the agentcfg variant semantic.
 
-The published schema supports additional model fields (`attachment`,
-`temperature`, cost, options and more). They remain outside the IR until their
-semantics are shared and required.
+The published schema names only `disabled` on each variant object and leaves
+other keys open. v1 still writes `reasoningEffort` as the agentcfg variant
+semantic. Extra native fields (`attachment`, `temperature`, cost, options)
+remain outside the IR until their semantics are shared and required.
 
 ## MCP
 
@@ -105,7 +106,7 @@ Native:
 }
 ```
 
-The schema supports `cwd`, `enabled`, and `timeout` for local and remote MCP; remote also has OAuth configuration. v1 maps stdio and HTTP headers, `cwd`, `enabled`, and `timeout_ms` (milliseconds, native `timeout`). OAuth is omitted because it contains runtime credential state. `enabled` defaults to `true` when the IR omits it.
+The schema supports `cwd`, `enabled`, and `timeout` (milliseconds, default 5000) for local and remote MCP. Remote also has `oauth` (an object, or `false` to disable auto-detection). v1 maps stdio and HTTP headers, `cwd`, `enabled`, and `timeout_ms` (milliseconds, native `timeout`). OAuth is omitted because it is runtime enrollment, not source configuration; v1 does not emit `oauth: false` either. `enabled` defaults to `true` when the IR omits it. Header values use `{env:NAME}` interpolation.
 
 ## Defaults
 

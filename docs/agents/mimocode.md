@@ -1,7 +1,7 @@
 # MiMo Code
 
 - **Target id:** `mimocode`
-- **Verified against:** official Xiaomi MiMo Code live JSON schema (`https://mimo.xiaomi.com/mimocode/config.json`, 268 KB), official docs, and repo source `config/variable.ts` (research report `.research/mimocode.md`, fetched 2026-09-07; repo `github.com/XiaomiMiMo/MiMo-Code`, MIT; binary `mimo`, npm `@mimo-ai/cli`).
+- **Verified against:** official Xiaomi MiMo Code live JSON schema (`https://mimo.xiaomi.com/mimocode/config.json`, 268 KB, re-fetched 2026-09-20), official docs, and repo source `config/variable.ts` (research report `.research/mimocode.md`, 2026-09-07; repo `github.com/XiaomiMiMo/MiMo-Code`, MIT; binary `mimo`, npm `@mimo-ai/cli`).
 - **Native file:** `~/.config/mimocode/mimocode.jsonc` (or project `mimocode.json(c)`; relocatable via `$MIMOCODE_HOME`).
 - **v1 artifact:** single JSON fragment (valid JSON, safe to store as `.jsonc`).
 
@@ -78,9 +78,10 @@ MiMo Code uses native `type` values `local` and `remote` (the `stdio`/`http` spe
 ### MCP timeout
 
 IR `timeout_ms` maps unchanged to native `mcp.<id>.timeout` for both `local`
-and `remote` servers. IR `cwd` has no MiMo Code MCP field and is rejected.
-A stdio server that sets `cwd: /var/lib/context7` validates for OpenCode and
-fails for MiMo Code.
+and `remote` servers (milliseconds, default 5000). The 2026-09-20 live schema
+still has no MCP `cwd`; IR `cwd` is rejected. A stdio server that sets
+`cwd: /var/lib/context7` validates for OpenCode and fails for MiMo Code. Remote
+MCP also documents `oauth` (object or `false`); v1 does not emit it.
 
 ## Defaults
 
@@ -88,7 +89,13 @@ fails for MiMo Code.
 
 ## Reasoning variants
 
-MiMo Code directly supports `models.<id>.variants`. agentcfg emits one native
-variant per source name with only `reasoningEffort` set to that name. It does
-not copy unrelated native fields such as `textVerbosity`, `reasoningSummary`,
-or `include`. Provider/model names such as `ultra` are preserved.
+MiMo Code directly supports `models.<id>.variants`. The live schema lists
+`disabled` on each variant object and leaves other keys open. agentcfg emits
+one native variant per source name with only `reasoningEffort` set to that
+name. It does not copy unrelated native fields such as `textVerbosity`,
+`reasoningSummary`, or `include`. Provider/model names such as `ultra` are
+preserved.
+
+## Sources
+
+- https://mimo.xiaomi.com/mimocode/config.json

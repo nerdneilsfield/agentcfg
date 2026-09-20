@@ -1,7 +1,7 @@
 # OpenClaw
 
 - **Target id:** `openclaw`
-- **Verified against:** official repo `openclaw/openclaw` (steipete/OpenClaw Foundation; research report `.research/openclaw.md`, fetched 2026-09-07). The npm package is `openclaw` (bin `openclaw`). OpenClaw is a personal/team AI-assistant gateway rather than a pure coding-agent CLI, but its provider/MCP config surfaces fit agentcfg scope. (Ruled out: the `pjasicek/OpenClaw` Captain Claw game engine and the PyPI `openclaw` cmdop installer.)
+- **Verified against:** official repo `openclaw/openclaw` (steipete/OpenClaw Foundation; research report `.research/openclaw.md`, 2026-09-07) and live docs `https://docs.openclaw.ai/tools/mcp` plus `https://docs.openclaw.ai/gateway/configuration` (fetched 2026-09-20). The npm package is `openclaw` (bin `openclaw`). OpenClaw is a personal/team AI-assistant gateway rather than a pure coding-agent CLI, but its provider/MCP config surfaces fit agentcfg scope. (Ruled out: the `pjasicek/OpenClaw` Captain Claw game engine and the PyPI `openclaw` cmdop installer.)
 - **Native file:** `~/.openclaw/openclaw.json` (JSON5, comments + `$include`; `OPENCLAW_STATE_DIR` overrides). The generated agent-local catalog `~/.openclaw/agents/<id>/agent/models.json` must NOT be written.
 - **v1 artifact:** a single JSON fragment for `openclaw.json`. v1 does not edit this file.
 
@@ -52,13 +52,18 @@ than remapped. No default thinking level or request parameters are generated.
 
 ## Defaults
 
-`defaults.model "provider/model"` maps to `agents.defaults.model` verbatim.
+`defaults.model "provider/model"` maps to `agents.defaults.model` as a plain string. Live docs also allow `agents.defaults.model.primary` plus fallbacks; v1 still writes the string form, which the 2026-09-20 reference still accepts.
 
 ## MCP
 
 `mcp.servers.<id>` supports stdio (`command`, `args`, `env`, `cwd`) and
 `transport: "streamable-http"` with `url` + `headers` (IR `http` maps here;
-`sse` also exists). `connectionTimeoutMs` / `requestTimeoutMs` take the IR
-`timeout_ms` value duplicated across both. IR `enabled` maps to the native
-`enabled` flag. First-party OAuth (`auth: "oauth"`) and mTLS options have no
-IR counterpart and are not emitted.
+`sse` also exists). The 2026-09-20 docs still show `connectionTimeoutMs` /
+`requestTimeoutMs`; v1 duplicates IR `timeout_ms` onto both. IR `enabled` maps
+to the native `enabled` flag. First-party OAuth (`auth: "oauth"`) and mTLS
+options have no IR counterpart and are not emitted.
+
+## Sources
+
+- https://docs.openclaw.ai/gateway/configuration
+- https://docs.openclaw.ai/tools/mcp

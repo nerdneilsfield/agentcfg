@@ -1,7 +1,7 @@
 # Codex CLI
 
 - **Target id:** `codex`
-- **Verified against:** local `codex-cli 0.153.4`; official configuration reference fetched 2026-09-07.
+- **Verified against:** local `codex-cli 0.153.4`; live `config.schema.json` and Configuration Reference fetched 2026-09-20.
 - **Native file:** `$CODEX_HOME/config.toml`, normally `~/.codex/config.toml`.
 - **v1 artifact:** TOML fragment. v1 does not edit this file.
 
@@ -76,9 +76,11 @@ generate from the common model IR.
 
 ## Sources
 
-- https://raw.githubusercontent.com/openai/codex/main/codex-rs/core/config.schema.json (`ModelProviderInfo.experimental_bearer_token`)
-- https://openai-codex.mintlify.app/configuration/reference
+- https://developers.openai.com/codex/config-reference (replaces the retired mintlify URL)
+- https://raw.githubusercontent.com/openai/codex/main/codex-rs/core/config.schema.json (`WireApi` is `responses` only; `ModelProviderInfo.experimental_bearer_token`; `RawMcpServerConfig`)
 - Local `codex mcp add --help` (0.153.4)
+
+The schema also documents provider `auth.command` (command-backed bearer tokens) and MCP `auth` (`oauth` | `chatgpt` | `ema_auth`). Those are runtime enrollment, not IR fields, and are not emitted.
 
 ## Reasoning variants
 

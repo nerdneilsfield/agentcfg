@@ -1,7 +1,7 @@
 # Crush
 
 - **Target id:** `crush`
-- **Verified against:** Charmbracelet Crush v0.92.0 (`github.com/charmbracelet/crush`; live schema `https://charm.land/crush.json`, fetched 2026-09-07). Local install via `charmbracelet/tap/crush`; config at `~/.config/crush/crush.json`.
+- **Verified against:** Charmbracelet Crush v0.92.0 (`github.com/charmbracelet/crush`; live schema `https://charm.land/crush.json`, re-fetched 2026-09-20). Local install via `charmbracelet/tap/crush`; config at `~/.config/crush/crush.json`.
 - **Native file:** `~/.config/crush/crush.json` (JSON; `$schema` optional).
 - **v1 artifact:** a single JSON fragment. v1 does not edit this file.
 
@@ -55,7 +55,7 @@ Custom providers live under `providers.<id>` (`ProviderConfig`, `additionalPrope
 
 ## MCP
 
-`mcp.<id>` (`MCPConfig`) requires `type` in `stdio|sse|http`. IR `http` maps to `http` (not `sse`). stdio uses `command`/`args`/`env`; http uses `url`/`headers`. `enabled: false` maps to `disabled: true`. `timeout` is whole seconds (`timeout_ms / 1000`); values not divisible by 1000 are rejected. IR `cwd` has no Crush MCP field and is rejected. Env/header interpolation uses the same `$VAR` / `Bearer ${VAR}` rendering as providers. When the IR has no MCP servers, the `mcp` object is omitted.
+`mcp.<id>` (`MCPConfig`) requires `type` in `stdio|sse|http`. IR `http` maps to `http` (not `sse`). stdio uses `command`/`args`/`env`; http uses `url`/`headers`. `enabled: false` maps to `disabled: true`. `timeout` is whole seconds (`timeout_ms / 1000`, native default 15); values not divisible by 1000 are rejected. IR `cwd` has no Crush MCP field and is rejected. Env/header interpolation uses the same `$VAR` / `Bearer ${VAR}` rendering as providers. When the IR has no MCP servers, the `mcp` object is omitted.
 
 IR:
 
@@ -99,4 +99,10 @@ Native:
 
 `models[].variants` maps to the model catalog's `reasoning_levels` array without
 setting `default_reasoning_effort` or the selected-model `reasoning_effort`. Names
-including provider-specific `ultra` are preserved unchanged.
+including provider-specific `ultra` are preserved unchanged. The live schema's
+selected-model `reasoning_effort` enum is only `low|medium|high`; that field is
+not written.
+
+## Sources
+
+- https://charm.land/crush.json

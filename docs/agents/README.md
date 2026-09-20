@@ -5,22 +5,22 @@ This directory records the native configuration evidence used by agentcfg emitte
 Write the IR against the protocol. Open the contract for a target before putting that id in `targets:` or `--to`. A field that is legal in the IR can still be unrepresentable on a given CLI. Common mismatches:
 
 - Codex accepts `openai-responses` only; OpenCode accepts `openai-completions` only.
-- Cline, Kimi, and ZCode reject `api_key: "ENV:NAME"` (literal keys only). Goose and DeepSeek Harness reject literal API keys.
+- Cline and ZCode reject `api_key: "ENV:NAME"` (literal keys only). Kimi's native `config.toml` now has `api_key_env`, but the v1 emitter still rejects `ENV:NAME` and writes only a literal `api_key`. Goose and DeepSeek Harness reject literal API keys.
 - Pi rejects every MCP server in v1. jcode rejects HTTP MCP.
-- Crush, MiMo Code, and jcode reject MCP `cwd`. Grok, Kimi, and Prime Agent reject MCP `timeout_ms`.
+- Crush, MiMo Code, and jcode reject MCP `cwd`. Grok and Prime Agent reject MCP `timeout_ms`. Kimi's `mcp.json` now documents `startupTimeoutMs` / `toolTimeoutMs`, but the v1 emitter still rejects IR `timeout_ms` because it does not choose between those fields.
 - Crush keeps reasoning-effort names such as `ultra`. Gajae, OpenClaw, Pi, Prime Agent, Grok, and DeepSeek Harness skip names outside their native ladder.
 
 `--to all` is a CLI wildcard for every compiled-in emitter. An IR list `targets: [all]` is an unknown id. One document rarely represents faithfully on every target at once; put the CLIs you generate for in `targets:` and override with `--to`.
 
 | Target | Provider form | MCP form | Schema snapshot |
 |---|---|---|---|
-| [Codex](codex.md) | TOML provider table | TOML MCP table | official reference (online) |
+| [Codex](codex.md) | TOML provider table | TOML MCP table | developers.openai.com/codex/config-reference + config.schema.json |
 | [OpenCode](opencode.md) | JSON `provider` | JSON `mcp` | [`opencode.config.schema.json`](opencode.config.schema.json) |
 | [Pi](pi.md) | TypeScript extension | external adapter only | upstream docs |
 | [Prime Agent](prime-agent.md) | JSON `models.json` | JSON `settings.json.mcpServers` | installed 0.9.3 source contract |
 | [DeepSeek Harness](deepseek-harness.md) | YAML `llm-pi-ai` route | Cordis MCP-client patch | provider guide; MCP partial |
 | [Grok Build](grok.md) | TOML `[model."<id>"]` | TOML `[mcp_servers]` | local install + upstream docs |
-| [Kimi Code](kimi.md) | TOML `[providers]`/`[models]` | JSON `mcp.json` | official repo zod schemas |
+| [Kimi Code](kimi.md) | TOML `[providers]`/`[models]` | JSON `mcp.json` | official kimi-code docs (2026-09-20) |
 | [ZCode](zcode.md) | JSON `provider` | JSON `mcp.servers` | installed v3.11.2 bundled schema |
 | [MiMo Code](mimocode.md) | JSON `provider` (AI SDK npm) | JSON `mcp` local/remote | official live JSON schema |
 | [jcode](jcode.md) | TOML `[providers]` | JSON `mcp.json` | official repo (Rust) |
