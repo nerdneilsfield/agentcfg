@@ -139,7 +139,7 @@ Prefer `ENV:NAME` when the selected target supports environment references. Use 
 | `protocol` | yes | `openai-completions`, `openai-responses`, or `anthropic-messages`. |
 | `base_url` | yes | Provider endpoint base URL, including the path the CLI should call (often `/v1`). |
 | `api_key` | no | String literal or `ENV:NAME`. `Bearer ENV:NAME` is invalid here. |
-| `auth_type` | no | How the credential is presented: `official` (default), `bearer`, `x-api-key`, or `none`. See [Choosing `auth_type`](#choosing-auth_type). |
+| `auth_type` | no | How the credential is presented: `official` (default), `bearer`, or `none`. See [Choosing `auth_type`](#choosing-auth_type). |
 | `headers` | no | Extra HTTP headers for provider requests. Same scalar forms as above. |
 | `models` | yes | Non-empty list of models this route serves. Model `id` values must be unique inside the provider. |
 
@@ -185,7 +185,6 @@ choice. Omitting it means `official`.
 |---|---|---|
 | `official` | Whatever the protocol's transport sends natively | no |
 | `bearer` | `Authorization: Bearer <credential>` | yes |
-| `x-api-key` | `x-api-key: <credential>` | yes |
 | `none` | No credential at all | no, and `api_key` must be absent |
 
 The protocols do not agree on their default, which is what makes the override
@@ -223,12 +222,12 @@ providers:
         context_window: 200000
 ```
 
-Not every target implements every value, and a target may accept a value only
-for some protocols. A target that cannot present the credential as asked reports
-a diagnostic instead of emitting a different header, so `validate` and `gen`
-fail until the document is changed. `pi`, `prime-agent`, and `omp` map it today;
-the shipped `example.yaml` selects `crush` and `gajae`, which do not, so a
-non-`official` value there fails for the example's own default targets.
+Not every target implements every value. A target that cannot present the
+credential as asked reports a diagnostic instead of emitting a different header,
+so `validate` and `gen` fail until the document is changed. `pi`, `prime-agent`,
+and `omp` map `bearer` and `none` today; the shipped `example.yaml` selects
+`crush` and `gajae`, which do not, so a non-`official` value there fails for the
+example's own default targets.
 
 ## Model
 

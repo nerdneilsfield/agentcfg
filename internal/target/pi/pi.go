@@ -43,10 +43,8 @@ func (t Target) Validate(cfg ir.Config) []diag.Diagnostic {
 	return diags
 }
 
-// ValidateAuthTypes maps auth_type for pi.
-func (t Target) ValidateAuthTypes(cfg ir.Config) []diag.Diagnostic {
-	return pifamily.ValidateAuthTypes(t.ID(), cfg)
-}
+// MappedAuthTypes reports the auth_type values pi maps.
+func (t Target) MappedAuthTypes() []ir.AuthType { return pifamily.MappedAuthTypes() }
 
 func (t Target) Emit(cfg ir.Config) ([]artifact.Artifact, error) {
 	content, err := pifamily.EncodeJSON(map[string]any{

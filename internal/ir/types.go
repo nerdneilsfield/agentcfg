@@ -26,7 +26,6 @@ type AuthType string
 const (
 	AuthTypeOfficial AuthType = "official"
 	AuthTypeBearer   AuthType = "bearer"
-	AuthTypeXAPIKey  AuthType = "x-api-key"
 	AuthTypeNone     AuthType = "none"
 )
 

@@ -44,9 +44,6 @@ Unlike Pi's extension, the observed Prime registry accepts model records without
 | `official` (default) | nothing extra | the protocol's native header |
 | `bearer` | `"authHeader": true` | Prime Agent sends `Authorization: Bearer <resolved apiKey>`; an unresolved key fails the request rather than sending an empty header |
 | `none` | `apiKey` omitted | no credential, for keyless local endpoints |
-| `x-api-key` | nothing extra | accepted with `anthropic-messages` only, where it is already native |
-
-`x-api-key` with the OpenAI protocols is rejected: those transports always authenticate with Bearer, so accepting it would send a different header than the document asked for.
 
 `apiKey` is omitted rather than written empty when a provider has no credential. The models.json schema declares `apiKey` as a non-empty string when present, so `"apiKey": ""` invalidates the whole document and takes every custom provider with it.
 

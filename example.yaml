@@ -8,7 +8,6 @@
 # auth_type is optional and overrides the credential header the protocol sends
 # by default. Omit it unless the upstream disagrees with the wire shape:
 #   auth_type: bearer          Authorization: Bearer <credential>
-#   auth_type: x-api-key       x-api-key: <credential> (anthropic-messages only)
 #   auth_type: none            no credential at all
 # It is not set below because only pi, prime-agent, and omp map it so far, and
 # this file's default targets (crush, gajae) reject anything but "official".

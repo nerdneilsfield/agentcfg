@@ -20,24 +20,36 @@ func authTypeConfig(authType ir.AuthType) ir.Config {
 	}}}
 }
 
+func mappedAuthTypes(emitter target.Target) map[ir.AuthType]bool {
+	mapped := map[ir.AuthType]bool{ir.AuthTypeOfficial: true}
+	if m, ok := emitter.(target.AuthTypeMapper); ok {
+		for _, authType := range m.MappedAuthTypes() {
+			mapped[authType] = true
+		}
+	}
+	return mapped
+}
+
 // Every target either maps auth_type or says it does not. Silently ignoring it
 // would let the emitted config authenticate differently than the IR asked for.
 func TestAuthTypeIsNeverSilentlyIgnored(t *testing.T) {
 	for _, id := range target.IDs() {
 		t.Run(id, func(t *testing.T) {
 			emitter, _ := target.Lookup(id)
-			diags := target.AuthTypeDiagnostics(emitter, authTypeConfig(ir.AuthTypeBearer))
-			if _, maps := emitter.(target.AuthTypeValidator); maps {
-				if diag.HasErrors(diags) {
-					t.Fatalf("%s maps auth_type but reported: %v", id, diags)
+			for _, authType := range []ir.AuthType{ir.AuthTypeBearer, ir.AuthTypeNone} {
+				diags := target.AuthTypeDiagnostics(emitter, authTypeConfig(authType))
+				if mappedAuthTypes(emitter)[authType] {
+					if diag.HasErrors(diags) {
+						t.Fatalf("%s maps auth_type %s but reported: %v", id, authType, diags)
+					}
+					continue
 				}
-				return
-			}
-			if !diag.HasErrors(diags) {
-				t.Fatalf("%s silently accepted auth_type: bearer", id)
-			}
-			if !strings.Contains(diags[0].Message, "does not implement auth_type") {
-				t.Fatalf("%s unexpected diagnostic: %v", id, diags)
+				if !diag.HasErrors(diags) {
+					t.Fatalf("%s silently accepted auth_type: %s", id, authType)
+				}
+				if !strings.Contains(diags[0].Message, "does not implement auth_type") {
+					t.Fatalf("%s unexpected diagnostic: %v", id, diags)
+				}
 			}
 		})
 	}

@@ -60,11 +60,9 @@ All three IR protocols map 1:1 to `api` values. Model `input` accepts `text` and
 | `official` (default) | nothing extra | the protocol's native header |
 | `bearer` | `"authHeader": true` | Oh My Pi sends `Authorization: Bearer <resolved apiKey>` |
 | `none` | `apiKey` omitted | no credential, for keyless local endpoints |
-| `x-api-key` | nothing extra | accepted with `anthropic-messages` only, where it is already native |
 
-`x-api-key` with the OpenAI protocols is rejected: those transports always
-authenticate with Bearer. An IR `Authorization: "Bearer ENV:NAME"` provider
-header is representable here and renders as `"Bearer ${NAME}"`.
+An IR `Authorization: "Bearer ENV:NAME"` provider header is representable here
+and renders as `"Bearer ${NAME}"`.
 
 ### Reasoning variants
 

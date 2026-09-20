@@ -140,19 +140,10 @@ func EncodeYAML(v any) ([]byte, error) {
 	return out, nil
 }
 
-// ValidateAuthTypes reports auth_type values these forks cannot map: their
-// OpenAI transports always send "Authorization: Bearer", so x-api-key is only
-// native on the Anthropic Messages wire.
-func ValidateAuthTypes(tid string, cfg ir.Config) []diag.Diagnostic {
-	var diags []diag.Diagnostic
-	for i, p := range cfg.Providers {
-		if p.EffectiveAuthType() != ir.AuthTypeXAPIKey || p.Protocol == ir.ProtocolAnthropicMessages {
-			continue
-		}
-		diags = append(diags, diag.TargetErrorf(tid, fmt.Sprintf("providers[%d].auth_type", i),
-			"%s authenticates %s with Authorization: Bearer; auth_type: x-api-key is only native on anthropic-messages", tid, p.Protocol))
-	}
-	return diags
+// MappedAuthTypes lists the auth_type values these forks map: they present the
+// credential natively, force "Authorization: Bearer", or send none.
+func MappedAuthTypes() []ir.AuthType {
+	return []ir.AuthType{ir.AuthTypeOfficial, ir.AuthTypeBearer, ir.AuthTypeNone}
 }
 
 // ValidateLiteralAPIKeys rejects literals a fork would read as its own

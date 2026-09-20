@@ -58,10 +58,8 @@ func (t Target) Validate(cfg ir.Config) []diag.Diagnostic {
 	return append(diags, pifamily.ValidateModelInput(t.ID(), cfg)...)
 }
 
-// ValidateAuthTypes maps auth_type for Oh My Pi.
-func (t Target) ValidateAuthTypes(cfg ir.Config) []diag.Diagnostic {
-	return pifamily.ValidateAuthTypes(t.ID(), cfg)
-}
+// MappedAuthTypes reports the auth_type values Oh My Pi maps.
+func (t Target) MappedAuthTypes() []ir.AuthType { return pifamily.MappedAuthTypes() }
 
 func (t Target) Emit(cfg ir.Config) ([]artifact.Artifact, error) {
 	models, err := pifamily.EncodeYAML(map[string]any{

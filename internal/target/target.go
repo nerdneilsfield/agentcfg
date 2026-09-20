@@ -24,21 +24,25 @@ type Target interface {
 	Emit(cfg ir.Config) ([]artifact.Artifact, error)
 }
 
-// AuthTypeValidator is implemented by targets that map auth_type values to
-// native fields. A target that does not implement it maps only "official".
-type AuthTypeValidator interface {
-	ValidateAuthTypes(cfg ir.Config) []diag.Diagnostic
+// AuthTypeMapper is implemented by targets that map auth_type values other than
+// "official" to native fields. A target that does not implement it maps only
+// "official".
+type AuthTypeMapper interface {
+	MappedAuthTypes() []ir.AuthType
 }
 
 // AuthTypeDiagnostics reports auth_type values the target does not map, so a
 // non-official value is never silently ignored.
 func AuthTypeDiagnostics(t Target, cfg ir.Config) []diag.Diagnostic {
-	if v, ok := t.(AuthTypeValidator); ok {
-		return v.ValidateAuthTypes(cfg)
+	mapped := map[ir.AuthType]bool{ir.AuthTypeOfficial: true}
+	if m, ok := t.(AuthTypeMapper); ok {
+		for _, authType := range m.MappedAuthTypes() {
+			mapped[authType] = true
+		}
 	}
 	var diags []diag.Diagnostic
 	for i, p := range cfg.Providers {
-		if p.EffectiveAuthType() == ir.AuthTypeOfficial {
+		if mapped[p.EffectiveAuthType()] {
 			continue
 		}
 		diags = append(diags, diag.TargetErrorf(t.ID(), fmt.Sprintf("providers[%d].auth_type", i),

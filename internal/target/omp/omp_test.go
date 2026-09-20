@@ -6,6 +6,7 @@ import (
 
 	"agentcfg/internal/diag"
 	"agentcfg/internal/ir"
+	"agentcfg/internal/target"
 )
 
 func i64(n int64) *int64 { return &n }
@@ -57,13 +58,8 @@ func expectValid(t *testing.T, cfg ir.Config) {
 	if diags := (Target{}).Validate(cfg); diag.HasErrors(diags) {
 		t.Fatalf("expected valid config, got %v", diags)
 	}
-	expectValidAuthTypes(t, cfg)
-}
-
-func expectValidAuthTypes(t *testing.T, cfg ir.Config) {
-	t.Helper()
-	if diags := (Target{}).ValidateAuthTypes(cfg); diag.HasErrors(diags) {
-		t.Fatalf("expected valid auth types, got %v", diags)
+	if diags := target.AuthTypeDiagnostics(Target{}, cfg); diag.HasErrors(diags) {
+		t.Fatalf("expected no auth_type diagnostics, got %v", diags)
 	}
 }
 

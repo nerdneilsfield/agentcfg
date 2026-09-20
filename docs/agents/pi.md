@@ -78,11 +78,6 @@ instead of being inferred:
 | `official` (default) | nothing extra | the protocol's native header: `Authorization: Bearer` for the OpenAI transports, `x-api-key` for `anthropic-messages` |
 | `bearer` | `"authHeader": true` | Pi sends `Authorization: Bearer <resolved apiKey>` for this provider |
 | `none` | `apiKey` omitted | no credential, for keyless local endpoints |
-| `x-api-key` | nothing extra | accepted with `anthropic-messages` only, where it is already native |
-
-`x-api-key` with `openai-completions` or `openai-responses` is rejected: those
-transports always authenticate with Bearer, so accepting the value would send a
-different header than the document asked for.
 
 ### Reasoning variants
 

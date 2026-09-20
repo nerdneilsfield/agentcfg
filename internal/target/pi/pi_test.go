@@ -193,14 +193,14 @@ func TestOmitsAPIKeyWithoutCredential(t *testing.T) {
 	}
 }
 
-func TestAuthTypeXAPIKeyOnlyOnAnthropicMessages(t *testing.T) {
-	cfg := exampleConfig()
-	cfg.Providers[0].AuthType = ir.AuthTypeXAPIKey
-	if diags := (Target{}).ValidateAuthTypes(cfg); !diag.HasErrors(diags) {
-		t.Fatal("expected a diagnostic for x-api-key on an OpenAI protocol")
+func TestAuthTypeMappings(t *testing.T) {
+	mapped := map[ir.AuthType]bool{}
+	for _, authType := range (Target{}).MappedAuthTypes() {
+		mapped[authType] = true
 	}
-	cfg.Providers[0].Protocol = ir.ProtocolAnthropicMessages
-	if diags := (Target{}).ValidateAuthTypes(cfg); diag.HasErrors(diags) {
-		t.Fatalf("anthropic-messages accepts x-api-key: %v", diags)
+	for _, want := range []ir.AuthType{ir.AuthTypeOfficial, ir.AuthTypeBearer, ir.AuthTypeNone} {
+		if !mapped[want] {
+			t.Errorf("auth_type %s is not mapped", want)
+		}
 	}
 }

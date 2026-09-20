@@ -76,7 +76,7 @@ func Validate(cfg Config) []diag.Diagnostic {
 		}
 		switch p.EffectiveAuthType() {
 		case AuthTypeOfficial:
-		case AuthTypeBearer, AuthTypeXAPIKey:
+		case AuthTypeBearer:
 			if p.APIKey.Value == "" && p.APIKey.FromEnv == "" {
 				diags = append(diags, diag.Errorf(path+".auth_type", "%s requires api_key", p.AuthType))
 			}
