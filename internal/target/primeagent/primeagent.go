@@ -23,8 +23,15 @@ func (Target) ID() string { return "prime-agent" }
 func (t Target) Validate(cfg ir.Config) []diag.Diagnostic {
 	var diags []diag.Diagnostic
 	for i, p := range cfg.Providers {
+		path := fmt.Sprintf("providers[%d]", i)
 		if strings.HasPrefix(p.APIKey.Value, "$") || strings.HasPrefix(p.APIKey.Value, "!") {
-			diags = append(diags, diag.TargetErrorf(t.ID(), fmt.Sprintf("providers[%d].api_key", i), "literal API key contains native expression syntax and cannot be represented literally"))
+			diags = append(diags, diag.TargetErrorf(t.ID(), path+".api_key", "literal API key contains native expression syntax and cannot be represented literally"))
+		}
+		for name, v := range p.Headers {
+			if v.BearerFromEnv != "" {
+				diags = append(diags, diag.TargetErrorf(t.ID(), path+".headers."+name,
+					"prime-agent provider headers are static strings or environment names; Bearer ENV:NAME is not representable"))
+			}
 		}
 	}
 	for i, p := range cfg.Providers {
@@ -38,6 +45,10 @@ func (t Target) Validate(cfg ir.Config) []diag.Diagnostic {
 	}
 	for i, s := range cfg.MCP {
 		path := fmt.Sprintf("mcp[%d]", i)
+		if s.TimeoutMS != nil {
+			diags = append(diags, diag.TargetErrorf(t.ID(), path+".timeout_ms",
+				"prime-agent v1 does not map MCP timeout_ms; the native start/call timeout policy is not finalized"))
+		}
 		if s.Transport == ir.TransportStdio {
 			for name, v := range s.Env {
 				if v.FromEnv == "" {
@@ -155,6 +166,9 @@ func (t Target) Emit(cfg ir.Config) ([]artifact.Artifact, error) {
 				}
 				headers := map[string]string{}
 				for name, v := range s.Headers {
+					if v.BearerFromEnv != "" {
+						continue
+					}
 					headers[name] = v.Value
 				}
 				if len(headers) > 0 {

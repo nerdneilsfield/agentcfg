@@ -149,3 +149,30 @@ func TestSkipsUnsupportedReasoningEffort(t *testing.T) {
 		t.Fatalf("unsupported effort must be skipped:\n%s", out)
 	}
 }
+
+func TestRejectsProviderBearerHeader(t *testing.T) {
+	cfg := exampleConfig()
+	cfg.Providers[0].Headers = map[string]ir.HeaderValue{"Authorization": {BearerFromEnv: "TOK"}}
+	expectInvalid(t, cfg, "Bearer ENV:NAME is not representable")
+}
+
+func TestRejectsMCPTimeout(t *testing.T) {
+	cfg := exampleConfig()
+	cfg.MCP[0].TimeoutMS = i64(5000)
+	expectInvalid(t, cfg, "does not map MCP timeout_ms")
+}
+
+func TestOmitsAuthorizationHeaderWhenBearerEnvVarIsSet(t *testing.T) {
+	expectValid(t, exampleConfig())
+	arts, err := (Target{}).Emit(exampleConfig())
+	if err != nil {
+		t.Fatal(err)
+	}
+	settings := string(arts[1].Content)
+	if !strings.Contains(settings, `"bearerTokenEnvVar": "GITHUB_TOKEN"`) {
+		t.Fatalf("missing bearerTokenEnvVar:\n%s", settings)
+	}
+	if strings.Contains(settings, `"Authorization"`) {
+		t.Fatalf("Authorization header must not be emitted alongside bearerTokenEnvVar:\n%s", settings)
+	}
+}

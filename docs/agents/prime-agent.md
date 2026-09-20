@@ -33,10 +33,7 @@ The installed `~/.prime/agent/models.json` is Pi-compatible. It contains a `prov
 }
 ```
 
-Unlike Pi's extension, the observed Prime registry accepts model records without Pi's required cost object. The v1 emitter maps all three IR protocols to the same Pi-AI names. Provider headers map to the native `headers` record. Literal values remain
-literal; `ENV:NAME` maps to the bare environment-variable name expected by Prime
-Agent's resolver. `api_key: "ENV:NAME"` likewise maps to a bare `apiKey` name,
-not Pi's `$NAME` template. Model input is limited to `text` and `image`.
+Unlike Pi's extension, the observed Prime registry accepts model records without Pi's required cost object. The v1 emitter maps all three IR protocols to the same Pi-AI names. Literal provider headers map to the native `headers` record; `ENV:NAME` maps to the bare environment-variable name expected by Prime Agent's resolver. `Bearer ENV:NAME` provider headers are rejected: Prime has no bearer expansion on provider headers, and emitting an empty string would look like a valid Authorization value. `api_key: "ENV:NAME"` likewise maps to a bare `apiKey` name, not Pi's `$NAME` template. Model input is limited to `text` and `image`.
 
 
 ### Reasoning variants
@@ -71,11 +68,11 @@ The installed source declares `settings.json.mcpServers` as a map. Its verified 
 }
 ```
 
-The source also supports static HTTP `headers`, `oauth`, `enabled`, tool allow/deny lists, and startup/call timeouts. v1 maps only safe env-derived fields, `enabled`, and `timeout_ms` (to the target's start/call timeout policy when that policy is finalized). Concretely, the v1 emitter writes `settings.json.mcpServers` with:
+The source also supports static HTTP `headers`, `oauth`, `enabled`, tool allow/deny lists, and startup/call timeouts. v1 maps only verified env-derived fields and `enabled`. IR `timeout_ms` is rejected: the native start/call timeout policy is not finalized, so the emitter does not guess a field. Concretely, the v1 emitter writes `settings.json.mcpServers` with:
 
 - stdio `env` entries as `{ "env": "SOURCE" }` objects; renamed references (`CHILD` key mapping to a different `SOURCE` name) are representable, but literal values are rejected because only env-derived fields are verified;
 - static HTTP `headers` (constant values only; IR `ENV:NAME` header references are rejected because no env interpolation syntax is verified for MCP headers);
-- `bearerTokenEnvVar` from an `Authorization` IR `Bearer ENV:NAME` entry only; bearer references on other header names are rejected;
+- `bearerTokenEnvVar` from an `Authorization` IR `Bearer ENV:NAME` entry only; that Authorization header is not also written as an empty string; bearer references on other header names are rejected;
 - `enabled: false` when the IR server is disabled.
 
 The CLI independently exposes `prime-agent mcp add`, including `--url`, `--bearer-token-env-var`, `--oauth`, and stdio `--env CHILD=SOURCE`.
