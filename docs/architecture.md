@@ -19,7 +19,7 @@ Target selection precedence is:
 --to > targets in agentcfg.yaml > error
 ```
 
-`--to` is a comma-separated list or `all`. `all` means all targets compiled into this binary, not all installed programs on the machine.
+`--to` is a comma-separated list or `all`. `--to all` means all targets compiled into this binary, not all installed programs on the machine. An IR `targets: [all]` entry is not a wildcard.
 
 ## Artifact-first output
 
@@ -60,7 +60,7 @@ target: prime-agent
 name: mcp-settings
 format: json
 suggested-path: ~/.prime/agent/settings.json
------
+===== artifact content begins =====
 { "mcpServers": { ... } }
 ===== END agentcfg artifact =====
 ```
@@ -95,7 +95,7 @@ Help, version, shell completion, and a future `--log-level` are Cobra concerns. 
 
 ### YAML loading policy
 
-`ir.Load` accepts bytes and a source label; it does not open paths. It decodes into typed structs with `go.yaml.in/yaml/v3`, calling `Decoder.KnownFields(true)` in strict mode, returns source-positioned diagnostics where available, then runs semantic normalization and validation.
+`ir.Load` accepts bytes and a source label; it does not open paths. It decodes into typed structs with `go.yaml.in/yaml/v3`, calling `Decoder.KnownFields(true)` in strict mode, rejects a second YAML document, returns source-positioned diagnostics where available, then runs semantic normalization and validation.
 
 The accepted format is the `agentcfg.yaml` IR in `protocol.md`, not arbitrary YAML. Anchors and aliases may be accepted by the parser but must resolve to values allowed by the typed IR. Custom YAML tags are rejected. `go test -bench` includes realistic small and multi-provider IR fixtures; changing the YAML library requires recording a faster eligible result without changing parsing correctness. YAML is used for input only in v1; no emitter serializes the source document.
 

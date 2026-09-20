@@ -28,19 +28,19 @@ Design principles:
 | `codex` | [openai/codex](https://github.com/openai/codex) | Responses only | stdio + HTTP | `[model_providers]` TOML fragment; Codex requires the Responses API |
 | `opencode` | [sst/opencode](https://github.com/sst/opencode) | OpenAI-compatible only | stdio + HTTP | `provider` + `mcp` in `opencode.json`; Anthropic/Responses providers rejected in v1 |
 | `pi` | [earendil-works/pi](https://github.com/earendil-works/pi) | any (TypeScript extension) | rejected in v1 (no built-in MCP) | emits a provider extension; header values use Pi `$NAME` syntax; defaults stay deferred until it is loaded |
-| `prime-agent` | [contract](docs/agents/prime-agent.md) | any (`models.json`) | stdio + HTTP | `models.json` + `settings.json` `mcpServers` fragments; provider headers rejected in v1 |
+| `prime-agent` | [contract](docs/agents/prime-agent.md) | any (`models.json`) | stdio + HTTP | `models.json` + `settings.json` `mcpServers` fragments; `Bearer ENV:NAME` provider headers rejected |
 | `deepseek-harness` | [deepseek-ai/deepseek-harness](https://github.com/deepseek-ai/deepseek-harness) | any (`api` route field) | stdio (Cordis patch) | YAML provider route + `@deepseek-ai/dsh-mcp-client` patch |
 | `grok` | [xai-org/grok-build](https://github.com/xai-org/grok-build) | Chat · Responses · Anthropic | stdio + HTTP | per-model TOML tables; duplicate model ids rejected; literal headers |
 | `kimi` | [MoonshotAI/kimi-code](https://github.com/MoonshotAI/kimi-code) | Chat · Responses · Anthropic | stdio + HTTP | flat `[models]` aliases; duplicate model ids and env refs rejected |
 | `zcode` | [zcode.z.ai](https://zcode.z.ai) | Chat · Anthropic | stdio + HTTP | closed-source CLI; MCP env/headers are literal-only |
 | `mimocode` | [XiaomiMiMo/MiMo-Code](https://github.com/XiaomiMiMo/MiMo-Code) | Chat · Anthropic | stdio + HTTP | single JSON fragment against the official live schema |
 | `jcode` | [1jehuang/jcode](https://github.com/1jehuang/jcode) | Chat · Anthropic | stdio | custom providers only; Responses API is built-in-provider-only; literal headers |
-| `cline` | [cline/cline](https://github.com/cline/cline) | Chat · Responses · Anthropic | stdio + HTTP | literal `apiKey` only (`api_key: "ENV:NAME"` rejected); MCP env refs rejected; timeout clamped to 1–3600 s |
+| `cline` | [cline/cline](https://github.com/cline/cline) | Chat · Responses · Anthropic | stdio + HTTP | literal `apiKey` only (`api_key: "ENV:NAME"` rejected); MCP env refs rejected; timeout is seconds (`ms/1000`) |
 | `gajae` | [Yeachan-Heo/gajae-code](https://github.com/Yeachan-Heo/gajae-code) | Chat · Responses · Anthropic | stdio + HTTP | all three protocols map 1:1 |
 | `hermes` | [NousResearch/hermes-agent](https://github.com/NousResearch/hermes-agent) | Chat · Responses · Anthropic | stdio + HTTP | provider display `name` not emitted |
 | `openclaw` | [openclaw/openclaw](https://github.com/openclaw/openclaw) | Chat · Responses · Anthropic | stdio + HTTP | JSON5 native; never write the agent-local `models.json` |
 | `crush` | [charmbracelet/crush](https://github.com/charmbracelet/crush) | Chat · Responses · Anthropic | stdio + HTTP | per-model `context_window` + `default_max_tokens` required; no MCP `cwd`; whole-second timeouts |
-| `goose` | [block/goose](https://github.com/block/goose) | Chat · Responses (`base_path`) · Anthropic | stdio + streamable HTTP | strict rejections: per-model max tokens, non-text modalities, `tool_calling: false`, env refs in MCP env, fractional timeouts; provider headers are literal |
+| `goose` | [block/goose](https://github.com/block/goose) | Chat · Responses (`base_path`) · Anthropic | stdio + streamable HTTP | strict rejections: per-model max tokens, non-text modalities, `tool_calling: false`, renamed MCP env refs, fractional timeouts; provider headers are literal |
 
 "Chat" = OpenAI Chat Completions, "Responses" = OpenAI Responses API. The full
 field-by-field contract per target — including what is rejected and why — lives
@@ -73,10 +73,11 @@ agentcfg version
 Windows assets are `.zip`; use `certutil -hashfile` and expand-archive instead
 of `tar`.
 
-**With Go 1.27+:**
+**With Go 1.27+**, clone and install (the Go module path is `agentcfg`, so `go install github.com/nerdneilsfield/agentcfg/...` cannot resolve):
 
 ```sh
-go install github.com/nerdneilsfield/agentcfg/cmd/agentcfg@latest
+git clone https://github.com/nerdneilsfield/agentcfg
+cd agentcfg && go install ./cmd/agentcfg
 ```
 
 **From source:**
