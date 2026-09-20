@@ -26,7 +26,7 @@ Design principles:
 
 | Target | Agent | Providers | MCP | Notes |
 |---|---|---|---|---|
-| `codex` | [openai/codex](https://github.com/openai/codex) | Responses only | stdio + HTTP | `[model_providers]` TOML fragment; Codex requires the Responses API |
+| `codex` | [openai/codex](https://github.com/openai/codex) | Responses only | stdio + HTTP | `[model_providers]` TOML fragment; `ENV:NAME` → `env_key`; MCP `timeout_ms` → `startup_timeout_ms` |
 | `opencode` | [sst/opencode](https://github.com/sst/opencode) | OpenAI-compatible only | stdio + HTTP | `provider` + `mcp` in `opencode.json`; Anthropic/Responses providers rejected in v1 |
 | `pi` | [earendil-works/pi](https://github.com/earendil-works/pi) | any (TypeScript extension) | rejected in v1 (no built-in MCP) | emits a provider extension; header values use Pi `$NAME` syntax; defaults stay deferred until it is loaded |
 | `prime-agent` | [contract](docs/agents/prime-agent.md) | any (`models.json`) | stdio + HTTP | `models.json` + `settings.json` `mcpServers` fragments; `Bearer ENV:NAME` provider headers rejected |
@@ -325,7 +325,7 @@ targets: [crush, gajae]       # used when --to is omitted
 
 Selection order: `--to` flag, then YAML `targets:`, then an error. Listing
 every compiled-in id in YAML is almost never useful: one document rarely
-represents faithfully on Codex, OpenCode, Cline, and Pi at the same time.
+represents faithfully on Codex, OpenCode, Cline, Kimi, and Pi at the same time.
 
 ## CLI
 

@@ -369,7 +369,7 @@ A single OpenCode artifact is printed as raw JSON. Merge the `provider` and `mod
 
 ### OpenAI Responses for Codex
 
-Codex accepts `openai-responses` only. `api_key: "ENV:NAME"` becomes `env_key`. Model catalog fields are validated as references but not written under `[model_providers]`.
+Codex accepts `openai-responses` only. `api_key: "ENV:NAME"` becomes `env_key`. MCP `timeout_ms` becomes `startup_timeout_ms`. Model catalog fields are validated as references but not written under `[model_providers]`. Command-backed `auth.command`, MCP `auth` (`oauth` | `chatgpt`), and `startup_timeout_sec` are not IR fields and are not emitted.
 
 ```yaml
 version: 1
@@ -383,6 +383,13 @@ providers:
       X-Gateway-Key: "ENV:GATEWAY_KEY"
     models:
       - id: glm-5.3
+mcp:
+  - id: context7
+    transport: stdio
+    command: [npx, -y, "@upstash/context7-mcp"]
+    timeout_ms: 20000
+    env:
+      CONTEXT7_API_KEY: "ENV:CONTEXT7_API_KEY"
 defaults:
   model: volcengine/glm-5.3
 targets: [codex]
@@ -431,7 +438,34 @@ targets: [cline, zcode]
 
 The literal appears in generated output. Keep the YAML and the fragments out of Git.
 
-Kimi accepts both forms: `api_key: "ENV:VOLC_API_KEY"` becomes `api_key_env`, and a quoted literal becomes `api_key`. Its `custom_headers` stay literal, so env-derived provider headers are still rejected.
+### Environment API keys on Kimi
+
+Kimi maps `api_key: "ENV:NAME"` to native `api_key_env` and a quoted literal to `api_key`. Provider `custom_headers` stay literal, so env-derived provider headers are rejected. MCP env values are also literals; HTTP `Authorization: "Bearer ENV:NAME"` still maps to `bearerTokenEnvVar`. `timeout_ms` maps to `startupTimeoutMs`.
+
+```yaml
+version: 1
+providers:
+  - id: volcengine
+    protocol: openai-responses
+    base_url: https://example.com/v1
+    api_key: "ENV:VOLC_API_KEY"
+    headers:
+      X-Tenant: "engineering"
+    models:
+      - id: glm-5.3
+        context_window: 128000
+        max_output_tokens: 8192
+mcp:
+  - id: context7
+    transport: stdio
+    command: [npx, -y, "@upstash/context7-mcp"]
+    timeout_ms: 20000
+    env:
+      CONTEXT7_API_KEY: "literal-key"
+targets: [kimi]
+```
+
+`agentcfg gen --to kimi` prints a `config.toml` fragment and an `mcp.json` fragment.
 
 ### Stdio MCP with working directory and timeout
 

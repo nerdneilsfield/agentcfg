@@ -200,7 +200,8 @@ Each emitter package calls `target.Register` from `init`. `internal/target/all` 
 `internal/ir` owns only cross-target semantics defined in [`protocol.md`](protocol.md). It does not import a target package. Emitters own spelling and narrowing:
 
 - `openai-responses` -> Codex `wire_api = "responses"`
-- `api_key: "ENV:NAME"` -> OpenCode `{env:NAME}`, Pi `$NAME`, DSH `apiKeyEnv: NAME`
+- `api_key: "ENV:NAME"` -> OpenCode `{env:NAME}`, Pi `$NAME`, DSH `apiKeyEnv: NAME`, Codex `env_key`, Kimi `api_key_env`
+- `timeout_ms` -> Codex `startup_timeout_ms`, Kimi `startupTimeoutMs`, OpenCode `timeout`
 - `command` argv -> Codex `command` plus `args`, or OpenCode `command` array
 
 A field unavailable in a target is omitted only if omitting it preserves the documented semantics. Optional model capability metadata (`context_window`, modalities, `reasoning`, and `tool_calling`) may be omitted for a target that has no custom model catalog at all, such as Codex; the emitter is not claiming it configured those properties. A provider protocol, endpoint, credential literal or reference, request header, MCP transport, MCP command/URL, MCP environment, or MCP authentication rule may never be dropped. Otherwise validation rejects the selected target. This rule prevents “successful” generation that silently makes a route or MCP server unusable.

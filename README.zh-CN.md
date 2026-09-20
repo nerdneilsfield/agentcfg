@@ -25,7 +25,7 @@ agentcfg 把一份 `agentcfg.yaml` 编译成各编码智能体 CLI 的原生配�
 
 | Target | 智能体 | Provider 支持 | MCP | 说明 |
 |---|---|---|---|---|
-| `codex` | [openai/codex](https://github.com/openai/codex) | 仅 Responses | stdio + HTTP | `[model_providers]` TOML 片段；Codex 只支持 Responses API |
+| `codex` | [openai/codex](https://github.com/openai/codex) | 仅 Responses | stdio + HTTP | `[model_providers]` TOML 片段；`ENV:NAME` 写入 `env_key`；MCP `timeout_ms` 写入 `startup_timeout_ms` |
 | `opencode` | [sst/opencode](https://github.com/sst/opencode) | 仅 OpenAI 兼容 | stdio + HTTP | `opencode.json` 中的 `provider` + `mcp`；v1 拒绝 Anthropic/Responses 供应商 |
 | `pi` | [earendil-works/pi](https://github.com/earendil-works/pi) | 任意（TypeScript 扩展） | v1 拒绝（无内置 MCP） | 输出 provider 扩展；header 值用 Pi `$NAME` 语法；默认模型在扩展加载前保持延后 |
 | `prime-agent` | [契约文档](docs/agents/prime-agent.md) | 任意（`models.json`） | stdio + HTTP | `models.json` + `settings.json` `mcpServers` 片段；拒绝 `Bearer ENV:NAME` provider headers |
@@ -312,7 +312,7 @@ targets: [crush, gajae]       # 省略 --to 时使用
 
 选择顺序：`--to` 参数，然后是 YAML 的 `targets:`，否则报错。把全部 16 个
 id 写进 YAML 几乎没有用：同一份文档很少能同时在 Codex、OpenCode、Cline、
-Pi 上忠实表示。
+Kimi、Pi 上忠实表示。
 
 ## CLI
 
