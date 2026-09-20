@@ -42,6 +42,12 @@ func (t Target) Validate(cfg ir.Config) []diag.Diagnostic {
 				"mimocode has no native mapping for protocol %q", p.Protocol))
 		}
 	}
+	for i, s := range cfg.MCP {
+		if s.CWD != "" {
+			diags = append(diags, diag.TargetErrorf(t.ID(), fmt.Sprintf("mcp[%d].cwd", i),
+				"mimocode MCP has no cwd field"))
+		}
+	}
 	return diags
 }
 

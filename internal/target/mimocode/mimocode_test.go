@@ -160,6 +160,12 @@ func TestRejectsResponsesProtocol(t *testing.T) {
 	expectInvalid(t, cfg, "not representable")
 }
 
+func TestRejectsMCPCWD(t *testing.T) {
+	cfg := exampleConfig()
+	cfg.MCP[0].CWD = "/tmp"
+	expectInvalid(t, cfg, "cwd")
+}
+
 func TestOmitsEmptyMCP(t *testing.T) {
 	cfg := exampleConfig()
 	cfg.MCP = nil

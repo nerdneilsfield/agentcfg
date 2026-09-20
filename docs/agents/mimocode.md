@@ -78,7 +78,7 @@ MiMo Code uses native `type` values `local` and `remote` (the `stdio`/`http` spe
 ### MCP timeout
 
 IR `timeout_ms` maps unchanged to native `mcp.<id>.timeout` for both `local`
-and `remote` servers.
+and `remote` servers. IR `cwd` has no MiMo Code MCP field and is rejected.
 
 ## Defaults
 
