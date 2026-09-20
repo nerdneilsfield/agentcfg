@@ -140,3 +140,23 @@ func TestEmitsModelToolCall(t *testing.T) {
 		t.Fatalf("must not emit non-model tools field:\n%s", out)
 	}
 }
+
+func TestEmitsMCPTimeout(t *testing.T) {
+	cfg := exampleConfig()
+	cfg.MCP = []ir.MCPServer{{
+		ID: "s", Transport: ir.TransportStdio, Command: []string{"npx"}, TimeoutMS: i64(12000), CWD: "/tmp",
+	}, {
+		ID: "r", Transport: ir.TransportHTTP, URL: "https://mcp.example", TimeoutMS: i64(34000),
+	}}
+	expectValid(t, cfg)
+	arts, err := (Target{}).Emit(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := string(arts[0].Content)
+	for _, want := range []string{`"timeout": 12000`, `"timeout": 34000`, `"cwd": "/tmp"`} {
+		if !strings.Contains(out, want) {
+			t.Errorf("missing %q:\n%s", want, out)
+		}
+	}
+}

@@ -79,7 +79,7 @@ semantics are shared and required.
 }
 ```
 
-The schema supports `cwd`, `enabled`, and `timeout` for local and remote MCP; remote also has OAuth configuration. v1 supports stdio and HTTP headers, and maps `timeout_ms` / `enabled`; OAuth is omitted because it contains runtime credential state.
+The schema supports `cwd`, `enabled`, and `timeout` for local and remote MCP; remote also has OAuth configuration. v1 maps stdio and HTTP headers, `cwd`, `enabled`, and `timeout_ms` (milliseconds, native `timeout`); OAuth is omitted because it contains runtime credential state.
 
 ## Defaults
 
