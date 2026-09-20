@@ -253,3 +253,21 @@ func TestRejectsLiteralCrushExpressions(t *testing.T) {
 		})
 	}
 }
+
+func TestReportsMCPURLExpressionOnURLPath(t *testing.T) {
+	cfg := exampleConfig()
+	cfg.MCP[1].URL = "https://ex.com/$TOKEN"
+	diags := (Target{}).Validate(cfg)
+	found := false
+	for _, d := range diags {
+		if strings.Contains(d.Path, ".url") && strings.Contains(d.Message, "expression syntax") {
+			found = true
+		}
+		if strings.Contains(d.Path, ".command") {
+			t.Fatalf("URL expression reported as command path: %v", diags)
+		}
+	}
+	if !found {
+		t.Fatalf("missing url diagnostic: %v", diags)
+	}
+}

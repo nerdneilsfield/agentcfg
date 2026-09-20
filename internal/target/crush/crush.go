@@ -86,11 +86,15 @@ func (t Target) Validate(cfg ir.Config) []diag.Diagnostic {
 			diags = append(diags, diag.TargetErrorf(t.ID(), path+".cwd",
 				"crush MCP has no cwd field"))
 		}
-		for j, value := range append(append([]string{}, srv.Command...), srv.URL) {
+		for j, value := range srv.Command {
 			if hasCrushExpression(value) {
 				diags = append(diags, diag.TargetErrorf(t.ID(), fmt.Sprintf("%s.command[%d]", path, j),
 					"literal value contains Crush expression syntax and cannot be represented literally"))
 			}
+		}
+		if hasCrushExpression(srv.URL) {
+			diags = append(diags, diag.TargetErrorf(t.ID(), path+".url",
+				"literal value contains Crush expression syntax and cannot be represented literally"))
 		}
 		for name, v := range srv.Env {
 			if hasCrushExpression(v.Value) {
