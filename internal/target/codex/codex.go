@@ -4,6 +4,7 @@ package codex
 import (
 	"bytes"
 	"fmt"
+	"sort"
 
 	"github.com/BurntSushi/toml"
 
@@ -112,6 +113,7 @@ func (t Target) Emit(cfg ir.Config) ([]artifact.Artifact, error) {
 					m.Env[name] = v.Value
 				}
 			}
+			sort.Strings(m.EnvVars)
 		} else {
 			m.URL = s.URL
 			for name, v := range s.Headers {

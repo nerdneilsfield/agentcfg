@@ -156,3 +156,17 @@ func TestEmitsMillisecondMCPTimeout(t *testing.T) {
 		t.Fatalf("missing millisecond timeout:\n%s", out)
 	}
 }
+
+func TestSortsMCPEnvVars(t *testing.T) {
+	cfg := exampleConfig()
+	cfg.MCP[0].Env = map[string]ir.HeaderValue{
+		"ZETA":  {FromEnv: "ZETA"},
+		"ALPHA": {FromEnv: "ALPHA"},
+		"MIKE":  {FromEnv: "MIKE"},
+		"BRAVO": {FromEnv: "BRAVO"},
+	}
+	out := gen(t, cfg)
+	if !strings.Contains(out, `env_vars = ["ALPHA", "BRAVO", "MIKE", "ZETA"]`) {
+		t.Fatalf("env_vars are not sorted:\n%s", out)
+	}
+}
