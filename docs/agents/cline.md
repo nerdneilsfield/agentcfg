@@ -57,6 +57,21 @@ millisecond value as seconds (for example 1500 ms becomes `1.5`). MCP `env` and 
 strings, so IR `ENV:NAME` / `Bearer ENV:NAME` MCP values are rejected. When the
 IR has no MCP servers, the artifact is omitted.
 
+Cline-valid MCP therefore uses literals, not `ENV:NAME`:
+
+```yaml
+mcp:
+  - id: context7
+    transport: stdio
+    command: [npx, -y, "@upstash/context7-mcp"]
+    timeout_ms: 1500
+    env:
+      CONTEXT7_API_KEY: "literal-key"
+```
+
+Native `timeout` is `1.5`. The same `timeout_ms: 1500` is rejected by Crush
+(not a whole second) and accepted by OpenCode as milliseconds `1500`.
+
 ## Reasoning variants
 
 Cline has provider-wide `settings.reasoning` and model capability metadata, but

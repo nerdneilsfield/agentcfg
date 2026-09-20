@@ -1,15 +1,24 @@
-# agentcfg example IR.
-# Values are strings: "literal", "ENV:NAME", or Authorization "Bearer ENV:NAME".
-# Environment references are never resolved by agentcfg. Literal secrets are emitted;
-# keep inputs and generated output containing secrets out of Git and logs.
+# Canonical agentcfg.yaml example (IR version 1).
 #
-# Compile with:  agentcfg validate --config example.yaml
-#                 agentcfg gen --config example.yaml
-# Or copy it elsewhere first:  agentcfg gen-example -o my-agentcfg.yaml
+# Scalar credentials are quoted strings:
+#   "literal"                  constant, copied into generated output
+#   "ENV:NAME"                 environment reference (never resolved here)
+#   "Bearer ENV:NAME"          Authorization header only
+#
+# Copy this file:
+#   agentcfg gen-example -o agentcfg.yaml
+# Then compile:
+#   agentcfg validate --config agentcfg.yaml
+#   agentcfg gen --config agentcfg.yaml
+#
+# Field reference: docs/protocol.md
+# Per-CLI mapping: docs/agents/
 
 version: 1
 
 providers:
+  # One route, one protocol. A gateway that also speaks Anthropic is a
+  # second provider (see anthropic-internal below).
   - id: volcengine
     name: Volcengine
     protocol: openai-completions
@@ -26,7 +35,8 @@ providers:
         input: [text, image]
         output: [text]
         reasoning: true
-        # Selectable provider/model reasoning efforts. These are not defaults.
+        # Selectable efforts for this model. Not a default, not extra model ids.
+        # Crush keeps every name. Gajae skips ultra (native ladder ends at max).
         variants: [low, medium, high, xhigh, max, ultra]
         tool_calling: true
 
@@ -45,12 +55,15 @@ providers:
         reasoning: true
 
 mcp:
+  # command is an argv array. cwd and timeout_ms are optional; omit them
+  # unless every selected target can represent them (Crush has no cwd).
   - id: context7
     transport: stdio
     command: [npx, -y, "@upstash/context7-mcp"]
     env:
       CONTEXT7_API_KEY: "ENV:CONTEXT7_API_KEY"
 
+  # Bearer ENV:NAME is valid only on Authorization.
   - id: github
     transport: http
     url: https://api.githubcopilot.com/mcp/
@@ -60,6 +73,6 @@ mcp:
 defaults:
   model: volcengine/glm-5.3
 
-# These targets preserve all listed effort names. Targets with fixed native
-# levels (for example OpenClaw) reject unsupported names such as "ultra".
+# Default selection when --to is omitted. Not a wildcard: targets: [all]
+# is an unknown id. Override with --to crush or --to all.
 targets: [crush, gajae]

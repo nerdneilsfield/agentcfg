@@ -44,7 +44,24 @@ Grok model tables have no capability/modality fields. IR `input`/`output`/`reaso
 
 Grok Build uses `[mcp_servers.<id>]` with either stdio fields (`command`, `args`, `env`, `cwd`) or http fields (`url`, `headers`, `bearer_token_env_var`).
 
-Upstream documents `${VAR}` expansion for MCP string fields, so the emitter renders IR `ENV:NAME` references as `"${VAR}"` literals in MCP `env`/`headers`. `Authorization: "Bearer ENV:NAME"` maps to the native `bearer_token_env_var`. IR `timeout_ms` is rejected: grok MCP tables have no timeout field.
+Upstream documents `${VAR}` expansion for MCP string fields, so the emitter renders IR `ENV:NAME` references as `"${VAR}"` literals in MCP `env`/`headers`. `Authorization: "Bearer ENV:NAME"` maps to the native `bearer_token_env_var`. IR `timeout_ms` is rejected: grok MCP tables have no timeout field. Omit `timeout_ms` when generating for Grok.
+
+IR:
+
+```yaml
+mcp:
+  - id: context7
+    transport: stdio
+    command: [npx, -y, "@upstash/context7-mcp"]
+    cwd: /var/lib/context7
+    env:
+      CONTEXT7_API_KEY: "ENV:CONTEXT7_API_KEY"
+  - id: github
+    transport: http
+    url: https://api.githubcopilot.com/mcp/
+    headers:
+      Authorization: "Bearer ENV:GITHUB_TOKEN"
+```
 
 ## Defaults
 

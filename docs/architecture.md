@@ -4,14 +4,15 @@ This document is the implementation plan for the stdout-only first release. It d
 
 ## Release boundary
 
-The first executable has two commands:
+The first executable has three commands:
 
 ```text
-agentcfg validate [--config agentcfg.yaml] [--to targets]
-agentcfg gen      [--config agentcfg.yaml] [--to targets]
+agentcfg validate    [--config agentcfg.yaml] [--to targets]
+agentcfg gen         [--config agentcfg.yaml] [--to targets]
+agentcfg gen-example [--output FILE]
 ```
 
-There is no target-file discovery, read, merge, write, backup, `--in-place`, `--output`, or `diff`. `gen` writes only to stdout; diagnostics go to stderr. A non-zero exit means no complete valid artifact bundle was emitted.
+There is no target-file discovery, read, merge, write, backup, `--in-place`, or `diff`. `gen` writes only to stdout; diagnostics and the `validate` `OK` summary go to stderr. `gen-example --output` writes the bundled example IR and refuses to overwrite an existing file. A non-zero exit means no complete valid artifact bundle was emitted.
 
 Target selection precedence is:
 
@@ -74,7 +75,7 @@ The implementation has these non-negotiable choices:
 
 | Concern | Choice | Reason and boundary |
 |---|---|---|
-| CLI | `github.com/spf13/cobra` | Root command plus `validate` and `gen` subcommands; Cobra owns flag parsing, usage, and completion generation. Business logic must not depend on `*cobra.Command`. |
+| CLI | `github.com/spf13/cobra` | Root command plus `validate`, `gen`, and `gen-example`; Cobra owns flag parsing, usage, and completion generation. Business logic must not depend on `*cobra.Command`. |
 | YAML | `go.yaml.in/yaml/v3` | Pure Go, no CGO, maintained YAML-org fork, and the fastest eligible typed-decoding baseline identified in the research. It provides `Decoder.KnownFields(true)` for strict IR decoding. A repository benchmark must confirm this choice against the exact IR fixtures before implementation is finalized. |
 | Logging | `github.com/GoFarsi/zapper` | Required structured logging facade over Zap. Application code receives a logger; it must not use package-global logging. |
 | Releases | GoReleaser v2 | Builds reproducible release archives and checksums; release configuration lives in `.goreleaser.yaml`. |
@@ -85,27 +86,24 @@ The implementation has these non-negotiable choices:
 
 ```text
 agentcfg
-├── validate  [--config FILE] [--to TARGETS]
-└── gen       [--config FILE] [--to TARGETS]
+├── validate     [--config FILE] [--to TARGETS]
+├── gen          [--config FILE] [--to TARGETS]
+└── gen-example  [--output FILE]
 ```
 
-The root command constructs shared dependencies once: stdout, stderr, filesystem reader for the source YAML, target registry, and logger. Each Cobra handler converts flags into an `app.Request` then calls `app.Validate` or `app.Generate`. It contains no IR validation or target-switch logic.
+Each Cobra handler converts flags into an `app.Request` then calls `app.Validate`, `app.Generate`, or `app.GenExample`. It contains no IR validation or target-switch logic. The logger is constructed after flag parse so `--verbose` and `--debug` take effect.
 
-Help, version, shell completion, and a future `--log-level` are Cobra concerns. The first release has no flags that mutate target files.
+Help, version, and `--verbose` / `--debug` are Cobra concerns. `--verbose` sets zapper to info; `--debug` sets it to debug. The first release has no flags that mutate target files except `gen-example --output`, which writes only the bundled example IR.
 
 ### YAML loading policy
 
-`ir.Load` accepts bytes and a source label; it does not open paths. It decodes into typed structs with `go.yaml.in/yaml/v3`, calling `Decoder.KnownFields(true)` in strict mode, rejects a second YAML document, returns source-positioned diagnostics where available, then runs semantic normalization and validation.
+`ir.Load` accepts YAML bytes; it does not open paths. It decodes into typed structs with `go.yaml.in/yaml/v3`, calling `Decoder.KnownFields(true)` in strict mode, rejects a second YAML document, then runs semantic IR validation. A non-nil error is only for empty input, YAML syntax, unknown fields, or a second document; semantic problems are diagnostics.
 
 The accepted format is the `agentcfg.yaml` IR in `protocol.md`, not arbitrary YAML. Anchors and aliases may be accepted by the parser but must resolve to values allowed by the typed IR. Custom YAML tags are rejected. `go test -bench` includes realistic small and multi-provider IR fixtures; changing the YAML library requires recording a faster eligible result without changing parsing correctness. YAML is used for input only in v1; no emitter serializes the source document.
 
 ### Logging with zapper
 
-Logs are operational diagnostics, not generated output. `gen` reserves stdout for artifacts, so zapper always writes to stderr. The default level is `warn`; `--verbose` switches to `info`, and `--debug` switches to `debug`. Logs use stable structured fields:
-
-```text
-command, target, artifact, source, duration_ms
-```
+Logs are operational diagnostics, not generated output. `gen` reserves stdout for artifacts, so zapper always writes to stderr. The default level is `warn`; `--verbose` switches to `info`, and `--debug` switches to `debug`. Current info fields are `command`, `source`, `targets` on validate, and `command`, `target`, `artifacts` on emit.
 
 agentcfg never resolves `ENV:NAME` references. Logs may include environment names, but must not include credential literals or generated artifact content. Literal secrets are emitted on stdout when the target supports them; users must keep secret-bearing input and output out of Git and logs.
 
@@ -125,53 +123,37 @@ It will produce archives (`tar.gz` for Unix, `zip` for Windows), SHA-256 checksu
 
 ```text
 cmd/agentcfg/
-  main.go                         # process exit code only
+  main.go                         # Cobra commands; process exit code
 
 internal/buildinfo/
   buildinfo.go                    # version, commit, date injected by GoReleaser
 
 internal/logging/
-  logger.go                       # zapper construction; stderr-only logger
+  logging.go                      # zapper construction; stderr-only logger
 
 internal/app/
-  run.go                          # application request orchestration
-  targets.go                      # --to parsing and target selection
+  app.go                          # load, select, validate, emit, render
 
 internal/artifact/
-  artifact.go                     # target-neutral Artifact type
-  bundle.go                       # deterministic stdout rendering
+  artifact.go                     # Artifact type and stdout rendering
 
 internal/ir/
   types.go                        # YAML-facing semantic structs
-  load.go                         # YAML decode with known-field checking
-  normalize.go                    # defaults such as name/id and modalities
-  validate.go                     # source-level validation and diagnostics
+  load.go                         # YAML decode (KnownFields) and IR validation
 
 internal/target/
-  target.go                       # Target interface and registry
-  capabilities.go                 # protocol/MCP/artifact capability declarations
-  codex/emit.go
-  opencode/emit.go
-  pi/emit.go
-  primeagent/emit.go
-  deepseekharness/emit.go
-  grok/grok.go
-  kimi/kimi.go
-  zcode/zcode.go
-  mimocode/mimocode.go
-  jcode/jcode.go
-  cline/cline.go
-  gajae/gajae.go
-  hermes/hermes.go
-  openclaw/openclaw.go
-  crush/crush.go
-  goose/goose.go
+  target.go                       # Target interface, registry, --to / targets:
+  all/all.go                      # blank imports that register every emitter
+  <id>/                           # one package per target: Validate + Emit
 
 internal/diag/
-  diagnostic.go                   # severity, source path, target, stable formatter
+  diag.go                         # severity, source path, target, stable formatter
+
+internal/example/
+  example.yaml                    # bundled copy of repo-root example.yaml
 
 testdata/
-  ir/                             # valid and invalid YAML input
+  ir/                             # valid YAML fixtures (protocol-split)
   targets/<target>/               # native artifact golden files
   bundles/                        # multi-artifact stdout golden files
 
@@ -184,17 +166,15 @@ No `internal/document`, merge engine, native-config parser, filesystem target-pa
 
 ```text
 YAML bytes
-  -> ir.Load
-  -> ir.Normalize
-  -> ir.ValidateSource
-  -> select targets
+  -> ir.Load (KnownFields decode, reject a second document, IR Validate)
+  -> select targets (--to, else YAML targets:)
   -> target.Validate(config) for each selected target
   -> target.Emit(config) for each selected target
-  -> artifact.RenderBundle
+  -> artifact.Render
   -> stdout
 ```
 
-`validate` stops after target validation. `gen` runs the same validation before any emission. Validation collects all independent diagnostics, sorts them by input path then target, and emits none of the artifacts if any error exists.
+`validate` stops after target validation. `gen` runs the same validation before any emission. Validation collects diagnostics in IR order, then selected-target order, and emits none of the artifacts if any error exists.
 
 ## Interfaces
 
@@ -206,15 +186,14 @@ type Target interface {
 }
 ```
 
-Target validation is not a generic boolean capability matrix. It receives the actual normalized configuration and can issue precise diagnostics, such as:
+Target validation is not a generic boolean capability matrix. It receives the decoded IR and can issue precise diagnostics, such as:
 
 ```text
-error [codex] providers[0].protocol: Codex 0.153.4 supports only openai-responses
-error [deepseek-harness] mcp[1]: HTTP MCP has no verified dsh-mcp-client mapping
-error [pi] mcp: Pi requires the external pi-mcp-adapter; no v1 artifact is enabled
+[codex] providers[0].protocol: error: codex supports wire_api=responses (openai-responses) only; got "openai-completions"
+[pi] mcp: error: pi has no built-in MCP support; the pi-mcp-adapter is a third-party dependency and is not generated by v1
 ```
 
-The registry is a static map populated by constructors. Targets must not self-register through package `init`; deterministic available targets are easier to test and show in help.
+Each emitter package calls `target.Register` from `init`. `internal/target/all` blank-imports every package so `cmd/agentcfg` and tests get a deterministic compiled-in set. There is no plugin loader.
 
 ## IR ownership
 
@@ -230,8 +209,9 @@ A field unavailable in a target is omitted only if omitting it preserves the doc
 
 - Usage or YAML/IR/target validation errors: formatted diagnostics to stderr; exit `1`; stdout empty.
 - Internal emitter or serialization error: contextual error to stderr; exit `1`; stdout empty.
-- Successful `validate`: human-readable `ok` line(s) to stdout; exit `0`.
+- Successful `validate`: one `OK` summary line on stderr; exit `0`; stdout empty.
 - Successful `gen`: only native content or an artifact bundle on stdout; exit `0`.
+- Successful `gen-example`: the bundled example YAML on stdout, or a new file at `--output`; exit `0`.
 
 Emitters build artifacts in memory. `app` writes stdout only after every target emits successfully, so a later emitter failure cannot leave a partial copy-paste bundle.
 

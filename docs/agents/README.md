@@ -1,6 +1,16 @@
 # Target contracts
 
-This directory records the native configuration evidence used by agentcfg emitters. It is intentionally separate from [`../protocol.md`](../protocol.md): the protocol describes agentcfg source semantics, while these files describe target-specific syntax and limits.
+This directory records the native configuration evidence used by agentcfg emitters. It is intentionally separate from [`../protocol.md`](../protocol.md): the protocol describes how to write `agentcfg.yaml`; these files describe how each CLI spells the same facts, and which IR fields it rejects.
+
+Write the IR against the protocol. Open the contract for a target before putting that id in `targets:` or `--to`. A field that is legal in the IR can still be unrepresentable on a given CLI. Common mismatches:
+
+- Codex accepts `openai-responses` only; OpenCode accepts `openai-completions` only.
+- Cline, Kimi, and ZCode reject `api_key: "ENV:NAME"` (literal keys only). Goose and DeepSeek Harness reject literal API keys.
+- Pi rejects every MCP server in v1. jcode rejects HTTP MCP.
+- Crush, MiMo Code, and jcode reject MCP `cwd`. Grok, Kimi, and Prime Agent reject MCP `timeout_ms`.
+- Crush keeps reasoning-effort names such as `ultra`. Gajae, OpenClaw, Pi, Prime Agent, Grok, and DeepSeek Harness skip names outside their native ladder.
+
+`--to all` is a CLI wildcard for every compiled-in emitter. An IR list `targets: [all]` is an unknown id. One document rarely represents faithfully on every target at once; put the CLIs you generate for in `targets:` and override with `--to`.
 
 | Target | Provider form | MCP form | Schema snapshot |
 |---|---|---|---|

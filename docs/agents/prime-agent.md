@@ -68,12 +68,15 @@ The installed source declares `settings.json.mcpServers` as a map. Its verified 
 }
 ```
 
-The source also supports static HTTP `headers`, `oauth`, `enabled`, tool allow/deny lists, and startup/call timeouts. v1 maps only verified env-derived fields and `enabled`. IR `timeout_ms` is rejected: the native start/call timeout policy is not finalized, so the emitter does not guess a field. Concretely, the v1 emitter writes `settings.json.mcpServers` with:
+The source also supports static HTTP `headers`, `oauth`, `enabled`, tool allow/deny lists, and startup/call timeouts. v1 maps only verified env-derived fields, `enabled`, and stdio `cwd`. IR `timeout_ms` is rejected: the native start/call timeout policy is not finalized, so the emitter does not guess a field. Concretely, the v1 emitter writes `settings.json.mcpServers` with:
 
 - stdio `env` entries as `{ "env": "SOURCE" }` objects; renamed references (`CHILD` key mapping to a different `SOURCE` name) are representable, but literal values are rejected because only env-derived fields are verified;
+- stdio `cwd` when present;
 - static HTTP `headers` (constant values only; IR `ENV:NAME` header references are rejected because no env interpolation syntax is verified for MCP headers);
 - `bearerTokenEnvVar` from an `Authorization` IR `Bearer ENV:NAME` entry only; that Authorization header is not also written as an empty string; bearer references on other header names are rejected;
 - `enabled: false` when the IR server is disabled.
+
+Omit `timeout_ms` when generating for Prime Agent. Do not expect the emitter to pick `startupTimeout` versus `callTimeout`.
 
 The CLI independently exposes `prime-agent mcp add`, including `--url`, `--bearer-token-env-var`, `--oauth`, and stdio `--env CHILD=SOURCE`.
 

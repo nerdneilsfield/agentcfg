@@ -9,15 +9,16 @@ English | [中文](README.zh-CN.md)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 agentcfg compiles one `agentcfg.yaml` into native config fragments for coding
-agent CLIs. Describe your custom model providers and MCP servers **once**, then
-render them for every supported CLI.
+agent CLIs. Describe custom model providers and MCP servers once, then render
+them for each supported CLI.
 
 Design principles:
 
-- **Explicit credentials.** Use string literals or `ENV:NAME` references.
-  agentcfg never resolves environment references; it emits literals as supplied.
-- **stdout only.** `gen` prints fragments; it never writes target files. You
-  review, then merge them into the native config yourself.
+- **Explicit credentials.** Use a quoted string literal or `ENV:NAME`.
+  agentcfg never reads the process environment; it emits literals as supplied
+  and translates references into each CLI's native syntax.
+- **stdout only.** `gen` prints fragments. It never writes target files. Review
+  the output, then merge it into the native config yourself.
 - **Never guess.** When a target cannot represent an IR field, the emitter
   rejects it with a diagnostic instead of silently dropping it.
 
@@ -29,8 +30,8 @@ Design principles:
 | `opencode` | [sst/opencode](https://github.com/sst/opencode) | OpenAI-compatible only | stdio + HTTP | `provider` + `mcp` in `opencode.json`; Anthropic/Responses providers rejected in v1 |
 | `pi` | [earendil-works/pi](https://github.com/earendil-works/pi) | any (TypeScript extension) | rejected in v1 (no built-in MCP) | emits a provider extension; header values use Pi `$NAME` syntax; defaults stay deferred until it is loaded |
 | `prime-agent` | [contract](docs/agents/prime-agent.md) | any (`models.json`) | stdio + HTTP | `models.json` + `settings.json` `mcpServers` fragments; `Bearer ENV:NAME` provider headers rejected |
-| `deepseek-harness` | [deepseek-ai/deepseek-harness](https://github.com/deepseek-ai/deepseek-harness) | any (`api` route field) | stdio (Cordis patch) | YAML provider route + `@deepseek-ai/dsh-mcp-client` patch |
-| `grok` | [xai-org/grok-build](https://github.com/xai-org/grok-build) | Chat · Responses · Anthropic | stdio + HTTP | per-model TOML tables; duplicate model ids rejected; literal headers |
+| `deepseek-harness` | [deepseek-ai/deepseek-harness](https://github.com/deepseek-ai/deepseek-harness) | any (`api` route field) | stdio + HTTP (Cordis patch) | YAML provider route + `@deepseek-ai/dsh-mcp-client` patch; literal API keys rejected |
+| `grok` | [xai-org/grok-build](https://github.com/xai-org/grok-build) | Chat · Responses · Anthropic | stdio + HTTP | per-model TOML tables; duplicate model ids rejected; `ENV:NAME` headers → `env_http_headers` |
 | `kimi` | [MoonshotAI/kimi-code](https://github.com/MoonshotAI/kimi-code) | Chat · Responses · Anthropic | stdio + HTTP | flat `[models]` aliases; duplicate model ids and env refs rejected |
 | `zcode` | [zcode.z.ai](https://zcode.z.ai) | Chat · Anthropic | stdio + HTTP | closed-source CLI; MCP env/headers are literal-only |
 | `mimocode` | [XiaomiMiMo/MiMo-Code](https://github.com/XiaomiMiMo/MiMo-Code) | Chat · Anthropic | stdio + HTTP | single JSON fragment against the official live schema |
@@ -43,7 +44,7 @@ Design principles:
 | `goose` | [block/goose](https://github.com/block/goose) | Chat · Responses (`base_path`) · Anthropic | stdio + streamable HTTP | strict rejections: per-model max tokens, non-text modalities, `tool_calling: false`, renamed MCP env refs, fractional timeouts; provider headers are literal |
 
 "Chat" = OpenAI Chat Completions, "Responses" = OpenAI Responses API. The full
-field-by-field contract per target — including what is rejected and why — lives
+field-by-field contract per target, including what is rejected and why, lives
 in [`docs/agents/`](docs/agents/README.md). `--to all` selects every target
 above.
 
@@ -73,7 +74,8 @@ agentcfg version
 Windows assets are `.zip`; use `certutil -hashfile` and expand-archive instead
 of `tar`.
 
-**With Go 1.27+**, clone and install (the Go module path is `agentcfg`, so `go install github.com/nerdneilsfield/agentcfg/...` cannot resolve):
+**With Go 1.27+**, clone and install. The Go module path is `agentcfg`, so
+`go install github.com/nerdneilsfield/agentcfg/...` cannot resolve:
 
 ```sh
 git clone https://github.com/nerdneilsfield/agentcfg
@@ -92,12 +94,11 @@ cd agentcfg && make build   # produces ./agentcfg
 Literal secrets in the input also appear in generated output. Keep both out of
 Git and logs. Prefer `ENV:NAME` when the target supports environment references.
 
-1. Write `agentcfg.yaml` next to your project (full field reference:
-   [`docs/protocol.md`](docs/protocol.md)). The repository ships a complete
-   [`example.yaml`](example.yaml), and `agentcfg gen-example -o agentcfg.yaml`
-   writes a fresh copy next to your project (without `-o` it prints to
-   stdout). Every flag accepts a short and a long form (`-c`/`--config`,
-   `-t`/`--to`, `-v`/`--verbose`, `-d`/`--debug`, `-o`/`--output`):
+1. Write `agentcfg.yaml` next to your project. The field reference is
+   [`docs/protocol.md`](docs/protocol.md). The repository ships
+   [`example.yaml`](example.yaml). `agentcfg gen-example -o agentcfg.yaml`
+   writes a copy next to your project; without `-o` it prints to stdout.
+   An existing file is never overwritten.
 
 ```yaml
 version: 1
@@ -110,6 +111,7 @@ providers:
     api_key: "ENV:VOLC_API_KEY"
     headers:
       X-Tenant: "engineering"
+      X-Gateway-Key: "ENV:GATEWAY_KEY"
     models:
       - id: glm-5.3
         name: GLM-5.3
@@ -121,6 +123,20 @@ providers:
         # Selectable provider/model reasoning efforts. These are not defaults.
         variants: [low, medium, high, xhigh, max, ultra]
         tool_calling: true
+
+  - id: anthropic-internal
+    name: Anthropic Internal
+    protocol: anthropic-messages
+    base_url: https://anthropic-internal.example.com
+    api_key: "ENV:ANTHROPIC_INTERNAL_TOKEN"
+    models:
+      - id: claude-internal
+        name: Claude Internal
+        context_window: 200000
+        max_output_tokens: 64000
+        input: [text, image]
+        output: [text]
+        reasoning: true
 
 mcp:
   - id: context7
@@ -140,22 +156,43 @@ defaults:
 targets: [crush, gajae]
 ```
 
-`variants` is a model-local list of selectable reasoning efforts. It does not
-choose a default effort or configure verbosity, summaries, or token budgets.
-This example selects Crush and Gajae because they preserve provider/model names
-such as `ultra`. A target with a fixed native effort list, such as OpenClaw,
-omits an unsupported name instead of silently changing it. A target with no
-model-level variants field omits the list and still generates its artifact. See
-[`docs/protocol.md`](docs/protocol.md) and the relevant target contract for
-supported names.
+What this file says:
 
-2. Validate the IR and every selected target:
+- `version: 1` is required. Unknown keys and a second YAML document (`---`)
+  are errors.
+- Each provider has exactly one `protocol`. `openai-completions` is Chat
+  Completions; `openai-responses` is the Responses API; `anthropic-messages`
+  is Anthropic. A gateway that speaks two protocols is two providers.
+- `api_key` and header values are quoted strings: `"literal"`, `"ENV:NAME"`,
+  or `"Bearer ENV:NAME"` on an `Authorization` header. agentcfg never reads
+  those environment variables.
+- `command` is an argv array, not a shell string.
+- `variants` lists selectable reasoning efforts for that model. It does not
+  choose a default effort. Crush keeps names such as `ultra`. Gajae's native
+  ladder is `minimal`, `low`, `medium`, `high`, `xhigh`, `max`; it skips
+  `ultra` and still emits the rest of the model.
+- `targets: [crush, gajae]` is the default selection when `--to` is omitted.
+  It is not a wildcard. `targets: [all]` is an unknown id.
+
+This example is valid for Crush and Gajae. It is not valid for every CLI:
+Codex rejects `openai-completions`, OpenCode rejects `anthropic-messages`,
+Cline/Kimi/ZCode reject `ENV:NAME` API keys, and Pi rejects MCP. Put the
+CLIs you actually generate for in `targets:`, then override with `--to`.
+
+2. Validate the IR and every selected target. `--config` defaults to
+   `agentcfg.yaml` in the current directory:
 
 ```sh
 agentcfg validate --config agentcfg.yaml
 ```
 
-Diagnostics name the target, the IR path, and the reason, e.g.:
+Success prints a one-line summary on stderr:
+
+```
+agentcfg.yaml: OK (2 providers, 2 MCP servers, 2 targets)
+```
+
+A failure names the target, the IR path, and the reason, for example:
 
 ```
 [crush] providers[0].models[0].context_window: error: crush Model.context_window is required
@@ -165,10 +202,15 @@ Diagnostics name the target, the IR path, and the reason, e.g.:
 
 ```sh
 agentcfg gen --config agentcfg.yaml
+agentcfg gen --config agentcfg.yaml --to crush
+agentcfg gen --config agentcfg.yaml --to all
 ```
 
-A single artifact is printed raw. Multiple artifacts are printed as a stable
-bundle stream, one block per file:
+`--to` overrides `targets:` in the YAML. `--to all` means every emitter
+compiled into this binary, not every CLI installed on the machine.
+
+A single artifact is printed raw (valid JSON, TOML, YAML, or TypeScript).
+Multiple artifacts are printed as a stable bundle stream, one block per file:
 
 ```
 ===== BEGIN agentcfg artifact =====
@@ -182,13 +224,137 @@ suggested-path: ~/.config/crush/crush.json
 ```
 
 `suggested-path` tells you where the fragment belongs. agentcfg never writes
-target files in v1: copy each block into the native config (new files can be
-used verbatim; existing files need a manual merge).
+target files in v1. A new file can use the block contents as-is; an existing
+file needs a manual merge. On any validation or emit error, stdout stays empty
+and the process exits `1`.
+
+## Writing agentcfg.yaml
+
+The IR is target-independent. Native spelling lives in
+[`docs/protocol.md`](docs/protocol.md) and [`docs/agents/`](docs/agents/README.md).
+The patterns below are the ones that usually matter first.
+
+### Credentials
+
+```yaml
+api_key: "ENV:VOLC_API_KEY"          # environment reference
+api_key: "sk-example-not-a-real-key" # literal; appears in generated output
+headers:
+  X-Tenant: "engineering"            # literal
+  X-Gateway-Key: "ENV:GATEWAY_KEY"   # environment reference
+  Authorization: "Bearer ENV:TOKEN"  # Authorization header only
+```
+
+Quote values that YAML would treat as a boolean or a number (`true`, `no`,
+`1e6`). Cline, Kimi, and ZCode store inline API keys and reject `ENV:NAME` on
+`api_key`. Goose and DeepSeek Harness reject literal API keys (they only have
+an environment-name field).
+
+### Protocol
+
+```yaml
+protocol: openai-completions   # Chat Completions; OpenCode accepts only this
+protocol: openai-responses     # Responses API; Codex accepts only this
+protocol: anthropic-messages   # Anthropic Messages
+```
+
+`base_url` is the endpoint the CLI should call, often including `/v1`.
+
+### Models
+
+Crush and Kimi require `context_window`. Crush also requires
+`max_output_tokens`. Goose rejects per-model `max_output_tokens` and any
+non-text modality.
+
+```yaml
+models:
+  - id: glm-5.3
+    name: GLM-5.3
+    context_window: 128000
+    max_output_tokens: 8192
+    input: [text, image]
+    output: [text]
+    reasoning: true
+    variants: [low, medium, high]
+    tool_calling: true
+```
+
+`id` is the upstream model name on the wire. `variants` requires
+`reasoning: true`. Names match `[a-z][a-z0-9_-]*` (`Ultra` is invalid).
+
+### MCP
+
+```yaml
+mcp:
+  - id: context7
+    transport: stdio
+    command: [npx, -y, "@upstash/context7-mcp"]
+    cwd: /var/lib/context7          # stdio only; Crush/MiMo Code/jcode reject it
+    timeout_ms: 30000               # milliseconds; some targets convert to seconds
+    env:
+      CONTEXT7_API_KEY: "ENV:CONTEXT7_API_KEY"
+    enabled: true
+
+  - id: github
+    transport: http
+    url: https://api.githubcopilot.com/mcp/
+    headers:
+      Authorization: "Bearer ENV:GITHUB_TOKEN"
+```
+
+There is no `sse` transport in the IR. Targets that distinguish SSE from
+streamable HTTP map `http` to streamable HTTP. Pi rejects every MCP server
+in v1. jcode loads stdio only.
+
+`timeout_ms` stays milliseconds on OpenCode, Gajae, Codex, ZCode, and several
+others. Crush, Goose, and jcode require a whole number of seconds
+(`timeout_ms` divisible by 1000). Grok, Kimi, and Prime Agent reject
+`timeout_ms` because they have no verified native field. Omit it unless every
+selected target can represent it.
+
+### Defaults and target selection
+
+```yaml
+defaults:
+  model: volcengine/glm-5.3   # provider-id/model-id; must exist in this file
+
+targets: [crush, gajae]       # used when --to is omitted
+```
+
+Selection order: `--to` flag, then YAML `targets:`, then an error. Listing
+every compiled-in id in YAML is almost never useful: one document rarely
+represents faithfully on Codex, OpenCode, Cline, and Pi at the same time.
+
+## CLI
+
+```text
+agentcfg validate [--config FILE] [--to TARGETS] [--verbose|--debug]
+agentcfg gen      [--config FILE] [--to TARGETS] [--verbose|--debug]
+agentcfg gen-example [--output FILE]
+agentcfg version
+```
+
+| Flag | Default | Meaning |
+|---|---|---|
+| `-c`, `--config` | `agentcfg.yaml` | Path to the IR document. |
+| `-t`, `--to` | (YAML `targets:`) | Comma-separated target ids, or `all`. |
+| `-v`, `--verbose` | off | Info logs on stderr. |
+| `-d`, `--debug` | off | Debug logs on stderr. |
+| `-o`, `--output` | stdout | `gen-example` only: write the bundled example to this path. |
+
+`--config`, `--to`, `--verbose`, and `--debug` are root flags, so
+`agentcfg -c file.yaml gen` and `agentcfg gen -c file.yaml` are equivalent.
+`gen-example` does not read `--config`; it writes the embedded copy of
+[`example.yaml`](example.yaml).
+
+stdout is reserved for artifacts (`gen`) or the example YAML (`gen-example`).
+Diagnostics, the `OK` summary, and logs go to stderr. Exit `0` on success,
+`1` on usage, decode, validation, or emit errors.
 
 ## Documentation
 
 - [`docs/protocol.md`](docs/protocol.md) — the IR contract: every provider,
-  model, MCP, and defaults field, and what validation enforces.
+  model, MCP, and defaults field, validation rules, and worked examples.
 - [`docs/architecture.md`](docs/architecture.md) — how the compiler is put
   together.
 - [`docs/agents/`](docs/agents/README.md) — one verified contract per target:

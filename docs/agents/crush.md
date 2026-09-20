@@ -47,7 +47,7 @@ Custom providers live under `providers.<id>` (`ProviderConfig`, `additionalPrope
   provider headers, MCP commands, arguments, environment values, URLs, and
   headers rather than being evaluated by Crush.
 - `extra_headers` is a flat `Record<string,string>`. IR `ENV:NAME` renders as `"$VAR"`; `Authorization: "Bearer ENV:NAME"` as `"Bearer ${VAR}"`. `Bearer ENV:NAME` on any other header name is rejected. Explicit model lists set `discover_models: false` so Catwalk cannot merge unexpected models.
-- Model schema **requires** `id`, `name`, `context_window`, `default_max_tokens`, `can_reason`, `supports_attachments`, and four cost fields. The emitter writes `cost_per_1m_*` as `0` (IR has no cost fields). Missing `context_window` or `max_output_tokens` is rejected. `can_reason` comes from IR `reasoning`; `supports_attachments` is true when IR input includes `image`. IR `tool_calling` and output modalities have no Crush field and are not emitted.
+- Model schema **requires** `id`, `name`, `context_window`, `default_max_tokens`, `can_reason`, `supports_attachments`, and four cost fields. The emitter writes `cost_per_1m_*` as `0` (IR has no cost fields). Missing `context_window` or `max_output_tokens` is rejected. `can_reason` comes from IR `reasoning`; `supports_attachments` is true when IR input includes `image`. Input is `text` and `image` only; non-text output is rejected. `tool_calling: false` is rejected (Crush agents always expose tools); `true` has no native field and is not emitted.
 
 ## Defaults
 
@@ -56,6 +56,44 @@ Custom providers live under `providers.<id>` (`ProviderConfig`, `additionalPrope
 ## MCP
 
 `mcp.<id>` (`MCPConfig`) requires `type` in `stdio|sse|http`. IR `http` maps to `http` (not `sse`). stdio uses `command`/`args`/`env`; http uses `url`/`headers`. `enabled: false` maps to `disabled: true`. `timeout` is whole seconds (`timeout_ms / 1000`); values not divisible by 1000 are rejected. IR `cwd` has no Crush MCP field and is rejected. Env/header interpolation uses the same `$VAR` / `Bearer ${VAR}` rendering as providers. When the IR has no MCP servers, the `mcp` object is omitted.
+
+IR:
+
+```yaml
+mcp:
+  - id: context7
+    transport: stdio
+    command: [npx, -y, "@upstash/context7-mcp"]
+    timeout_ms: 30000
+    env:
+      CONTEXT7_API_KEY: "ENV:CONTEXT7_API_KEY"
+  - id: github
+    transport: http
+    url: https://api.githubcopilot.com/mcp/
+    headers:
+      Authorization: "Bearer ENV:GITHUB_TOKEN"
+```
+
+Native:
+
+```json
+{
+  "mcp": {
+    "context7": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@upstash/context7-mcp"],
+      "timeout": 30,
+      "env": { "CONTEXT7_API_KEY": "$CONTEXT7_API_KEY" }
+    },
+    "github": {
+      "type": "http",
+      "url": "https://api.githubcopilot.com/mcp/",
+      "headers": { "Authorization": "Bearer ${GITHUB_TOKEN}" }
+    }
+  }
+}
+```
 
 ## Reasoning variants
 

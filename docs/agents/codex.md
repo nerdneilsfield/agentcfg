@@ -33,11 +33,31 @@ Codex has no documented custom model catalog under `model_providers`; provider m
 
 Codex uses `[mcp_servers.<id>]`.
 
+IR:
+
+```yaml
+mcp:
+  - id: context7
+    transport: stdio
+    command: [npx, -y, "@upstash/context7-mcp"]
+    timeout_ms: 20000
+    env:
+      CONTEXT7_API_KEY: "ENV:CONTEXT7_API_KEY"
+  - id: github
+    transport: http
+    url: https://api.githubcopilot.com/mcp/
+    headers:
+      Authorization: "Bearer ENV:GITHUB_TOKEN"
+```
+
+Native:
+
 ```toml
 [mcp_servers.context7]
 command = "npx"
 args = ["-y", "@upstash/context7-mcp"]
 env_vars = ["CONTEXT7_API_KEY"]
+startup_timeout_ms = 20000
 
 [mcp_servers.github]
 url = "https://api.githubcopilot.com/mcp/"

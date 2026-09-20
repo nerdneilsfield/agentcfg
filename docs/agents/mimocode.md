@@ -79,6 +79,8 @@ MiMo Code uses native `type` values `local` and `remote` (the `stdio`/`http` spe
 
 IR `timeout_ms` maps unchanged to native `mcp.<id>.timeout` for both `local`
 and `remote` servers. IR `cwd` has no MiMo Code MCP field and is rejected.
+A stdio server that sets `cwd: /var/lib/context7` validates for OpenCode and
+fails for MiMo Code.
 
 ## Defaults
 

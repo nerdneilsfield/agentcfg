@@ -52,10 +52,52 @@ discovery, so IR `ENV:NAME` renders as `"${VAR}"` and
 `Authorization: "Bearer ENV:NAME"` renders as `Bearer ${VAR}`. IR `timeout_ms`
 maps 1:1 (no conversion).
 
+IR:
+
+```yaml
+mcp:
+  - id: context7
+    transport: stdio
+    command: [npx, -y, "@upstash/context7-mcp"]
+    cwd: /var/lib/context7
+    timeout_ms: 30000
+    env:
+      CONTEXT7_API_KEY: "ENV:CONTEXT7_API_KEY"
+  - id: github
+    transport: http
+    url: https://api.githubcopilot.com/mcp/
+    headers:
+      Authorization: "Bearer ENV:GITHUB_TOKEN"
+```
+
+Native:
+
+```json
+{
+  "mcpServers": {
+    "context7": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@upstash/context7-mcp"],
+      "env": { "CONTEXT7_API_KEY": "${CONTEXT7_API_KEY}" },
+      "cwd": "/var/lib/context7",
+      "timeout": 30000,
+      "enabled": true
+    },
+    "github": {
+      "type": "http",
+      "url": "https://api.githubcopilot.com/mcp/",
+      "headers": { "Authorization": "Bearer ${GITHUB_TOKEN}" },
+      "enabled": true
+    }
+  }
+}
+```
+
 ## Reasoning variants
 
 `models[].variants` maps to `thinking` in `effort` mode with required
 `minLevel`, `maxLevel`, and `levels`, plus `compat.supportsReasoningEffort:
 true`. Gajae accepts `minimal`, `low`, `medium`, `high`, `xhigh`, and `max`;
-other names are skipped. It does not use budget/adaptive modes or set a default
-level.
+other names, including `ultra`, are skipped without a diagnostic. It does not
+use budget/adaptive modes or set a default level.

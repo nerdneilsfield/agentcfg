@@ -60,7 +60,23 @@ Kimi reads MCP servers from a separate `mcp.json`:
 }
 ```
 
-MCP `env` and `headers` values are literal strings: IR `ENV:NAME` MCP env/header references are rejected. `Authorization: "Bearer ENV:NAME"` maps to the native `bearerTokenEnvVar`. IR `timeout_ms` is rejected: kimi `mcp.json` has no timeout field.
+MCP `env` and `headers` values are literal strings: IR `ENV:NAME` MCP env/header references are rejected. `Authorization: "Bearer ENV:NAME"` maps to the native `bearerTokenEnvVar`. IR `timeout_ms` is rejected: kimi `mcp.json` has no timeout field. Omit `timeout_ms` when `--to` includes `kimi`.
+
+A Kimi-valid MCP pair uses a literal stdio env value and a bearer env var on HTTP:
+
+```yaml
+mcp:
+  - id: context7
+    transport: stdio
+    command: [npx, -y, "@upstash/context7-mcp"]
+    env:
+      CONTEXT7_API_KEY: "literal-key"
+  - id: github
+    transport: http
+    url: https://api.githubcopilot.com/mcp/
+    headers:
+      Authorization: "Bearer ENV:GITHUB_TOKEN"
+```
 
 ## Defaults
 

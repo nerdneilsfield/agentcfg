@@ -62,24 +62,50 @@ semantics are shared and required.
 
 ## MCP
 
+IR:
+
+```yaml
+mcp:
+  - id: context7
+    transport: stdio
+    command: [npx, -y, "@upstash/context7-mcp"]
+    cwd: /var/lib/context7
+    timeout_ms: 30000
+    env:
+      CONTEXT7_API_KEY: "ENV:CONTEXT7_API_KEY"
+  - id: github
+    transport: http
+    url: https://api.githubcopilot.com/mcp/
+    headers:
+      Authorization: "Bearer ENV:GITHUB_TOKEN"
+    timeout_ms: 15000
+```
+
+Native:
+
 ```json
 {
   "mcp": {
     "context7": {
       "type": "local",
       "command": ["npx", "-y", "@upstash/context7-mcp"],
-      "environment": { "CONTEXT7_API_KEY": "{env:CONTEXT7_API_KEY}" }
+      "enabled": true,
+      "environment": { "CONTEXT7_API_KEY": "{env:CONTEXT7_API_KEY}" },
+      "cwd": "/var/lib/context7",
+      "timeout": 30000
     },
     "github": {
       "type": "remote",
       "url": "https://api.githubcopilot.com/mcp/",
-      "headers": { "Authorization": "Bearer {env:GITHUB_TOKEN}" }
+      "enabled": true,
+      "headers": { "Authorization": "Bearer {env:GITHUB_TOKEN}" },
+      "timeout": 15000
     }
   }
 }
 ```
 
-The schema supports `cwd`, `enabled`, and `timeout` for local and remote MCP; remote also has OAuth configuration. v1 maps stdio and HTTP headers, `cwd`, `enabled`, and `timeout_ms` (milliseconds, native `timeout`); OAuth is omitted because it contains runtime credential state.
+The schema supports `cwd`, `enabled`, and `timeout` for local and remote MCP; remote also has OAuth configuration. v1 maps stdio and HTTP headers, `cwd`, `enabled`, and `timeout_ms` (milliseconds, native `timeout`). OAuth is omitted because it contains runtime credential state. `enabled` defaults to `true` when the IR omits it.
 
 ## Defaults
 
