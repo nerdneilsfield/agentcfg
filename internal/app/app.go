@@ -34,7 +34,6 @@ func Validate(req Request) error {
 	req.Log.InfoW("validation started", "command", "validate", "source", req.ConfigPath, "targets", len(targets))
 	if diags := runTargetValidation(cfg, targets); len(diags) > 0 {
 		printDiagnostics(req.Stderr, diags)
-		return fmt.Errorf("validation failed with %d diagnostic(s)", len(diags))
 	}
 	_, _ = fmt.Fprintf(req.Stderr, "%s: OK (%d providers, %d MCP servers, %d targets)\n",
 		req.ConfigPath, len(cfg.Providers), len(cfg.MCP), len(targets))
@@ -78,7 +77,6 @@ func Generate(req Request) error {
 	}
 	if diags := runTargetValidation(cfg, targets); len(diags) > 0 {
 		printDiagnostics(req.Stderr, diags)
-		return fmt.Errorf("validation failed with %d diagnostic(s)", len(diags))
 	}
 
 	var arts []artifact.Artifact

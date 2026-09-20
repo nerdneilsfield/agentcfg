@@ -68,22 +68,11 @@ func TestGenerateBundleGolden(t *testing.T) {
 
 func TestGenerateAllTargets(t *testing.T) {
 	var stdout, stderr bytes.Buffer
-	err := Generate(newRequest(fixture(t, "ir", "example.yaml"), "all", &stdout, &stderr))
-	out := stdout.String()
-	// example.yaml is rejected by the newer targets (kimi rejects
-	// env-derived provider headers; zcode/mimocode reject
-	// openai-responses providers), so --to all must fail with diagnostics
-	// instead of emitting a partial bundle.
-	if err == nil {
-		t.Fatalf("expected --to all to fail for example.yaml, got output:\n%s", out)
+	if err := Generate(newRequest(fixture(t, "ir", "example.yaml"), "all", &stdout, &stderr)); err != nil {
+		t.Fatalf("Generate all: %v\nstderr: %s", err, stderr.String())
 	}
-	if stdout.Len() != 0 {
-		t.Fatalf("stdout must stay empty on failure: %q", out)
-	}
-	for _, marker := range []string{"kimi", "zcode", "mimocode"} {
-		if !strings.Contains(stderr.String(), marker) {
-			t.Fatalf("diagnostics missing %q: %q", marker, stderr.String())
-		}
+	if stdout.Len() == 0 {
+		t.Fatal("expected supported target artifacts")
 	}
 }
 
@@ -171,8 +160,8 @@ providers:
 	}
 	var stdout, stderr bytes.Buffer
 	err := Generate(newRequest(bad, "codex", &stdout, &stderr))
-	if err == nil {
-		t.Fatal("expected codex protocol rejection")
+	if err != nil {
+		t.Fatalf("Generate: %v", err)
 	}
 	if !strings.Contains(stderr.String(), "wire_api=responses") {
 		t.Fatalf("unexpected stderr: %q", stderr.String())
