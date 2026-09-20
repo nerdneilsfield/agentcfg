@@ -110,17 +110,13 @@ func TestValidateExampleCompletionsOK(t *testing.T) {
 	}
 }
 
-func TestValidateRejectsPiMCP(t *testing.T) {
+func TestGenerateSkipsUnsupportedPiMCP(t *testing.T) {
 	var stdout, stderr bytes.Buffer
-	err := Generate(newRequest(fixture(t, "ir", "example-mcp.yaml"), "pi", &stdout, &stderr))
-	if err == nil {
-		t.Fatal("expected pi MCP rejection")
+	if err := Generate(newRequest(fixture(t, "ir", "example-mcp.yaml"), "pi", &stdout, &stderr)); err != nil {
+		t.Fatalf("Generate: %v\nstderr: %s", err, stderr.String())
 	}
-	if stdout.Len() != 0 {
-		t.Fatalf("stdout must stay empty on failure: %q", stdout.String())
-	}
-	if !strings.Contains(stderr.String(), "pi has no built-in MCP support") {
-		t.Fatalf("unexpected stderr: %q", stderr.String())
+	if !strings.Contains(stdout.String(), `"providers"`) {
+		t.Fatalf("expected models output: %q", stdout.String())
 	}
 }
 
@@ -140,13 +136,11 @@ func TestValidateRejectsUnknownTarget(t *testing.T) {
 
 func TestGenerateWritesStdoutOnlyAfterSuccess(t *testing.T) {
 	var stdout, stderr bytes.Buffer
-	// pi rejects the MCP fixture, so generation must fail with empty stdout.
-	err := Generate(newRequest(fixture(t, "ir", "example-mcp.yaml"), "codex,pi", &stdout, &stderr))
-	if err == nil {
-		t.Fatal("expected validation failure")
+	if err := Generate(newRequest(fixture(t, "ir", "example-mcp.yaml"), "pi", &stdout, &stderr)); err != nil {
+		t.Fatalf("Generate: %v\nstderr: %s", err, stderr.String())
 	}
-	if stdout.Len() != 0 {
-		t.Fatalf("stdout must stay empty on failure: %q", stdout.String())
+	if stdout.Len() == 0 || !strings.Contains(stdout.String(), `"providers"`) {
+		t.Fatalf("expected generated artifacts: %q", stdout.String())
 	}
 }
 

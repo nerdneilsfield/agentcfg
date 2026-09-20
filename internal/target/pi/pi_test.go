@@ -77,14 +77,21 @@ func TestRejectsBearerFromEnv(t *testing.T) {
 	expectInvalid(t, cfg, "$NAME expression syntax")
 }
 
-func TestRejectsMCP(t *testing.T) {
+func TestSkipsMCP(t *testing.T) {
 	cfg := exampleConfig()
 	cfg.MCP = []ir.MCPServer{{
 		ID:        "context7",
 		Transport: ir.TransportStdio,
 		Command:   []string{"npx"},
 	}}
-	expectInvalid(t, cfg, "no built-in MCP support")
+	expectValid(t, cfg)
+	arts, err := (Target{}).Emit(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(arts) != 1 || arts[0].Name != "models.json" {
+		t.Fatalf("expected models.json only, got %+v", arts)
+	}
 }
 
 func TestEmitsThinkingLevelMap(t *testing.T) {
