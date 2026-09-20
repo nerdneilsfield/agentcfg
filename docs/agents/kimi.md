@@ -60,7 +60,7 @@ Kimi reads MCP servers from a separate `mcp.json`:
 }
 ```
 
-MCP `env` and `headers` values are literal strings: IR `ENV:NAME` MCP env/header references are rejected. `Authorization: "Bearer ENV:NAME"` maps to the native `bearerTokenEnvVar`.
+MCP `env` and `headers` values are literal strings: IR `ENV:NAME` MCP env/header references are rejected. `Authorization: "Bearer ENV:NAME"` maps to the native `bearerTokenEnvVar`. IR `timeout_ms` is rejected: kimi `mcp.json` has no timeout field.
 
 ## Defaults
 

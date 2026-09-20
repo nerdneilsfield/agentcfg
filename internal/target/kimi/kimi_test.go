@@ -168,6 +168,12 @@ func TestRejectsBearerOnNonAuthorizationHeader(t *testing.T) {
 	expectInvalid(t, cfg, "Authorization only")
 }
 
+func TestRejectsMCPTimeout(t *testing.T) {
+	cfg := exampleConfig()
+	cfg.MCP[0].TimeoutMS = i64(1500)
+	expectInvalid(t, cfg, "no timeout field")
+}
+
 func TestEmitsSupportEfforts(t *testing.T) {
 	cfg := exampleConfig()
 	cfg.Providers[0].Models[0].Variants = []ir.ReasoningEffort{"low", "high", "max"}

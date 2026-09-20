@@ -61,6 +61,10 @@ func (t Target) Validate(cfg ir.Config) []diag.Diagnostic {
 	}
 	for i, s := range cfg.MCP {
 		path := fmt.Sprintf("mcp[%d]", i)
+		if s.TimeoutMS != nil {
+			diags = append(diags, diag.TargetErrorf(t.ID(), path+".timeout_ms",
+				"kimi mcp.json has no timeout field"))
+		}
 		if s.Transport == ir.TransportStdio {
 			for name, v := range s.Env {
 				if v.FromEnv != "" || v.BearerFromEnv != "" {
