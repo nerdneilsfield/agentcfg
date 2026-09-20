@@ -226,7 +226,9 @@ providers:
 Not every target implements every value, and a target may accept a value only
 for some protocols. A target that cannot present the credential as asked reports
 a diagnostic instead of emitting a different header, so `validate` and `gen`
-fail until the document is changed.
+fail until the document is changed. `pi`, `prime-agent`, and `omp` map it today;
+the shipped `example.yaml` selects `crush` and `gajae`, which do not, so a
+non-`official` value there fails for the example's own default targets.
 
 ## Model
 
