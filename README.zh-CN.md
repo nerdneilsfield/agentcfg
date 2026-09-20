@@ -31,7 +31,7 @@ agentcfg 把一份 `agentcfg.yaml` 编译成各编码智能体 CLI 的原生配�
 | `prime-agent` | [契约文档](docs/agents/prime-agent.md) | 任意（`models.json`） | stdio + HTTP | `models.json` + `settings.json` `mcpServers` 片段；拒绝 `Bearer ENV:NAME` provider headers |
 | `deepseek-harness` | [deepseek-ai/deepseek-harness](https://github.com/deepseek-ai/deepseek-harness) | 任意（`api` 路由字段） | stdio + HTTP（Cordis 补丁） | YAML provider 路由 + `@deepseek-ai/dsh-mcp-client` 补丁；拒绝字面量 API key |
 | `grok` | [xai-org/grok-build](https://github.com/xai-org/grok-build) | Chat · Responses · Anthropic | stdio + HTTP | 按模型拆 TOML 表；跨供应商重复模型 id 会被拒绝；`ENV:NAME` headers 写入 `env_http_headers` |
-| `kimi` | [MoonshotAI/kimi-code](https://github.com/MoonshotAI/kimi-code) | Chat · Responses · Anthropic | stdio + HTTP | 扁平 `[models]` 别名表；重复模型 id 会拒绝；原生已有 `api_key_env` / `startupTimeoutMs`，v1 仍拒绝 `ENV:NAME` API key 与 MCP `timeout_ms` |
+| `kimi` | [MoonshotAI/kimi-code](https://github.com/MoonshotAI/kimi-code) | Chat · Responses · Anthropic | stdio + HTTP | 扁平 `[models]` 别名表；重复模型 id 会拒绝；`ENV:NAME` API key 写入 `api_key_env`；MCP `timeout_ms` 写入 `startupTimeoutMs`；供应商 headers 仍仅字面量 |
 | `zcode` | [zcode.z.ai](https://zcode.z.ai) | Chat · Anthropic | stdio + HTTP | 闭源 CLI；MCP env/headers 仅支持字面量 |
 | `mimocode` | [XiaomiMiMo/MiMo-Code](https://github.com/XiaomiMiMo/MiMo-Code) | Chat · Anthropic | stdio + HTTP | 单个 JSON 片段，对齐官方线上 schema |
 | `jcode` | [1jehuang/jcode](https://github.com/1jehuang/jcode) | Chat · Anthropic | stdio | 仅自定义供应商；Responses API 仅内置供应商可用；headers 仅字面量 |
@@ -170,8 +170,8 @@ targets: [crush, gajae]
 
 本例对 Crush 和 Gajae 合法，并不能用于所有 CLI：Codex 拒绝
 `openai-completions`，OpenCode 拒绝 `anthropic-messages`，Cline/ZCode
-拒绝 `api_key` 上的 `ENV:NAME`，v1 的 Kimi emitter 同样拒绝，Pi 拒绝 MCP。
-把真正要生成的 CLI 写进 `targets:`，再用 `--to` 覆盖。
+拒绝 `api_key` 上的 `ENV:NAME`，Kimi 拒绝环境变量引用的供应商 headers，
+Pi 拒绝 MCP。把真正要生成的 CLI 写进 `targets:`，再用 `--to` 覆盖。
 
 2. 校验 IR 与所有选中的 target。`--config` 默认为当前目录的 `agentcfg.yaml`：
 
@@ -239,9 +239,8 @@ headers:
 
 会被 YAML 当成布尔值或数字的内容（`true`、`no`、`1e6`）必须加引号。
 Cline 和 ZCode 把 API key 存成字面量，拒绝 `api_key` 上的 `ENV:NAME`。
-Kimi 原生 `config.toml` 已有 `api_key_env`，但 v1 emitter 仍只写字面量
-`api_key`，因此同样拒绝 `ENV:NAME`。Goose 和 DeepSeek Harness 没有字面量
-密钥字段，会拒绝字面量 `api_key`。
+Kimi 把 `api_key: "ENV:NAME"` 写成 `api_key_env`。Goose 和 DeepSeek Harness
+没有字面量密钥字段，会拒绝字面量 `api_key`。
 
 ### 协议
 
@@ -297,10 +296,9 @@ mcp:
 IR 没有 `sse` 传输。会区分 SSE 与 streamable HTTP 的 target 把 `http` 映射成
 streamable HTTP。Pi 在 v1 拒绝全部 MCP。jcode 只加载 stdio。
 
-`timeout_ms` 在 OpenCode、Gajae、Codex、ZCode 等 target 上仍是毫秒。
-Crush、Goose、jcode 要求整秒（`timeout_ms` 能被 1000 整除）。Grok 和
-Prime Agent 没有已验证的原生超时字段，会直接拒绝。Kimi 的 `mcp.json` 现在
-有 `startupTimeoutMs` / `toolTimeoutMs`，但 v1 仍拒绝 IR `timeout_ms`。
+`timeout_ms` 在 OpenCode、Gajae、Codex、Kimi（`startupTimeoutMs`）、
+ZCode 等 target 上仍是毫秒。Crush、Goose、jcode 要求整秒（`timeout_ms`
+能被 1000 整除）。Grok 和 Prime Agent 没有已验证的原生超时字段，会直接拒绝。
 只有所有选中的 target 都能表示时才写这个字段。
 
 ### 默认模型与 target 选择

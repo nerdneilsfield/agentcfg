@@ -36,10 +36,6 @@ func (t Target) Validate(cfg ir.Config) []diag.Diagnostic {
 			diags = append(diags, diag.TargetErrorf(t.ID(), path+".protocol",
 				"kimi provider type must be one of kimi, anthropic, openai, openai_responses, google-genai, vertexai; got %q", p.Protocol))
 		}
-		if p.APIKey.FromEnv != "" {
-			diags = append(diags, diag.TargetErrorf(t.ID(), path+".api_key",
-				"kimi reads literal api_key values only and has no environment fallback; api_key environment references are not representable"))
-		}
 		for name, v := range p.Headers {
 			if v.FromEnv != "" || v.BearerFromEnv != "" {
 				diags = append(diags, diag.TargetErrorf(t.ID(), path+".headers."+name,
@@ -61,9 +57,9 @@ func (t Target) Validate(cfg ir.Config) []diag.Diagnostic {
 	}
 	for i, s := range cfg.MCP {
 		path := fmt.Sprintf("mcp[%d]", i)
-		if s.TimeoutMS != nil {
+		if s.TimeoutMS != nil && (*s.TimeoutMS < 1 || *s.TimeoutMS > 2147483647) {
 			diags = append(diags, diag.TargetErrorf(t.ID(), path+".timeout_ms",
-				"kimi mcp.json has no timeout field"))
+				"kimi startupTimeoutMs must be between 1 and 2147483647 milliseconds"))
 		}
 		if s.Transport == ir.TransportStdio {
 			for name, v := range s.Env {
@@ -100,7 +96,7 @@ func (t Target) Emit(cfg ir.Config) ([]artifact.Artifact, error) {
 		Models:    map[string]kimiModel{},
 	}
 	for _, p := range cfg.Providers {
-		kp := kimiProvider{Type: providerType[p.Protocol], APIKey: p.APIKey.Value}
+		kp := kimiProvider{Type: providerType[p.Protocol], APIKey: p.APIKey.Value, APIKeyEnv: p.APIKey.FromEnv}
 		if p.BaseURL != "" {
 			kp.BaseURL = p.BaseURL
 		}
@@ -155,6 +151,9 @@ func (t Target) Emit(cfg ir.Config) ([]artifact.Artifact, error) {
 			entry := kimiMCPServer{Enabled: true}
 			if s.Enabled != nil {
 				entry.Enabled = *s.Enabled
+			}
+			if s.TimeoutMS != nil {
+				entry.StartupTimeoutMS = s.TimeoutMS
 			}
 			if s.Transport == ir.TransportStdio {
 				entry.Transport = "stdio"
@@ -246,6 +245,7 @@ type kimiConfig struct {
 
 type kimiProvider struct {
 	APIKey        string            `toml:"api_key,omitempty"`
+	APIKeyEnv     string            `toml:"api_key_env,omitempty"`
 	Type          string            `toml:"type"`
 	BaseURL       string            `toml:"base_url,omitempty"`
 	CustomHeaders map[string]string `toml:"custom_headers,omitempty"`
@@ -273,6 +273,7 @@ type kimiMCPServer struct {
 	Env               map[string]string `json:"env,omitempty"`
 	CWD               string            `json:"cwd,omitempty"`
 	Enabled           bool              `json:"enabled"`
+	StartupTimeoutMS  *int64            `json:"startupTimeoutMs,omitempty"`
 }
 
 func effortStrings(efforts []ir.ReasoningEffort) []string {

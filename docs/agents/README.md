@@ -5,9 +5,9 @@ This directory records the native configuration evidence used by agentcfg emitte
 Write the IR against the protocol. Open the contract for a target before putting that id in `targets:` or `--to`. A field that is legal in the IR can still be unrepresentable on a given CLI. Common mismatches:
 
 - Codex accepts `openai-responses` only; OpenCode accepts `openai-completions` only.
-- Cline and ZCode reject `api_key: "ENV:NAME"` (literal keys only). Kimi's native `config.toml` now has `api_key_env`, but the v1 emitter still rejects `ENV:NAME` and writes only a literal `api_key`. Goose and DeepSeek Harness reject literal API keys.
+- Cline and ZCode reject `api_key: "ENV:NAME"` (literal keys only). Kimi maps that scalar to `api_key_env`. Goose and DeepSeek Harness reject literal API keys.
 - Pi rejects every MCP server in v1. jcode rejects HTTP MCP.
-- Crush, MiMo Code, and jcode reject MCP `cwd`. Grok and Prime Agent reject MCP `timeout_ms`. Kimi's `mcp.json` now documents `startupTimeoutMs` / `toolTimeoutMs`, but the v1 emitter still rejects IR `timeout_ms` because it does not choose between those fields.
+- Crush, MiMo Code, and jcode reject MCP `cwd`. Grok and Prime Agent reject MCP `timeout_ms`. Kimi maps `timeout_ms` to `startupTimeoutMs` and does not write `toolTimeoutMs`.
 - Crush keeps reasoning-effort names such as `ultra`. Gajae, OpenClaw, Pi, Prime Agent, Grok, and DeepSeek Harness skip names outside their native ladder.
 
 `--to all` is a CLI wildcard for every compiled-in emitter. An IR list `targets: [all]` is an unknown id. One document rarely represents faithfully on every target at once; put the CLIs you generate for in `targets:` and override with `--to`.

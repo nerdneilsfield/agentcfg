@@ -32,7 +32,7 @@ Design principles:
 | `prime-agent` | [contract](docs/agents/prime-agent.md) | any (`models.json`) | stdio + HTTP | `models.json` + `settings.json` `mcpServers` fragments; `Bearer ENV:NAME` provider headers rejected |
 | `deepseek-harness` | [deepseek-ai/deepseek-harness](https://github.com/deepseek-ai/deepseek-harness) | any (`api` route field) | stdio + HTTP (Cordis patch) | YAML provider route + `@deepseek-ai/dsh-mcp-client` patch; literal API keys rejected |
 | `grok` | [xai-org/grok-build](https://github.com/xai-org/grok-build) | Chat · Responses · Anthropic | stdio + HTTP | per-model TOML tables; duplicate model ids rejected; `ENV:NAME` headers → `env_http_headers` |
-| `kimi` | [MoonshotAI/kimi-code](https://github.com/MoonshotAI/kimi-code) | Chat · Responses · Anthropic | stdio + HTTP | flat `[models]` aliases; duplicate model ids rejected; v1 still rejects `ENV:NAME` API keys and MCP `timeout_ms` even though native `api_key_env` / `startupTimeoutMs` now exist |
+| `kimi` | [MoonshotAI/kimi-code](https://github.com/MoonshotAI/kimi-code) | Chat · Responses · Anthropic | stdio + HTTP | flat `[models]` aliases; duplicate model ids rejected; `ENV:NAME` API keys → `api_key_env`; MCP `timeout_ms` → `startupTimeoutMs`; provider headers stay literal |
 | `zcode` | [zcode.z.ai](https://zcode.z.ai) | Chat · Anthropic | stdio + HTTP | closed-source CLI; MCP env/headers are literal-only |
 | `mimocode` | [XiaomiMiMo/MiMo-Code](https://github.com/XiaomiMiMo/MiMo-Code) | Chat · Anthropic | stdio + HTTP | single JSON fragment against the official live schema |
 | `jcode` | [1jehuang/jcode](https://github.com/1jehuang/jcode) | Chat · Anthropic | stdio | custom providers only; Responses API is built-in-provider-only; literal headers |
@@ -176,8 +176,9 @@ What this file says:
 
 This example is valid for Crush and Gajae. It is not valid for every CLI:
 Codex rejects `openai-completions`, OpenCode rejects `anthropic-messages`,
-Cline/ZCode reject `ENV:NAME` API keys, the v1 Kimi emitter still does, and Pi rejects MCP. Put the
-CLIs you actually generate for in `targets:`, then override with `--to`.
+Cline/ZCode reject `ENV:NAME` API keys, Kimi rejects env-derived provider
+headers, and Pi rejects MCP. Put the CLIs you actually generate for in
+`targets:`, then override with `--to`.
 
 2. Validate the IR and every selected target. `--config` defaults to
    `agentcfg.yaml` in the current directory:
@@ -247,9 +248,9 @@ headers:
 
 Quote values that YAML would treat as a boolean or a number (`true`, `no`,
 `1e6`). Cline and ZCode store inline API keys and reject `ENV:NAME` on
-`api_key`. The v1 Kimi emitter still rejects `ENV:NAME` even though native
-`api_key_env` exists. Goose and DeepSeek Harness reject literal API keys (they
-only have an environment-name field).
+`api_key`. Kimi maps `api_key: "ENV:NAME"` to `api_key_env`. Goose and
+DeepSeek Harness reject literal API keys (they only have an environment-name
+field).
 
 ### Protocol
 
@@ -307,11 +308,10 @@ There is no `sse` transport in the IR. Targets that distinguish SSE from
 streamable HTTP map `http` to streamable HTTP. Pi rejects every MCP server
 in v1. jcode loads stdio only.
 
-`timeout_ms` stays milliseconds on OpenCode, Gajae, Codex, ZCode, and several
-others. Crush, Goose, and jcode require a whole number of seconds
-(`timeout_ms` divisible by 1000). Grok and Prime Agent reject `timeout_ms`
-because they have no verified native field. Kimi now documents
-`startupTimeoutMs` / `toolTimeoutMs`, but v1 still rejects IR `timeout_ms`.
+`timeout_ms` stays milliseconds on OpenCode, Gajae, Codex, Kimi
+(`startupTimeoutMs`), ZCode, and several others. Crush, Goose, and jcode
+require a whole number of seconds (`timeout_ms` divisible by 1000). Grok and
+Prime Agent reject `timeout_ms` because they have no verified native field.
 Omit it unless every selected target can represent it.
 
 ### Defaults and target selection

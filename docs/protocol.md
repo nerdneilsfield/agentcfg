@@ -128,7 +128,7 @@ Literal API keys are also rejected when the target would treat the text as a nat
 
 Gajae uses native environment-name-or-literal semantics: a literal that equals a set environment variable's name can be resolved by Gajae at runtime. agentcfg does not inspect the runtime environment to disambiguate it.
 
-Prefer `ENV:NAME` when the selected target supports environment references. Use a quoted literal when the selected target has no implemented reference form (Cline and ZCode store inline API keys; the v1 Kimi emitter still rejects `ENV:NAME` even though native `api_key_env` now exists).
+Prefer `ENV:NAME` when the selected target supports environment references. Use a quoted literal when the selected target has no implemented reference form (Cline and ZCode store inline API keys).
 
 ## Provider
 
@@ -276,9 +276,9 @@ The IR unit is always milliseconds. Emitters do not guess a field that the nativ
 
 | Behavior | Targets |
 |---|---|
-| Milliseconds unchanged | OpenCode `timeout`, MiMo Code `timeout`, Gajae `timeout`, ZCode `timeoutMs`, DeepSeek Harness `toolCallTimeoutMs`, OpenClaw `connectionTimeoutMs` and `requestTimeoutMs` (same value on both), Codex `startup_timeout_ms` |
+| Milliseconds unchanged | OpenCode `timeout`, MiMo Code `timeout`, Gajae `timeout`, ZCode `timeoutMs`, DeepSeek Harness `toolCallTimeoutMs`, OpenClaw `connectionTimeoutMs` and `requestTimeoutMs` (same value on both), Codex `startup_timeout_ms`, Kimi `startupTimeoutMs` (range 1–2147483647; `toolTimeoutMs` is not written) |
 | Converted to seconds (`ms / 1000`) | Crush (integer seconds; not divisible by 1000 is rejected), Goose (positive integer seconds), jcode `timeout_secs` (integer seconds), Hermes `timeout` (positive; fractional seconds allowed), Cline `timeout` (fractional seconds allowed, so `1500` becomes `1.5`) |
-| Rejected | Grok, Prime Agent, and Kimi (Kimi's `mcp.json` now has `startupTimeoutMs` / `toolTimeoutMs`; v1 still rejects because it does not pick one) |
+| Rejected | Grok, Prime Agent |
 
 Omit `timeout_ms` unless every selected target can represent it.
 
@@ -319,7 +319,7 @@ agentcfg gen --config agentcfg.yaml --to all
 
 If both `--to` and `targets:` are omitted, agentcfg exits with `no targets: pass --to <id|all> or set targets: in agentcfg.yaml`.
 
-Listing every compiled-in id in YAML is almost never useful. One document rarely represents faithfully on Codex (Responses only), OpenCode (Completions only), Cline/Kimi/ZCode (literal keys), and Pi (no MCP) at the same time. Put the CLIs you actually generate for in `targets:`, and use `--to` to override.
+Listing every compiled-in id in YAML is almost never useful. One document rarely represents faithfully on Codex (Responses only), OpenCode (Completions only), Cline/ZCode (literal keys), Kimi (literal provider headers), and Pi (no MCP) at the same time. Put the CLIs you actually generate for in `targets:`, and use `--to` to override.
 
 Current compiled-in ids: `cline`, `codex`, `crush`, `deepseek-harness`, `gajae`, `goose`, `grok`, `hermes`, `jcode`, `kimi`, `mimocode`, `openclaw`, `opencode`, `pi`, `prime-agent`, `zcode`.
 
@@ -409,9 +409,9 @@ targets: [gajae, crush, openclaw]
 
 Do not send this document to OpenCode, Codex, or a Completions-only adapter. The protocol is `anthropic-messages`, not an OpenAI route with a Claude model id.
 
-### Literal API keys (Cline, Kimi, ZCode)
+### Literal API keys (Cline, ZCode)
 
-Cline and ZCode store inline key strings and have no custom-provider environment fallback. Kimi's native `config.toml` now documents `api_key_env`, but the v1 emitter still rejects `ENV:NAME` and writes only `api_key`. For all three, `ENV:NAME` is rejected:
+Cline and ZCode store inline key strings and have no custom-provider environment fallback. `ENV:NAME` is rejected:
 
 ```yaml
 version: 1
@@ -426,10 +426,12 @@ providers:
       - id: glm-5.3
         context_window: 128000
         max_output_tokens: 8192
-targets: [cline, kimi, zcode]
+targets: [cline, zcode]
 ```
 
 The literal appears in generated output. Keep the YAML and the fragments out of Git.
+
+Kimi accepts both forms: `api_key: "ENV:VOLC_API_KEY"` becomes `api_key_env`, and a quoted literal becomes `api_key`. Its `custom_headers` stay literal, so env-derived provider headers are still rejected.
 
 ### Stdio MCP with working directory and timeout
 
@@ -455,7 +457,7 @@ mcp:
 targets: [opencode, gajae]
 ```
 
-`timeout_ms: 30000` is 30 seconds. Crush would accept the timeout (integer seconds) but reject `cwd`. Grok, Prime Agent, and the v1 Kimi emitter would reject the timeout. Omit those fields when the selected target cannot represent them.
+`timeout_ms: 30000` is 30 seconds. Crush would accept the timeout (integer seconds) but reject `cwd`. Grok and Prime Agent would reject the timeout. Kimi would accept the timeout as `startupTimeoutMs` but reject the `ENV:NAME` MCP env value. Omit those fields when the selected target cannot represent them.
 
 ### HTTP MCP with a bearer token
 

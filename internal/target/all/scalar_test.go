@@ -28,7 +28,7 @@ func TestScalarAPIKeys(t *testing.T) {
 				}
 				emitter, _ := target.Lookup(id)
 				ds = emitter.Validate(cfg)
-				reject := ((id == "goose" || id == "deepseek-harness") && key == "literal-test-key") || ((id == "cline" || id == "kimi" || id == "zcode") && key != "literal-test-key")
+				reject := ((id == "goose" || id == "deepseek-harness") && key == "literal-test-key") || ((id == "cline" || id == "zcode") && key != "literal-test-key")
 				if reject {
 					if !diag.HasErrors(ds) {
 						t.Fatal("expected unsupported key diagnostic")
@@ -69,6 +69,18 @@ func TestScalarAPIKeys(t *testing.T) {
 					} else {
 						native = `env_key = "AGENTCFG_TEST_KEY"`
 						if strings.Contains(output, "experimental_bearer_token =") {
+							t.Fatal("environment reference emitted as literal key")
+						}
+					}
+				case "kimi":
+					if key == "literal-test-key" {
+						native = `api_key = "literal-test-key"`
+						if strings.Contains(output, "api_key_env") {
+							t.Fatal("literal key emitted as environment reference")
+						}
+					} else {
+						native = `api_key_env = "AGENTCFG_TEST_KEY"`
+						if strings.Contains(output, `api_key =`) {
 							t.Fatal("environment reference emitted as literal key")
 						}
 					}

@@ -70,8 +70,8 @@ func TestGenerateAllTargets(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	err := Generate(newRequest(fixture(t, "ir", "example.yaml"), "all", &stdout, &stderr))
 	out := stdout.String()
-	// example.yaml is rejected by the newer targets (kimi/zcode reject
-	// api_key_env and env-derived headers; mimocode/zcode reject
+	// example.yaml is rejected by the newer targets (kimi rejects
+	// env-derived provider headers; zcode/mimocode reject
 	// openai-responses providers), so --to all must fail with diagnostics
 	// instead of emitting a partial bundle.
 	if err == nil {

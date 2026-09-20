@@ -131,10 +131,21 @@ func TestEmitGolden(t *testing.T) {
 	}
 }
 
-func TestRejectsAPIKeyEnv(t *testing.T) {
+func TestEmitsAPIKeyEnv(t *testing.T) {
 	cfg := exampleConfig()
 	cfg.Providers[0].APIKey.FromEnv = "VOLC_API_KEY"
-	expectInvalid(t, cfg, "api_key")
+	expectValid(t, cfg)
+	arts, err := (Target{}).Emit(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := string(arts[0].Content)
+	if !strings.Contains(out, `api_key_env = "VOLC_API_KEY"`) {
+		t.Fatalf("missing api_key_env:\n%s", out)
+	}
+	if strings.Contains(out, `api_key =`) {
+		t.Fatalf("environment reference emitted as literal api_key:\n%s", out)
+	}
 }
 
 func TestRejectsMissingContextWindow(t *testing.T) {
@@ -168,10 +179,29 @@ func TestRejectsBearerOnNonAuthorizationHeader(t *testing.T) {
 	expectInvalid(t, cfg, "Authorization only")
 }
 
-func TestRejectsMCPTimeout(t *testing.T) {
+func TestEmitsMCPStartupTimeout(t *testing.T) {
 	cfg := exampleConfig()
 	cfg.MCP[0].TimeoutMS = i64(1500)
-	expectInvalid(t, cfg, "no timeout field")
+	expectValid(t, cfg)
+	arts, err := (Target{}).Emit(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := string(arts[1].Content)
+	if !strings.Contains(out, `"startupTimeoutMs": 1500`) {
+		t.Fatalf("missing startupTimeoutMs:\n%s", out)
+	}
+	if strings.Contains(out, "toolTimeoutMs") {
+		t.Fatalf("must not emit toolTimeoutMs:\n%s", out)
+	}
+}
+
+func TestRejectsOutOfRangeMCPTimeout(t *testing.T) {
+	cfg := exampleConfig()
+	cfg.MCP[0].TimeoutMS = i64(0)
+	expectInvalid(t, cfg, "startupTimeoutMs")
+	cfg.MCP[0].TimeoutMS = i64(2147483648)
+	expectInvalid(t, cfg, "startupTimeoutMs")
 }
 
 func TestEmitsSupportEfforts(t *testing.T) {
