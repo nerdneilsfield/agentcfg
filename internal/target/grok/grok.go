@@ -52,6 +52,10 @@ func (t Target) Validate(cfg ir.Config) []diag.Diagnostic {
 	}
 	for i, srv := range cfg.MCP {
 		path := fmt.Sprintf("mcp[%d]", i)
+		if srv.TimeoutMS != nil {
+			diags = append(diags, diag.TargetErrorf(t.ID(), path+".timeout_ms",
+				"grok mcp_servers has no timeout field"))
+		}
 		if srv.Transport == ir.TransportHTTP {
 			for name, v := range srv.Headers {
 				if v.BearerFromEnv != "" && name != "Authorization" {

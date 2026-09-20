@@ -157,6 +157,12 @@ func TestRejectsBearerOnNonAuthorizationHeader(t *testing.T) {
 	expectInvalid(t, cfg, "Authorization only")
 }
 
+func TestRejectsMCPTimeout(t *testing.T) {
+	cfg := exampleConfig()
+	cfg.MCP[0].TimeoutMS = i64(1500)
+	expectInvalid(t, cfg, "no timeout field")
+}
+
 func TestOmitsEmptyMCPServers(t *testing.T) {
 	cfg := exampleConfig()
 	cfg.MCP = nil
