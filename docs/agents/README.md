@@ -37,6 +37,10 @@ Write the IR against the protocol. Open the contract for a target before putting
 | [Command Code](commandcode.md) | JSON `provider` | JSON `mcpServers` | installed v1.64.0 BYOK/MCP parsers + official BYOK and MCP docs |
 | [fast-agent](fast-agent.md) | YAML model overlays | YAML `mcp.servers` | repo source + v0.10.33 native settings/overlay loader |
 | [Crow](crow.md) | YAML `providers` + ordered `models` | YAML `mcpServers` | pinned config loader + ACP MCP conversion |
+| [Aider](aider.md) | YAML model settings + JSON metadata | skipped | source + native LiteLLM request |
+| [Continue](continue.md) | YAML `models` | YAML `mcpServers` | published config-yaml 1.42.0 schema |
+| [Qwen Code](qwen-code.md) | JSON `modelProviders` | JSON `mcpServers` | CLI 0.24.5 + pinned source |
+| [Kilo CLI](kilo.md) | JSON `provider` | JSON `mcp` | CLI 7.7.9 + pinned source |
 | [CometixCode](cometixcode.md) | Anthropic env (`ANTHROPIC_BASE_URL`) | JSON `mcpServers` | repo source (`Haleclipse/CometixCode`) + Claude Code settings/env/MCP docs |
 
 Every emitter change must update the applicable target contract with version, source URL/path, and tested status.

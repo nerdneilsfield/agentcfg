@@ -26,6 +26,10 @@ agentcfg 把一份 `agentcfg.yaml` 编译成各编码智能体 CLI 的原生配�
 
 | Target | 智能体 | Provider 支持 | MCP | 说明 |
 |---|---|---|---|---|
+| `aider` | [Aider-AI/aider](https://github.com/Aider-AI/aider) | Chat · Anthropic | 跳过 | 模型 settings + metadata + 默认配置；LiteLLM 运行时解析环境 key |
+| `continue` | [continuedev/continue](https://github.com/continuedev/continue) | Chat · Anthropic | stdio + HTTP | YAML 配置；已发布 schema 丢弃 Responses 选择；默认模型由客户端保存，跳过并 warning |
+| `qwen-code` | [QwenLM/qwen-code](https://github.com/QwenLM/qwen-code) | Chat · Responses · Anthropic | stdio + HTTP | 具名模型供应商、协议映射、generation config 与 MCP exclusions |
+| `kilo` | [Kilo-Org/kilo](https://github.com/Kilo-Org/kilo) | Chat · Responses · Anthropic | stdio + HTTP | Kilo CLI，非旧 IDE extension；单数 `provider` + `mcp`；无 MCP `cwd` |
 | `codex` | [openai/codex](https://github.com/openai/codex) | 仅 Responses | stdio + HTTP | `[model_providers]` TOML 片段；`ENV:NAME` 写入 `env_key`；MCP `timeout_ms` 写入 `startup_timeout_ms` |
 | `opencode` | [sst/opencode](https://github.com/sst/opencode) | Chat · Responses · Anthropic | stdio + HTTP | 原生 V2 形状（`providers` + `mcp.servers`）；`ENV:NAME` 写入 `env: [NAME]`；供应商 headers 与模型 reasoning 标志无法表示，跳过并 warning |
 | `pi` | [earendil-works/pi](https://github.com/earendil-works/pi) | 任意（TypeScript 扩展） | v1 跳过（无内置 MCP） | 输出 provider 扩展；header 值用 Pi `$NAME` 语法；默认模型在扩展加载前保持延后 |

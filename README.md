@@ -27,6 +27,10 @@ Design principles:
 
 | Target | Agent | Providers | MCP | Notes |
 |---|---|---|---|---|
+| `aider` | [Aider-AI/aider](https://github.com/Aider-AI/aider) | Chat · Anthropic | skipped | Model settings + metadata + default config; runtime environment keys via LiteLLM |
+| `continue` | [continuedev/continue](https://github.com/continuedev/continue) | Chat · Anthropic | stdio + HTTP | YAML config; published schema drops Responses selection; client-owned default model skipped |
+| `qwen-code` | [QwenLM/qwen-code](https://github.com/QwenLM/qwen-code) | Chat · Responses · Anthropic | stdio + HTTP | Named model providers, protocol mapping, generation config and MCP exclusions |
+| `kilo` | [Kilo-Org/kilo](https://github.com/Kilo-Org/kilo) | Chat · Responses · Anthropic | stdio + HTTP | Kilo CLI, not the legacy IDE extension; singular `provider` + `mcp`; no MCP `cwd` |
 | `codex` | [openai/codex](https://github.com/openai/codex) | Responses only | stdio + HTTP | `[model_providers]` TOML fragment; `ENV:NAME` → `env_key`; MCP `timeout_ms` → `startup_timeout_ms` |
 | `opencode` | [sst/opencode](https://github.com/sst/opencode) | Chat · Responses · Anthropic | stdio + HTTP | native V2 shape (`providers` + `mcp.servers`); `ENV:NAME` → `env: [NAME]`; provider headers and the model reasoning flag cannot be represented and are skipped with warnings |
 | `pi` | [earendil-works/pi](https://github.com/earendil-works/pi) | any (`models.json`) | skipped (no built-in MCP) | `~/.pi/agent/models.json`; `ENV:NAME` → `"$NAME"`; `auth_type: bearer` → `authHeader: true`; unset limits are omitted so Pi's defaults apply |

@@ -46,6 +46,10 @@ An emitter returns zero or more named artifacts. A target does not have to corre
 - CometixCode: a `settings.json` fragment and a `.mcp.json` MCP fragment.
 - fast-agent: `fastagent.config.yaml`, home-local model overlays, and optional companion secrets.
 - Crow: one YAML fragment (`~/.agents/crow/config.yaml`), with the default model first.
+- Aider: `.aider.conf.yml`, `.aider.model.settings.yml`, and `.aider.model.metadata.json`.
+- Continue: a YAML `config.yaml` fragment with models and MCP servers.
+- Qwen Code: a `settings.json` fragment with model providers and MCP servers.
+- Kilo CLI: an OpenCode-derived `opencode.json` fragment, distinct from OpenCode V2.
 
 ```go
 type Artifact struct {
