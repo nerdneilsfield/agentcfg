@@ -14,19 +14,19 @@ func b(v bool) *bool { return &v }
 
 func expectValid(t *testing.T, cfg ir.Config) {
 	t.Helper()
-	if diags := (Target{}).Validate(cfg); diag.HasErrors(diags) {
+	if diags := (Target{}).Validate(cfg); len(diags) != 0 {
 		t.Fatalf("expected valid config, got %v", diags)
 	}
 }
 
-func expectInvalid(t *testing.T, cfg ir.Config, substr string) {
+func expectWarning(t *testing.T, cfg ir.Config, substr string) {
 	t.Helper()
 	diags := (Target{}).Validate(cfg)
-	if !diag.HasErrors(diags) {
+	if len(diags) == 0 {
 		t.Fatalf("expected validation error containing %q, got none", substr)
 	}
 	for _, d := range diags {
-		if d.Severity == diag.SeverityError && strings.Contains(d.Message, substr) {
+		if d.Severity == diag.SeverityWarning && strings.Contains(d.Message, substr) {
 			return
 		}
 	}
@@ -169,40 +169,40 @@ func TestMapsOpenAIResponses(t *testing.T) {
 	}
 }
 
-func TestRejectsMCPCWD(t *testing.T) {
+func TestSkipsMCPCWD(t *testing.T) {
 	cfg := exampleConfig()
 	cfg.MCP[0].CWD = "/tmp"
-	expectInvalid(t, cfg, "cwd")
+	expectWarning(t, cfg, "cwd")
 }
 
-func TestRejectsFractionalTimeout(t *testing.T) {
+func TestSkipsFractionalTimeout(t *testing.T) {
 	cfg := exampleConfig()
 	cfg.MCP[0].TimeoutMS = i64(1500)
-	expectInvalid(t, cfg, "divisible by 1000")
+	expectWarning(t, cfg, "divisible by 1000")
 }
 
-func TestRejectsToolCallingFalse(t *testing.T) {
+func TestSkipsToolCallingFalse(t *testing.T) {
 	cfg := exampleConfig()
 	cfg.Providers[0].Models[0].ToolCalling = b(false)
-	expectInvalid(t, cfg, "tool_calling")
+	expectWarning(t, cfg, "tool_calling")
 }
 
-func TestRejectsMissingContextWindow(t *testing.T) {
+func TestSkipsMissingContextWindow(t *testing.T) {
 	cfg := exampleConfig()
 	cfg.Providers[0].Models[0].ContextWindow = nil
-	expectInvalid(t, cfg, "context_window")
+	expectWarning(t, cfg, "context_window")
 }
 
-func TestRejectsMissingMaxTokens(t *testing.T) {
+func TestSkipsMissingMaxTokens(t *testing.T) {
 	cfg := exampleConfig()
 	cfg.Providers[0].Models[0].MaxOutputTokens = nil
-	expectInvalid(t, cfg, "default_max_tokens")
+	expectWarning(t, cfg, "default_max_tokens")
 }
 
-func TestRejectsNonAuthBearerHeader(t *testing.T) {
+func TestSkipsNonAuthBearerHeader(t *testing.T) {
 	cfg := exampleConfig()
 	cfg.Providers[0].Headers["X-Token"] = ir.HeaderValue{BearerFromEnv: "TOKEN"}
-	expectInvalid(t, cfg, "Authorization")
+	expectWarning(t, cfg, "Authorization")
 }
 
 func TestOmitsMCPWhenEmpty(t *testing.T) {
@@ -234,7 +234,7 @@ func TestEmitsReasoningLevels(t *testing.T) {
 	}
 }
 
-func TestRejectsLiteralCrushExpressions(t *testing.T) {
+func TestSkipsLiteralCrushExpressions(t *testing.T) {
 	cases := []struct {
 		name   string
 		mutate func(*ir.Config)
@@ -249,8 +249,138 @@ func TestRejectsLiteralCrushExpressions(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			cfg := exampleConfig()
 			tc.mutate(&cfg)
-			expectInvalid(t, cfg, "expression syntax")
+			expectWarning(t, cfg, "expression syntax")
 		})
+	}
+}
+
+func TestEmitSkipsModelWithMissingLimit(t *testing.T) {
+	cases := []struct {
+		name   string
+		mutate func(*ir.Model)
+	}{
+		{"context_window", func(m *ir.Model) { m.ContextWindow = nil }},
+		{"max_output_tokens", func(m *ir.Model) { m.MaxOutputTokens = nil }},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			cfg := exampleConfig()
+			tc.mutate(&cfg.Providers[0].Models[0])
+			expectWarning(t, cfg, "required")
+			arts, err := (Target{}).Emit(cfg)
+			if err != nil {
+				t.Fatalf("Emit: %v", err)
+			}
+			if out := string(arts[0].Content); strings.Contains(out, "glm-5.3") {
+				t.Fatalf("model missing a required limit must be skipped:\n%s", out)
+			}
+		})
+	}
+}
+
+func TestEmitSkipsDefaultForSkippedModel(t *testing.T) {
+	cfg := exampleConfig()
+	cfg.Providers[0].Models[0].ContextWindow = nil
+	expectWarning(t, cfg, "does not resolve")
+	arts, err := (Target{}).Emit(cfg)
+	if err != nil {
+		t.Fatalf("Emit: %v", err)
+	}
+	if out := string(arts[0].Content); strings.Contains(out, `"models"`) {
+		t.Fatalf("default for a skipped model must not be emitted:\n%s", out)
+	}
+}
+
+func TestEmitSkipsUnknownProtocolProvider(t *testing.T) {
+	cfg := exampleConfig()
+	cfg.Providers[0].Protocol = ir.Protocol("vertex")
+	expectWarning(t, cfg, "provider type must be")
+	arts, err := (Target{}).Emit(cfg)
+	if err != nil {
+		t.Fatalf("Emit: %v", err)
+	}
+	out := string(arts[0].Content)
+	if strings.Contains(out, "volcengine") {
+		t.Fatalf("provider with no native type must be skipped:\n%s", out)
+	}
+	if strings.Contains(out, `"type": ""`) {
+		t.Fatalf("must not emit an empty provider type:\n%s", out)
+	}
+}
+
+func TestEmitOmitsExpressionLiterals(t *testing.T) {
+	cfg := exampleConfig()
+	cfg.Providers[0].BaseURL = "https://$HOST/v1"
+	cfg.Providers[0].APIKey = ir.HeaderValue{Value: "$(token)"}
+	cfg.Providers[0].Headers["X-Test"] = ir.HeaderValue{Value: "`whoami`"}
+	arts, err := (Target{}).Emit(cfg)
+	if err != nil {
+		t.Fatalf("Emit: %v", err)
+	}
+	out := string(arts[0].Content)
+	for _, bad := range []string{"$HOST", "$(token)", "whoami", "X-Test"} {
+		if strings.Contains(out, bad) {
+			t.Fatalf("expression literal %q must be omitted:\n%s", bad, out)
+		}
+	}
+}
+
+func TestEmitOmitsFractionalTimeout(t *testing.T) {
+	cfg := exampleConfig()
+	cfg.MCP[0].TimeoutMS = i64(1500)
+	expectWarning(t, cfg, "divisible by 1000")
+	arts, err := (Target{}).Emit(cfg)
+	if err != nil {
+		t.Fatalf("Emit: %v", err)
+	}
+	if out := string(arts[0].Content); strings.Contains(out, `"timeout"`) {
+		t.Fatalf("a 1500 ms timeout must not be truncated to whole seconds:\n%s", out)
+	}
+}
+
+func TestEmitSkipsMCPWithExpressionCommandOrURL(t *testing.T) {
+	cases := []struct {
+		name   string
+		mutate func(*ir.Config)
+		id     string
+	}{
+		{"command", func(c *ir.Config) { c.MCP[0].Command[1] = "`whoami`" }, "context7"},
+		{"url", func(c *ir.Config) { c.MCP[1].URL = "https://${HOST}/mcp" }, "github"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			cfg := exampleConfig()
+			tc.mutate(&cfg)
+			expectWarning(t, cfg, "expression syntax")
+			arts, err := (Target{}).Emit(cfg)
+			if err != nil {
+				t.Fatalf("Emit: %v", err)
+			}
+			if out := string(arts[0].Content); strings.Contains(out, tc.id) {
+				t.Fatalf("MCP entry with an unrepresentable %s must be skipped:\n%s", tc.name, out)
+			}
+		})
+	}
+}
+
+func TestEmitOmitsMCPExpressionFields(t *testing.T) {
+	cfg := exampleConfig()
+	cfg.MCP[0].Env["BAD"] = ir.HeaderValue{Value: "$HOME"}
+	cfg.MCP[1].Headers["X-Bad"] = ir.HeaderValue{Value: "$(x)"}
+	arts, err := (Target{}).Emit(cfg)
+	if err != nil {
+		t.Fatalf("Emit: %v", err)
+	}
+	out := string(arts[0].Content)
+	for _, bad := range []string{"BAD", "X-Bad"} {
+		if strings.Contains(out, bad) {
+			t.Fatalf("expression field %q must be omitted:\n%s", bad, out)
+		}
+	}
+	for _, kept := range []string{"context7", "github"} {
+		if !strings.Contains(out, kept) {
+			t.Fatalf("entry %q must be kept:\n%s", kept, out)
+		}
 	}
 }
 

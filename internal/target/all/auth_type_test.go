@@ -39,12 +39,12 @@ func TestAuthTypeIsNeverSilentlyIgnored(t *testing.T) {
 			for _, authType := range []ir.AuthType{ir.AuthTypeBearer, ir.AuthTypeNone} {
 				diags := target.AuthTypeDiagnostics(emitter, authTypeConfig(authType))
 				if mappedAuthTypes(emitter)[authType] {
-					if diag.HasErrors(diags) {
+					if len(diags) != 0 {
 						t.Fatalf("%s maps auth_type %s but reported: %v", id, authType, diags)
 					}
 					continue
 				}
-				if !diag.HasErrors(diags) {
+				if len(diags) == 0 {
 					t.Fatalf("%s silently accepted auth_type: %s", id, authType)
 				}
 				if !strings.Contains(diags[0].Message, "does not implement auth_type") {

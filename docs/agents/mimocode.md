@@ -11,7 +11,8 @@ Note: the npm package `mimocode` by `eurocybersecurite` is an unrelated name col
 
 An IR literal such as `api_key: "example-key"` is emitted in the native
 `options.apiKey` field. The example key is a placeholder; real literals also appear in
-generated output.
+generated output. A literal that contains `{env:` or `{file:` is skipped with a
+warning and `options.apiKey` is omitted.
 
 MiMo Code (an opencode fork) uses AI SDK provider packages selected by an `npm` field:
 
@@ -41,7 +42,7 @@ MiMo Code (an opencode fork) uses AI SDK provider packages selected by an `npm` 
 }
 ```
 
-Protocol mapping: `openai-completions` → `@ai-sdk/openai-compatible`, `anthropic-messages` → `@ai-sdk/anthropic`. There is no protocol enum — the `api` wire protocol is implied by the npm package. IR `openai-responses` is not representable for custom providers (built-in loaders only) and is rejected.
+Protocol mapping: `openai-completions` → `@ai-sdk/openai-compatible`, `anthropic-messages` → `@ai-sdk/anthropic`. There is no protocol enum — the `api` wire protocol is implied by the npm package. IR `openai-responses` is not representable for custom providers (built-in loaders only); the emitter warns and drops that provider entry, as it does for any protocol with no native mapping.
 
 **Environment interpolation is the key advantage of this target:** MiMo Code substitutes `{env:VAR}` and `{file:path}` across the entire raw config text before parsing (verified in `config/variable.ts`). Therefore:
 
@@ -79,9 +80,11 @@ MiMo Code uses native `type` values `local` and `remote` (the `stdio`/`http` spe
 
 IR `timeout_ms` maps unchanged to native `mcp.<id>.timeout` for both `local`
 and `remote` servers (milliseconds, default 5000). The 2026-09-20 live schema
-still has no MCP `cwd`; IR `cwd` is rejected. A stdio server that sets
-`cwd: /var/lib/context7` validates for OpenCode and fails for MiMo Code. Remote
-MCP also documents `oauth` (object or `false`); v1 does not emit it.
+still has no MCP `cwd`; IR `cwd` is skipped with a warning (the field is
+omitted). A stdio server that sets `cwd: /var/lib/context7` validates for
+OpenCode and only warns for MiMo Code. A local server that declares no command
+is skipped with a warning. Remote MCP also documents `oauth` (object or
+`false`); v1 does not emit it.
 
 ## Defaults
 

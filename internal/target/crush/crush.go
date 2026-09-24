@@ -30,52 +30,52 @@ func (t Target) Validate(cfg ir.Config) []diag.Diagnostic {
 	var diags []diag.Diagnostic
 	for i, p := range cfg.Providers {
 		if hasCrushExpression(p.APIKey.Value) {
-			diags = append(diags, diag.TargetErrorf(t.ID(), fmt.Sprintf("providers[%d].api_key", i), "literal API key contains native expression syntax and cannot be represented literally"))
+			diags = append(diags, diag.TargetWarnf(t.ID(), fmt.Sprintf("providers[%d].api_key", i), "literal API key contains native expression syntax and cannot be represented literally"))
 		}
 		if hasCrushExpression(p.BaseURL) {
-			diags = append(diags, diag.TargetErrorf(t.ID(), fmt.Sprintf("providers[%d].base_url", i), "literal value contains Crush expression syntax and cannot be represented literally"))
+			diags = append(diags, diag.TargetWarnf(t.ID(), fmt.Sprintf("providers[%d].base_url", i), "literal value contains Crush expression syntax and cannot be represented literally"))
 		}
 	}
 	for i, p := range cfg.Providers {
 		path := fmt.Sprintf("providers[%d]", i)
 		if _, ok := typeName[p.Protocol]; !ok {
-			diags = append(diags, diag.TargetErrorf(t.ID(), path+".protocol",
+			diags = append(diags, diag.TargetWarnf(t.ID(), path+".protocol",
 				"crush provider type must be openai-compat, openai, or anthropic; got %q", p.Protocol))
 		}
 		for name, v := range p.Headers {
 			if hasCrushExpression(v.Value) {
-				diags = append(diags, diag.TargetErrorf(t.ID(), path+".headers."+name,
+				diags = append(diags, diag.TargetWarnf(t.ID(), path+".headers."+name,
 					"literal value contains Crush expression syntax and cannot be represented literally"))
 			}
 			if v.BearerFromEnv != "" && name != "Authorization" {
-				diags = append(diags, diag.TargetErrorf(t.ID(), path+".headers."+name,
+				diags = append(diags, diag.TargetWarnf(t.ID(), path+".headers."+name,
 					"crush extra_headers are flat strings; Bearer ENV:NAME is only representable as Authorization: Bearer ${VAR}"))
 			}
 		}
 		for j, m := range p.Models {
 			mpath := fmt.Sprintf("%s.models[%d]", path, j)
 			if m.ContextWindow == nil {
-				diags = append(diags, diag.TargetErrorf(t.ID(), mpath+".context_window",
+				diags = append(diags, diag.TargetWarnf(t.ID(), mpath+".context_window",
 					"crush Model.context_window is required"))
 			}
 			if m.MaxOutputTokens == nil {
-				diags = append(diags, diag.TargetErrorf(t.ID(), mpath+".max_output_tokens",
+				diags = append(diags, diag.TargetWarnf(t.ID(), mpath+".max_output_tokens",
 					"crush Model.default_max_tokens is required"))
 			}
 			for _, mod := range m.Input {
 				if mod != ir.ModalityText && mod != ir.ModalityImage {
-					diags = append(diags, diag.TargetErrorf(t.ID(), mpath+".input",
+					diags = append(diags, diag.TargetWarnf(t.ID(), mpath+".input",
 						"crush attachments are image-only; %q is not representable", mod))
 				}
 			}
 			for _, mod := range m.Output {
 				if mod != ir.ModalityText {
-					diags = append(diags, diag.TargetErrorf(t.ID(), mpath+".output",
+					diags = append(diags, diag.TargetWarnf(t.ID(), mpath+".output",
 						"crush has no output-modality field; non-text output %q is not representable", mod))
 				}
 			}
 			if m.ToolCalling != nil && !*m.ToolCalling {
-				diags = append(diags, diag.TargetErrorf(t.ID(), mpath+".tool_calling",
+				diags = append(diags, diag.TargetWarnf(t.ID(), mpath+".tool_calling",
 					"crush agents always expose tools; tool_calling: false is not representable"))
 			}
 		}
@@ -83,43 +83,43 @@ func (t Target) Validate(cfg ir.Config) []diag.Diagnostic {
 	for i, srv := range cfg.MCP {
 		path := fmt.Sprintf("mcp[%d]", i)
 		if srv.CWD != "" {
-			diags = append(diags, diag.TargetErrorf(t.ID(), path+".cwd",
+			diags = append(diags, diag.TargetWarnf(t.ID(), path+".cwd",
 				"crush MCP has no cwd field"))
 		}
 		for j, value := range srv.Command {
 			if hasCrushExpression(value) {
-				diags = append(diags, diag.TargetErrorf(t.ID(), fmt.Sprintf("%s.command[%d]", path, j),
+				diags = append(diags, diag.TargetWarnf(t.ID(), fmt.Sprintf("%s.command[%d]", path, j),
 					"literal value contains Crush expression syntax and cannot be represented literally"))
 			}
 		}
 		if hasCrushExpression(srv.URL) {
-			diags = append(diags, diag.TargetErrorf(t.ID(), path+".url",
+			diags = append(diags, diag.TargetWarnf(t.ID(), path+".url",
 				"literal value contains Crush expression syntax and cannot be represented literally"))
 		}
 		for name, v := range srv.Env {
 			if hasCrushExpression(v.Value) {
-				diags = append(diags, diag.TargetErrorf(t.ID(), path+".env."+name,
+				diags = append(diags, diag.TargetWarnf(t.ID(), path+".env."+name,
 					"literal value contains Crush expression syntax and cannot be represented literally"))
 			}
 		}
 		for name, v := range srv.Headers {
 			if hasCrushExpression(v.Value) {
-				diags = append(diags, diag.TargetErrorf(t.ID(), path+".headers."+name,
+				diags = append(diags, diag.TargetWarnf(t.ID(), path+".headers."+name,
 					"literal value contains Crush expression syntax and cannot be represented literally"))
 			}
 		}
 		if srv.TimeoutMS != nil && *srv.TimeoutMS%1000 != 0 {
-			diags = append(diags, diag.TargetErrorf(t.ID(), path+".timeout_ms",
+			diags = append(diags, diag.TargetWarnf(t.ID(), path+".timeout_ms",
 				"crush timeout is whole seconds; %d ms is not divisible by 1000", *srv.TimeoutMS))
 		}
 	}
 	if cfg.Defaults != nil && cfg.Defaults.Model != "" {
 		pid, mid, ok := splitRef(cfg.Defaults.Model)
 		if !ok {
-			diags = append(diags, diag.TargetErrorf(t.ID(), "defaults.model",
+			diags = append(diags, diag.TargetWarnf(t.ID(), "defaults.model",
 				`crush expects defaults.model as "provider/model"; got %q`, cfg.Defaults.Model))
-		} else if !hasModel(cfg, pid, mid) {
-			diags = append(diags, diag.TargetErrorf(t.ID(), "defaults.model",
+		} else if !emittedModel(cfg, pid, mid) {
+			diags = append(diags, diag.TargetWarnf(t.ID(), "defaults.model",
 				"crush default %q does not resolve to an emitted provider model", cfg.Defaults.Model))
 		}
 	}
@@ -129,26 +129,43 @@ func (t Target) Validate(cfg ir.Config) []diag.Diagnostic {
 func (t Target) Emit(cfg ir.Config) ([]artifact.Artifact, error) {
 	providers := map[string]crushProvider{}
 	for _, p := range cfg.Providers {
+		ctype, ok := typeName[p.Protocol]
+		if !ok {
+			// No native type: the provider cannot be represented at all.
+			continue
+		}
 		cp := crushProvider{
 			ID:             p.ID,
 			Name:           orDefault(p.Name, p.ID),
 			BaseURL:        p.BaseURL,
-			Type:           typeName[p.Protocol],
+			Type:           ctype,
 			DiscoverModels: false,
+		}
+		if hasCrushExpression(cp.BaseURL) {
+			cp.BaseURL = ""
 		}
 		if p.APIKey.FromEnv != "" {
 			cp.APIKey = "$" + p.APIKey.FromEnv
-		} else if p.APIKey.Value != "" {
+		} else if p.APIKey.Value != "" && !hasCrushExpression(p.APIKey.Value) {
 			cp.APIKey = p.APIKey.Value
 		}
 		if len(p.Headers) > 0 {
 			headers := map[string]string{}
 			for name, v := range p.Headers {
+				if hasCrushExpression(v.Value) || (v.BearerFromEnv != "" && name != "Authorization") {
+					continue
+				}
 				headers[name] = envInterp(v)
 			}
-			cp.ExtraHeaders = headers
+			if len(headers) > 0 {
+				cp.ExtraHeaders = headers
+			}
 		}
 		for _, m := range p.Models {
+			if m.ContextWindow == nil || m.MaxOutputTokens == nil {
+				// Both limits are required and cannot be invented.
+				continue
+			}
 			cm := crushModel{
 				ID:               m.ID,
 				Name:             orDefault(m.Name, m.ID),
@@ -168,10 +185,11 @@ func (t Target) Emit(cfg ir.Config) ([]artifact.Artifact, error) {
 	}
 	doc := crushConfig{Providers: providers}
 	if cfg.Defaults != nil && cfg.Defaults.Model != "" {
-		pid, mid, _ := splitRef(cfg.Defaults.Model)
-		doc.Models = map[string]crushSelected{
-			"large": {Provider: pid, Model: mid},
-			"small": {Provider: pid, Model: mid},
+		if pid, mid, ok := splitRef(cfg.Defaults.Model); ok && hasEmittedModel(providers, pid, mid) {
+			doc.Models = map[string]crushSelected{
+				"large": {Provider: pid, Model: mid},
+				"small": {Provider: pid, Model: mid},
+			}
 		}
 	}
 	if len(cfg.MCP) > 0 {
@@ -181,10 +199,13 @@ func (t Target) Emit(cfg ir.Config) ([]artifact.Artifact, error) {
 			if s.Enabled != nil && !*s.Enabled {
 				entry.Disabled = true
 			}
-			if s.TimeoutMS != nil {
-				entry.Timeout = int64(*s.TimeoutMS / 1000)
+			if s.TimeoutMS != nil && *s.TimeoutMS%1000 == 0 {
+				entry.Timeout = *s.TimeoutMS / 1000
 			}
 			if s.Transport == ir.TransportStdio {
+				if !representableCommand(s.Command) {
+					continue
+				}
 				entry.Type = "stdio"
 				entry.Command = s.Command[0]
 				if len(s.Command) > 1 {
@@ -193,19 +214,32 @@ func (t Target) Emit(cfg ir.Config) ([]artifact.Artifact, error) {
 				if len(s.Env) > 0 {
 					env := map[string]string{}
 					for name, v := range s.Env {
+						if hasCrushExpression(v.Value) {
+							continue
+						}
 						env[name] = envInterp(v)
 					}
-					entry.Env = env
+					if len(env) > 0 {
+						entry.Env = env
+					}
 				}
 			} else {
+				if hasCrushExpression(s.URL) {
+					continue
+				}
 				entry.Type = "http"
 				entry.URL = s.URL
 				if len(s.Headers) > 0 {
 					headers := map[string]string{}
 					for name, v := range s.Headers {
+						if hasCrushExpression(v.Value) {
+							continue
+						}
 						headers[name] = envInterp(v)
 					}
-					entry.Headers = headers
+					if len(headers) > 0 {
+						entry.Headers = headers
+					}
 				}
 			}
 			servers[s.ID] = entry
@@ -249,18 +283,52 @@ func hasImage(m ir.Model) bool {
 	return false
 }
 
-func hasModel(cfg ir.Config, pid, mid string) bool {
+// emittedModel reports whether Emit keeps the referenced model: the provider
+// needs a mapped protocol and the model both required limits.
+func emittedModel(cfg ir.Config, pid, mid string) bool {
 	for _, p := range cfg.Providers {
 		if p.ID != pid {
 			continue
 		}
+		if _, ok := typeName[p.Protocol]; !ok {
+			return false
+		}
 		for _, m := range p.Models {
-			if m.ID == mid {
+			if m.ID == mid && m.ContextWindow != nil && m.MaxOutputTokens != nil {
 				return true
 			}
 		}
 	}
 	return false
+}
+
+// hasEmittedModel reports whether the referenced model survived into the
+// emitted provider document.
+func hasEmittedModel(providers map[string]crushProvider, pid, mid string) bool {
+	cp, ok := providers[pid]
+	if !ok {
+		return false
+	}
+	for _, m := range cp.Models {
+		if m.ID == mid {
+			return true
+		}
+	}
+	return false
+}
+
+// representableCommand reports whether every command token can be written
+// literally; Crush reads $ and ` inside a command as expression syntax.
+func representableCommand(command []string) bool {
+	if len(command) == 0 {
+		return false
+	}
+	for _, token := range command {
+		if hasCrushExpression(token) {
+			return false
+		}
+	}
+	return true
 }
 
 func splitRef(providerModel string) (string, string, bool) {

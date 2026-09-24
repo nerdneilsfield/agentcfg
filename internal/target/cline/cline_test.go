@@ -14,19 +14,19 @@ func b(v bool) *bool { return &v }
 
 func expectValid(t *testing.T, cfg ir.Config) {
 	t.Helper()
-	if diags := (Target{}).Validate(cfg); diag.HasErrors(diags) {
+	if diags := (Target{}).Validate(cfg); len(diags) != 0 {
 		t.Fatalf("expected valid config, got %v", diags)
 	}
 }
 
-func expectInvalid(t *testing.T, cfg ir.Config, substr string) {
+func expectWarning(t *testing.T, cfg ir.Config, substr string) {
 	t.Helper()
 	diags := (Target{}).Validate(cfg)
-	if !diag.HasErrors(diags) {
+	if len(diags) == 0 {
 		t.Fatalf("expected validation error containing %q, got none", substr)
 	}
 	for _, d := range diags {
-		if d.Severity == diag.SeverityError && strings.Contains(d.Message, substr) {
+		if d.Severity == diag.SeverityWarning && strings.Contains(d.Message, substr) {
 			return
 		}
 	}
@@ -188,21 +188,66 @@ func TestEmitGolden(t *testing.T) {
 	}
 }
 
-func TestRejectsAPIKeyEnv(t *testing.T) {
-	expectInvalid(t, exampleConfig(), "literal apiKey")
+func TestSkipsAPIKeyEnv(t *testing.T) {
+	expectWarning(t, exampleConfig(), "literal apiKey")
+	arts, err := (Target{}).Emit(exampleConfig())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(arts[0].Content), `"apiKey"`) {
+		t.Fatalf("an env-derived api_key must be skipped:\n%s", arts[0].Content)
+	}
 }
 
-func TestRejectsEnvDerivedProviderHeaders(t *testing.T) {
+func TestSkipsEnvDerivedProviderHeaders(t *testing.T) {
 	cfg := exampleConfig()
 	cfg.Providers[0].APIKey.FromEnv = ""
-	expectInvalid(t, cfg, "literal strings")
+	expectWarning(t, cfg, "literal strings")
+	arts, err := (Target{}).Emit(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := string(arts[0].Content)
+	if strings.Contains(out, "X-Gateway-Key") {
+		t.Fatalf("an env-derived provider header must be skipped:\n%s", out)
+	}
+	if !strings.Contains(out, "X-Tenant") {
+		t.Fatalf("a literal provider header must be kept:\n%s", out)
+	}
 }
 
-func TestRejectsMCPEnvRef(t *testing.T) {
+func TestSkipsMCPEnvRef(t *testing.T) {
 	cfg := exampleConfig()
 	cfg.Providers[0].APIKey.FromEnv = ""
 	delete(cfg.Providers[0].Headers, "X-Gateway-Key")
-	expectInvalid(t, cfg, "literal strings")
+	expectWarning(t, cfg, "literal strings")
+	arts, err := (Target{}).Emit(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := string(arts[2].Content)
+	if strings.Contains(out, "CONTEXT7_API_KEY") {
+		t.Fatalf("an env-derived MCP env value must be skipped:\n%s", out)
+	}
+	if !strings.Contains(out, `"context7"`) {
+		t.Fatalf("the MCP entry itself must be kept:\n%s", out)
+	}
+}
+
+func TestSkipsMCPHeaderRef(t *testing.T) {
+	cfg := exampleConfig()
+	cfg.Providers[0].APIKey.FromEnv = ""
+	delete(cfg.Providers[0].Headers, "X-Gateway-Key")
+	cfg.MCP[1].Headers["X-Gateway-Token"] = ir.HeaderValue{FromEnv: "GW_TOKEN"}
+	expectWarning(t, cfg, "literal strings")
+	arts, err := (Target{}).Emit(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := string(arts[2].Content)
+	if strings.Contains(out, "X-Gateway-Token") {
+		t.Fatalf("an env-derived MCP header must be skipped:\n%s", out)
+	}
 }
 
 func TestPreservesFractionalMCPTimeout(t *testing.T) {
@@ -222,12 +267,23 @@ func TestPreservesFractionalMCPTimeout(t *testing.T) {
 	}
 }
 
-func TestRejectsToolCallingFalse(t *testing.T) {
+func TestSkipsToolCallingFalse(t *testing.T) {
 	cfg := exampleConfig()
 	cfg.Providers[0].APIKey.FromEnv = ""
 	delete(cfg.Providers[0].Headers, "X-Gateway-Key")
 	cfg.Providers[0].Models[0].ToolCalling = b(false)
-	expectInvalid(t, cfg, "cannot disable tools")
+	expectWarning(t, cfg, "cannot disable tools")
+	arts, err := (Target{}).Emit(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := string(arts[1].Content)
+	if strings.Contains(out, `"tools"`) {
+		t.Fatalf("tool_calling: false must not be reported as a tools capability:\n%s", out)
+	}
+	if !strings.Contains(out, `"glm-5.3"`) {
+		t.Fatalf("the model entry itself must be kept:\n%s", out)
+	}
 }
 
 func TestOmitsMCPArtifactWhenEmpty(t *testing.T) {

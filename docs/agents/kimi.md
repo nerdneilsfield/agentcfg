@@ -33,11 +33,11 @@ All three IR protocols map 1:1 (`openai`, `openai_responses`, `anthropic`).
 
 Official Kimi Code docs (2026-09-20) document `api_key` and `api_key_env` as mutually exclusive provider credentials. `api_key_env` is the name of a shell variable re-read on every request; it is not an automatic fallback from `export KIMI_API_KEY`. The emitter writes exactly one of those two fields from the IR scalar. It does not emit the `[providers.<id>.env]` fallback table or OAuth `storage`/`key` objects: those are CLI-owned credential sources, not IR fields.
 
-`custom_headers` values remain literal strings with no interpolation, so `ENV:NAME`/`Bearer ENV:NAME` provider headers are rejected.
+`custom_headers` values remain literal strings with no interpolation, so `ENV:NAME`/`Bearer ENV:NAME` provider headers are skipped; only constant values are written.
 
-`max_context_size` is required for every model; an IR model without `context_window` is rejected. `capabilities` is emitted natively: `thinking` (IR `reasoning`), `tool_use` (IR `tool_calling`), `image_in`/`video_in`/`audio_in` (IR `input` modalities).
+`max_context_size` is required for every model; an IR model without `context_window` is skipped and gets no `[models]` entry. `capabilities` is emitted natively: `thinking` (IR `reasoning`), `tool_use` (IR `tool_calling`), `image_in`/`video_in`/`audio_in` (IR `input` modalities).
 
-Model aliases are a flat `[models]` table, so duplicate model IDs across IR providers are rejected.
+Model aliases are a flat `[models]` table, so duplicate model IDs across IR providers collapse to one alias; the first provider's model wins.
 
 ## MCP
 
@@ -64,9 +64,9 @@ Kimi reads MCP servers from a separate `mcp.json`:
 }
 ```
 
-MCP `env` and `headers` values are literal strings: IR `ENV:NAME` MCP env/header references are rejected. `Authorization: "Bearer ENV:NAME"` maps to the native `bearerTokenEnvVar`. Stdio `cwd` is documented and emitted.
+MCP `env` and `headers` values are literal strings: IR `ENV:NAME` MCP env/header references are skipped (the entry is kept, the value omitted). `Authorization: "Bearer ENV:NAME"` maps to the native `bearerTokenEnvVar`. Stdio `cwd` is documented and emitted.
 
-IR `timeout_ms` maps to per-server `startupTimeoutMs` (milliseconds; native range 1–2147483647, default 30000). Values outside that range are rejected. Official MCP docs also list `toolTimeoutMs` for a single tool call, plus global `[mcp] startup_timeout_ms` / `tool_timeout_ms` in `config.toml`. v1 does not emit `toolTimeoutMs` or the global table: the IR has one timeout, and Codex/OpenCode already treat that field as connection/startup, not per-tool. Deferred loading (`deferred`), tool allow/deny lists, and `/mcp-config` OAuth login are omitted for the same reason.
+IR `timeout_ms` maps to per-server `startupTimeoutMs` (milliseconds; native range 1–2147483647, default 30000). Values outside that range are skipped, so no `startupTimeoutMs` is written. Official MCP docs also list `toolTimeoutMs` for a single tool call, plus global `[mcp] startup_timeout_ms` / `tool_timeout_ms` in `config.toml`. v1 does not emit `toolTimeoutMs` or the global table: the IR has one timeout, and Codex/OpenCode already treat that field as connection/startup, not per-tool. Deferred loading (`deferred`), tool allow/deny lists, and `/mcp-config` OAuth login are omitted for the same reason.
 
 A Kimi-valid MCP pair uses a literal stdio env value, an optional startup timeout, and a bearer env var on HTTP:
 
@@ -87,7 +87,7 @@ mcp:
 
 ## Defaults
 
-`defaults.model` maps to top-level `default_model = "<alias>"` (the model ID part after the provider prefix). Validation rejects a default that does not resolve to an emitted alias.
+`defaults.model` maps to top-level `default_model = "<alias>"` (the model ID part after the provider prefix). A default that does not resolve to an emitted alias is skipped with a warning and `default_model` is omitted.
 
 When the IR has no MCP servers, the `mcp.json` artifact is omitted entirely.
 

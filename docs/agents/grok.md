@@ -27,14 +27,19 @@ context_window = 128000
 max_completion_tokens = 8192
 ```
 
-`api_backend` is one of `chat_completions`, `responses`, `messages`, so all three IR protocols map 1:1. `env_key` is a native environment-variable name — the IR `api_key: "ENV:NAME"` maps directly without resolving the reference.
+`api_backend` is one of `chat_completions`, `responses`, `messages`, so all three IR protocols map 1:1. A provider on any other protocol is skipped with a warning, and none of its model tables are emitted. `env_key` is a native environment-variable name — the IR `api_key: "ENV:NAME"` maps directly without resolving the reference.
 
-Grok has no provider table: every model repeats `base_url`/`env_key`. The emitter therefore rejects duplicate model IDs across IR providers, because both would emit the same `[model."<id>"]` table.
+Grok has no provider table: every model repeats `base_url`/`env_key`. A model
+with no `context_window` is skipped with a warning, since the emitted table
+requires that key. The emitter therefore emits only the first and skips
+duplicate model IDs across IR providers with a warning, because both would
+otherwise emit the same `[model."<id>"]` table.
 
 Literal provider headers map to `extra_headers`. IR `ENV:NAME` provider headers
 map to the native per-model `env_http_headers` name-to-environment-name map, so
-the secret is not written to the fragment. `Bearer ENV:NAME` is rejected: that
-field inserts the raw environment value and cannot add the `Bearer ` prefix.
+the secret is not written to the fragment. `Bearer ENV:NAME` is skipped with a
+warning: that field inserts the raw environment value and cannot add the
+`Bearer ` prefix.
 
 ## Capabilities
 
@@ -42,9 +47,9 @@ Grok model tables have no capability/modality fields. IR `input`/`output`/`reaso
 
 ## MCP
 
-Grok Build uses `[mcp_servers.<id>]` with either stdio fields (`command`, `args`, `env`, `cwd`) or http fields (`url`, `headers`, `bearer_token_env_var`).
+Grok Build uses `[mcp_servers.<id>]` with either stdio fields (`command`, `args`, `env`, `cwd`) or http fields (`url`, `headers`, `bearer_token_env_var`). A stdio server with no command is dropped with a warning.
 
-Upstream documents `${VAR}` expansion for MCP string fields, so the emitter renders IR `ENV:NAME` references as `"${VAR}"` literals in MCP `env`/`headers`. `Authorization: "Bearer ENV:NAME"` maps to the native `bearer_token_env_var`. IR `timeout_ms` is rejected: grok MCP tables have no timeout field. Omit `timeout_ms` when generating for Grok.
+Upstream documents `${VAR}` expansion for MCP string fields, so the emitter renders IR `ENV:NAME` references as `"${VAR}"` literals in MCP `env`/`headers`. `Authorization: "Bearer ENV:NAME"` maps to the native `bearer_token_env_var`; a bearer reference on any other header is omitted, since that field applies to `Authorization` only. IR `timeout_ms` is skipped with a warning: grok MCP tables have no timeout field. Omit `timeout_ms` when generating for Grok.
 
 IR:
 
@@ -65,7 +70,7 @@ mcp:
 
 ## Defaults
 
-`defaults.model` maps to `[models] default = "<model-id>"` (the model ID part after the provider prefix). Validation rejects a default that does not resolve to an emitted model table.
+`defaults.model` maps to `[models] default = "<model-id>"` (the model ID part after the provider prefix). A default that does not resolve to an emitted model table is skipped with a warning, and the `[models] default` selector is omitted.
 
 ## Reasoning variants
 

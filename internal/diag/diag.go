@@ -26,8 +26,10 @@ func Errorf(path, format string, args ...any) Diagnostic {
 	return Diagnostic{Severity: SeverityError, Path: path, Message: fmtSprintf(format, args...)}
 }
 
-func TargetErrorf(target, path, format string, args ...any) Diagnostic {
-	return Diagnostic{Severity: SeverityError, Target: target, Path: path, Message: fmtSprintf(format, args...)}
+// TargetWarnf reports a representability limitation: the emitter skips the
+// field or entry and keeps generating.
+func TargetWarnf(target, path, format string, args ...any) Diagnostic {
+	return Diagnostic{Severity: SeverityWarning, Target: target, Path: path, Message: fmtSprintf(format, args...)}
 }
 
 func fmtSprintf(format string, args ...any) string {

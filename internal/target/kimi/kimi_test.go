@@ -14,19 +14,19 @@ func b(v bool) *bool { return &v }
 
 func expectValid(t *testing.T, cfg ir.Config) {
 	t.Helper()
-	if diags := (Target{}).Validate(cfg); diag.HasErrors(diags) {
+	if diags := (Target{}).Validate(cfg); len(diags) != 0 {
 		t.Fatalf("expected valid config, got %v", diags)
 	}
 }
 
-func expectInvalid(t *testing.T, cfg ir.Config, substr string) {
+func expectWarning(t *testing.T, cfg ir.Config, substr string) {
 	t.Helper()
 	diags := (Target{}).Validate(cfg)
-	if !diag.HasErrors(diags) {
+	if len(diags) == 0 {
 		t.Fatalf("expected validation error containing %q, got none", substr)
 	}
 	for _, d := range diags {
-		if d.Severity == diag.SeverityError && strings.Contains(d.Message, substr) {
+		if d.Severity == diag.SeverityWarning && strings.Contains(d.Message, substr) {
 			return
 		}
 	}
@@ -148,16 +148,78 @@ func TestEmitsAPIKeyEnv(t *testing.T) {
 	}
 }
 
-func TestRejectsMissingContextWindow(t *testing.T) {
+func TestSkipsMissingContextWindow(t *testing.T) {
 	cfg := exampleConfig()
 	cfg.Providers[0].Models[0].ContextWindow = nil
-	expectInvalid(t, cfg, "max_context_size")
+	expectWarning(t, cfg, "max_context_size")
+	expectWarning(t, cfg, "does not resolve")
+	arts, err := (Target{}).Emit(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := string(arts[0].Content)
+	if strings.Contains(out, `[models."glm-5.3"]`) {
+		t.Fatalf("a model without context_window must be skipped:\n%s", out)
+	}
+	if strings.Contains(out, "default_model") {
+		t.Fatalf("a default naming a skipped alias must be omitted:\n%s", out)
+	}
 }
 
-func TestRejectsMCPEnvRef(t *testing.T) {
+func TestSkipsDuplicateModelID(t *testing.T) {
+	cfg := exampleConfig()
+	cfg.Providers = append(cfg.Providers, ir.Provider{
+		ID:       "second",
+		Protocol: ir.ProtocolAnthropicMessages,
+		BaseURL:  "https://example.com/anthropic",
+		Models:   []ir.Model{{ID: "glm-5.3", ContextWindow: i64(64000)}},
+	})
+	expectWarning(t, cfg, "duplicate model id")
+	arts, err := (Target{}).Emit(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := string(arts[0].Content)
+	if n := strings.Count(out, `[models."glm-5.3"]`); n != 1 {
+		t.Fatalf("duplicate model id must collapse to one alias, got %d:\n%s", n, out)
+	}
+	if !strings.Contains(out, `provider = "volcengine"`) {
+		t.Fatalf("the first provider's model must win:\n%s", out)
+	}
+}
+
+func TestSkipsEnvDerivedProviderHeader(t *testing.T) {
+	cfg := exampleConfig()
+	cfg.Providers[0].Headers["X-Gateway-Key"] = ir.HeaderValue{FromEnv: "GATEWAY_KEY"}
+	expectWarning(t, cfg, "literal strings")
+	arts, err := (Target{}).Emit(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := string(arts[0].Content)
+	if strings.Contains(out, "X-Gateway-Key") {
+		t.Fatalf("an env-derived provider header must be skipped:\n%s", out)
+	}
+	if !strings.Contains(out, "X-Tenant") {
+		t.Fatalf("a literal provider header must be kept:\n%s", out)
+	}
+}
+
+func TestSkipsMCPEnvRef(t *testing.T) {
 	cfg := exampleConfig()
 	cfg.MCP[0].Env["CONTEXT7_API_KEY"] = ir.HeaderValue{FromEnv: "CONTEXT7_API_KEY"}
-	expectInvalid(t, cfg, "literal strings")
+	expectWarning(t, cfg, "literal strings")
+	arts, err := (Target{}).Emit(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := string(arts[1].Content)
+	if strings.Contains(out, "CONTEXT7_API_KEY") {
+		t.Fatalf("an env-derived MCP env value must be skipped:\n%s", out)
+	}
+	if !strings.Contains(out, `"context7"`) {
+		t.Fatalf("the MCP entry itself must be kept:\n%s", out)
+	}
 }
 
 func TestOmitsMCPArtifactWhenEmpty(t *testing.T) {
@@ -173,10 +235,35 @@ func TestOmitsMCPArtifactWhenEmpty(t *testing.T) {
 	}
 }
 
-func TestRejectsBearerOnNonAuthorizationHeader(t *testing.T) {
+func TestSkipsBearerOnNonAuthorizationHeader(t *testing.T) {
 	cfg := exampleConfig()
 	cfg.MCP[1].Headers["X-Token"] = ir.HeaderValue{BearerFromEnv: "SOME_TOKEN"}
-	expectInvalid(t, cfg, "Authorization only")
+	expectWarning(t, cfg, "Authorization only")
+	arts, err := (Target{}).Emit(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := string(arts[1].Content)
+	if strings.Contains(out, "X-Token") {
+		t.Fatalf("a bearer reference on a non-Authorization header must be skipped:\n%s", out)
+	}
+	if !strings.Contains(out, `"bearerTokenEnvVar": "GITHUB_TOKEN"`) {
+		t.Fatalf("the Authorization bearer reference must be preserved:\n%s", out)
+	}
+}
+
+func TestSkipsEnvDerivedMCPHeader(t *testing.T) {
+	cfg := exampleConfig()
+	cfg.MCP[1].Headers["X-Plain-Env"] = ir.HeaderValue{FromEnv: "SOME_VAR"}
+	expectWarning(t, cfg, "literal strings")
+	arts, err := (Target{}).Emit(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := string(arts[1].Content)
+	if strings.Contains(out, "X-Plain-Env") || strings.Contains(out, `"": `) {
+		t.Fatalf("an env-derived MCP header must be skipped:\n%s", out)
+	}
 }
 
 func TestEmitsMCPStartupTimeout(t *testing.T) {
@@ -196,12 +283,19 @@ func TestEmitsMCPStartupTimeout(t *testing.T) {
 	}
 }
 
-func TestRejectsOutOfRangeMCPTimeout(t *testing.T) {
+func TestSkipsOutOfRangeMCPTimeout(t *testing.T) {
 	cfg := exampleConfig()
 	cfg.MCP[0].TimeoutMS = i64(0)
-	expectInvalid(t, cfg, "startupTimeoutMs")
+	expectWarning(t, cfg, "startupTimeoutMs")
 	cfg.MCP[0].TimeoutMS = i64(2147483648)
-	expectInvalid(t, cfg, "startupTimeoutMs")
+	expectWarning(t, cfg, "startupTimeoutMs")
+	arts, err := (Target{}).Emit(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(arts[1].Content), "startupTimeoutMs") {
+		t.Fatalf("an out-of-range timeout must be omitted:\n%s", arts[1].Content)
+	}
 }
 
 func TestEmitsSupportEfforts(t *testing.T) {

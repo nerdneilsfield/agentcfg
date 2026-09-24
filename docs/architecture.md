@@ -42,6 +42,8 @@ An emitter returns zero or more named artifacts. A target does not have to corre
 - OpenClaw: one JSON fragment (`openclaw.json`).
 - Crush: one JSON fragment (`crush.json`).
 - Goose: one JSON file per custom provider plus a `config.yaml` fragment.
+- Command Code: `providers.json`, a `.mcp.json` MCP fragment, and a `config.json` default-model fragment.
+- CometixCode: a `settings.json` fragment and a `.mcp.json` MCP fragment.
 
 ```go
 type Artifact struct {
@@ -204,7 +206,7 @@ Each emitter package calls `target.Register` from `init`. `internal/target/all` 
 - `timeout_ms` -> Codex `startup_timeout_ms`, Kimi `startupTimeoutMs`, OpenCode `timeout`
 - `command` argv -> Codex `command` plus `args`, or OpenCode `command` array
 
-A field unavailable in a target is omitted only if omitting it preserves the documented semantics. Optional model capability metadata (`context_window`, modalities, `reasoning`, and `tool_calling`) may be omitted for a target that has no custom model catalog at all, such as Codex; the emitter is not claiming it configured those properties. A provider protocol, endpoint, credential literal or reference, request header, MCP transport, MCP command/URL, MCP environment, or MCP authentication rule may never be dropped. Otherwise validation rejects the selected target. This rule prevents “successful” generation that silently makes a route or MCP server unusable.
+A field an entry cannot carry is omitted, and an entry that cannot be represented at all is dropped, always with a warning that names the field or entry that disappeared and why. Optional model capability metadata (`context_window`, modalities, `reasoning`, and `tool_calling`) may be omitted for a target that has no custom model catalog at all, such as Codex; the emitter is not claiming it configured those properties. A provider protocol, endpoint, credential literal or reference, request header, MCP transport, MCP command/URL, MCP environment, or MCP authentication rule is dropped only when the native format has no home for it, and the warning says so — so a generation never makes a route or MCP server unusable without saying it. Only invalid IR fails a run.
 
 ## Failure and stdout contract
 
@@ -220,7 +222,7 @@ Emitters build artifacts in memory. `app` writes stdout only after every target 
 
 1. **IR unit tests**: YAML decoding, defaults, identifiers, scalar values and environment-reference restrictions, duplicate IDs, model references, and transport constraints.
 2. **Target golden tests**: one fixture per supported protocol/MCP combination; compare each artifact byte-for-byte.
-3. **Target rejection tests**: unsupported protocol, unsupported transport, adapter prerequisite, and no-default-mapping diagnostics.
+3. **Target skip tests**: unsupported protocol, unsupported transport, adapter prerequisite, and no-default-mapping warnings, plus the emitter skip each one produces.
 4. **Bundle tests**: one artifact stays raw; multiple artifacts receive stable wrappers in target/artifact sort order.
 5. **CLI black-box tests**: default targets, `--to` precedence, `--to all`, stderr/stdout separation, and exit codes.
 

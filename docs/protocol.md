@@ -117,9 +117,9 @@ The prefixes `ENV:` and `Bearer ENV:` are case-sensitive. `env:VOLC_API_KEY` is 
 
 agentcfg does not read the referenced variables. A target that cannot represent a literal or a reference reports a diagnostic instead of resolving the variable or dropping the field.
 
-Literal API keys are also rejected when the target would treat the text as a native expression:
+A literal API key is also skipped, with a warning, when the target would read the text as its own native expression:
 
-| Target | Rejected literal API-key content |
+| Target | Skipped literal API-key content |
 |---|---|
 | Crush | Contains `$` or a backtick. |
 | Pi, Prime Agent | Starts with `$` or `!`. |
@@ -173,7 +173,7 @@ providers:
       - id: claude-internal
 ```
 
-Not every target accepts every protocol. Codex accepts `openai-responses` only. OpenCode accepts `openai-completions` only. ZCode, MiMo Code, and jcode reject `openai-responses` on custom providers. The other compiled-in targets accept all three. See [`docs/agents/README.md`](agents/README.md).
+Not every target accepts every protocol. Codex accepts `openai-responses` only. ZCode, MiMo Code, and jcode skip a provider on `openai-responses`. The other compiled-in targets accept all three. See [`docs/agents/README.md`](agents/README.md).
 
 ### Choosing `auth_type`
 
@@ -236,16 +236,16 @@ example's own default targets.
 | `id` | yes | Upstream model identifier as the provider expects it on the wire. |
 | `name` | no | Display name. Defaults to `id` in emitters that have a display field. |
 | `context_window` | no | Maximum accepted context tokens. Crush and Kimi require it. |
-| `max_output_tokens` | no | Maximum generated tokens. Crush requires it (`default_max_tokens`). Goose rejects it (global max tokens only). |
+| `max_output_tokens` | no | Maximum generated tokens. Crush requires it (`default_max_tokens`). Goose skips it (global max tokens only). |
 | `input` | no | Accepted input modalities: `text`, `image`, `audio`, `video`, `pdf`. The IR does not default an omitted list; emitters that have a modality field typically treat empty as text-only. |
 | `output` | no | Produced modalities. Same omit/empty rule as `input`. |
 | `reasoning` | no | Model supports a reasoning/thinking mode. |
 | `variants` | no | Ordered, selectable reasoning-effort names for this model. Requires `reasoning: true`. |
-| `tool_calling` | no | Model supports tool calls. Cline, Crush, and Goose reject `false` (those CLIs cannot turn tools off for a custom model). |
+| `tool_calling` | no | Model supports tool calls. Cline, Crush, and Goose skip `false` (those CLIs cannot turn tools off for a custom model). |
 
 `id` may contain dots, colons, or slashes when the upstream model name does. Provider `id` may not.
 
-Several targets restrict modalities. Pi, Prime Agent, and DeepSeek Harness accept `text` and `image` input only. Crush accepts `text` and `image` input and `text` output only. Gajae accepts `text` and `image` on both. Goose accepts `text` only. OpenClaw rejects `pdf` input.
+Several targets restrict modalities. Pi, Prime Agent, and DeepSeek Harness accept `text` and `image` input only. Crush accepts `text` and `image` input and `text` output only. Gajae accepts `text` and `image` on both. Goose accepts `text` only. OpenClaw skips `pdf` input.
 
 ### Reasoning variants
 
@@ -269,7 +269,7 @@ A variant's only IR meaning is its effort name. It does not carry output verbosi
 
 agentcfg preserves the configured name. Common values include `low`, `medium`, `high`, `xhigh`, `max`, and `ultra`. A target with a fixed native set skips unrecognized names without a diagnostic (OpenClaw, Pi, Prime Agent, Grok, DeepSeek Harness, and Gajae skip `ultra`). A target with no faithful model-level field omits the list and still emits the rest of the configuration (Codex, Cline, jcode, Goose, Hermes). Crush, OpenCode, Kimi, ZCode, and MiMo Code keep provider/model names such as `ultra`.
 
-The v1 IR excludes costs, per-level provider wire-value overrides, per-model provider options, and compatibility toggles. A target that needs one of those must reject the route, or a later IR version must add a named cross-target field. There is no arbitrary native-config escape hatch.
+The v1 IR excludes costs, per-level provider wire-value overrides, per-model provider options, and compatibility toggles. A target that needs one of those skips the route, or a later IR version must add a named cross-target field. There is no arbitrary native-config escape hatch.
 
 ## MCP
 
@@ -280,10 +280,10 @@ Every MCP server has `id` and `transport`. Optional shared fields are `enabled`,
 | `id` | yes | Target-safe identifier: `[a-z][a-z0-9_-]*`. Unique across MCP servers. |
 | `transport` | yes | `stdio` or `http`. There is no `sse` transport in the IR; targets that distinguish SSE from streamable HTTP map `http` to their streamable-HTTP form. |
 | `enabled` | no | When `false`, emitters that have a disable flag set it (`disabled: true` or `enabled: false`). Omitted means enabled. |
-| `cwd` | no | Working directory for a stdio process. Invalid on `http`. Crush, MiMo Code, and jcode have no native field and reject it. |
+| `cwd` | no | Working directory for a stdio process. Invalid on `http`. Crush, MiMo Code, and jcode have no native field and skip it. |
 | `timeout_ms` | no | Timeout in milliseconds. Mapping is target-specific (see below). |
 
-Pi rejects every MCP server in v1 (no built-in MCP). jcode loads stdio only and rejects `http`.
+Pi skips every MCP server (no built-in MCP). jcode loads stdio only and skips `http`.
 
 ### Stdio
 
@@ -304,9 +304,9 @@ mcp:
 
 `env` values use the same scalar forms as provider headers, except `Bearer ENV:NAME` is invalid on `env`. Some targets can only pass through a same-name environment variable:
 
-- Codex `env_vars` and Goose `env_keys` inherit `NAME` from the host. `CHILD: "ENV:SOURCE"` with `CHILD != SOURCE` is rejected.
-- Prime Agent stdio `env` entries are environment references only; a literal child value is rejected.
-- Cline, Kimi, and ZCode MCP env values are literals; `ENV:NAME` is rejected. Kimi HTTP MCP still maps `Authorization: "Bearer ENV:NAME"` to `bearerTokenEnvVar`.
+- Codex `env_vars` and Goose `env_keys` inherit `NAME` from the host. `CHILD: "ENV:SOURCE"` with `CHILD != SOURCE` is skipped.
+- Prime Agent stdio `env` entries are environment references only; a literal child value is skipped.
+- Cline, Kimi, and ZCode MCP env values are literals; `ENV:NAME` is skipped. Kimi HTTP MCP still maps `Authorization: "Bearer ENV:NAME"` to `bearerTokenEnvVar`.
 
 ### HTTP
 
@@ -332,14 +332,14 @@ The IR unit is always milliseconds. Emitters do not guess a field that the nativ
 | Behavior | Targets |
 |---|---|
 | Milliseconds unchanged | OpenCode `timeout`, MiMo Code `timeout`, Gajae `timeout`, ZCode `timeoutMs`, DeepSeek Harness `toolCallTimeoutMs`, OpenClaw `connectionTimeoutMs` and `requestTimeoutMs` (same value on both), Codex `startup_timeout_ms`, Kimi `startupTimeoutMs` (range 1–2147483647; `toolTimeoutMs` is not written) |
-| Converted to seconds (`ms / 1000`) | Crush (integer seconds; not divisible by 1000 is rejected), Goose (positive integer seconds), jcode `timeout_secs` (integer seconds), Hermes `timeout` (positive; fractional seconds allowed), Cline `timeout` (fractional seconds allowed, so `1500` becomes `1.5`) |
-| Rejected | Grok, Prime Agent |
+| Converted to seconds (`ms / 1000`) | Crush (integer seconds; a value not divisible by 1000 is skipped), Goose (positive integer seconds), jcode `timeout_secs` (integer seconds), Hermes `timeout` (positive; fractional seconds allowed), Cline `timeout` (fractional seconds allowed, so `1500` becomes `1.5`) |
+| Skipped (no native timeout field) | Grok, Prime Agent |
 
 Omit `timeout_ms` unless every selected target can represent it.
 
 ### `cwd` mapping
 
-`cwd` is stdio-only. OpenCode, Codex, Grok, Kimi, ZCode, Cline, Gajae, Hermes, OpenClaw, Goose, DeepSeek Harness, and Prime Agent emit it. Crush, MiMo Code, and jcode reject it.
+`cwd` is stdio-only. OpenCode, Codex, Grok, Kimi, ZCode, Cline, Gajae, Hermes, OpenClaw, Goose, DeepSeek Harness, and Prime Agent emit it. Crush, MiMo Code, and jcode skip it.
 
 ## Defaults
 
@@ -374,15 +374,15 @@ agentcfg gen --config agentcfg.yaml --to all
 
 If both `--to` and `targets:` are omitted, agentcfg exits with `no targets: pass --to <id|all> or set targets: in agentcfg.yaml`.
 
-Listing every compiled-in id in YAML is almost never useful. One document rarely represents faithfully on Codex (Responses only), OpenCode (Completions only), Cline/ZCode (literal keys), Kimi (literal provider headers), and Pi (no MCP) at the same time. Put the CLIs you actually generate for in `targets:`, and use `--to` to override.
+Listing every compiled-in id in YAML is almost never useful. One document rarely represents faithfully on Codex (Responses only), Cline/ZCode (literal keys), Kimi (literal provider headers), and Pi (no MCP) at the same time. Put the CLIs you actually generate for in `targets:`, and use `--to` to override.
 
-Current compiled-in ids: `cline`, `codex`, `crush`, `deepseek-harness`, `gajae`, `goose`, `grok`, `hermes`, `jcode`, `kimi`, `mimocode`, `omp`, `openclaw`, `opencode`, `pi`, `prime-agent`, `zcode`.
+Current compiled-in ids: `cline`, `codex`, `cometixcode`, `commandcode`, `crush`, `deepseek-harness`, `gajae`, `goose`, `grok`, `hermes`, `jcode`, `kimi`, `mimocode`, `omp`, `openclaw`, `opencode`, `pi`, `prime-agent`, `zcode`.
 
 ## IR validation
 
 IR validation checks document version, field types, identifiers, scalar value and environment-reference forms, `auth_type` values and their `api_key` requirement, duplicate IDs, provider/model references, protocol names, and transport constraints. It does not read environment-variable values, contact endpoints, or decide whether a target can represent a field.
 
-Target validation runs after IR validation, once per selected target. A field that is legal in the IR can still be rejected for a target. Diagnostics name the target, the IR path, and the reason:
+Target validation runs after IR validation, once per selected target. A field that is legal in the IR can still be skipped for a target. Diagnostics name the target, the IR path, and the reason:
 
 ```
 [crush] providers[0].models[0].context_window: error: crush Model.context_window is required
@@ -394,7 +394,7 @@ Target validation runs after IR validation, once per selected target. A field th
 
 ### OpenAI Chat Completions for OpenCode
 
-OpenCode accepts `openai-completions` only. Environment references become `{env:NAME}`.
+OpenCode maps every protocol to a native V2 provider package. An `ENV:NAME` credential becomes the provider `env` array, while provider headers stay literal and MCP entries use `{env:NAME}`.
 
 ```yaml
 version: 1
@@ -473,7 +473,7 @@ Do not send this document to OpenCode, Codex, or a Completions-only adapter. The
 
 ### Literal API keys (Cline, ZCode)
 
-Cline and ZCode store inline key strings and have no custom-provider environment fallback. `ENV:NAME` is rejected:
+Cline and ZCode store inline key strings and have no custom-provider environment fallback. `ENV:NAME` is skipped:
 
 ```yaml
 version: 1
@@ -495,7 +495,7 @@ The literal appears in generated output. Keep the YAML and the fragments out of 
 
 ### Environment API keys on Kimi
 
-Kimi maps `api_key: "ENV:NAME"` to native `api_key_env` and a quoted literal to `api_key`. Provider `custom_headers` stay literal, so env-derived provider headers are rejected. MCP env values are also literals; HTTP `Authorization: "Bearer ENV:NAME"` still maps to `bearerTokenEnvVar`. `timeout_ms` maps to `startupTimeoutMs`.
+Kimi maps `api_key: "ENV:NAME"` to native `api_key_env` and a quoted literal to `api_key`. Provider `custom_headers` stay literal, so env-derived provider headers are skipped. MCP env values are also literals; HTTP `Authorization: "Bearer ENV:NAME"` still maps to `bearerTokenEnvVar`. `timeout_ms` maps to `startupTimeoutMs`.
 
 ```yaml
 version: 1
@@ -546,7 +546,7 @@ mcp:
 targets: [opencode, gajae]
 ```
 
-`timeout_ms: 30000` is 30 seconds. Crush would accept the timeout (integer seconds) but reject `cwd`. Grok and Prime Agent would reject the timeout. Kimi would accept the timeout as `startupTimeoutMs` but reject the `ENV:NAME` MCP env value. Omit those fields when the selected target cannot represent them.
+`timeout_ms: 30000` is 30 seconds. Crush would accept the timeout (integer seconds) but skip `cwd`. Grok and Prime Agent would skip the timeout. Kimi would accept the timeout as `startupTimeoutMs` but skip the `ENV:NAME` MCP env value. Omit those fields when the selected target cannot represent them.
 
 ### HTTP MCP with a bearer token
 
@@ -559,7 +559,7 @@ mcp:
       Authorization: "Bearer ENV:GITHUB_TOKEN"
 ```
 
-OpenCode emits `"Authorization": "Bearer {env:GITHUB_TOKEN}"`. Codex and Prime Agent emit `bearer_token_env_var` / `bearerTokenEnvVar` instead of an `Authorization` header. Cline and ZCode reject the environment reference; they need a literal header value.
+OpenCode emits `"Authorization": "Bearer {env:GITHUB_TOKEN}"`. Codex and Prime Agent emit `bearer_token_env_var` / `bearerTokenEnvVar` instead of an `Authorization` header. Cline and ZCode skip the environment reference; they need a literal header value.
 
 ### Disable an MCP server without deleting it
 
@@ -575,4 +575,4 @@ Crush and Cline map this to `disabled: true`. OpenCode, Gajae, Hermes, OpenClaw,
 
 ## What the IR does not include
 
-v1 does not model pricing, per-model request option bags, OAuth client enrollment, mTLS, tool allow/deny lists, agent roles beyond a single default model, or native file merge. If a target needs one of those to be correct, the emitter rejects the route rather than inventing a value.
+v1 does not model pricing, per-model request option bags, OAuth client enrollment, mTLS, tool allow/deny lists, agent roles beyond a single default model, or native file merge. If a target needs one of those to be correct, the emitter skips the route rather than inventing a value.

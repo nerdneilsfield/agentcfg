@@ -44,7 +44,8 @@ model with the same id replaces the built-in entry for that provider.
 All three IR protocols map 1:1 to Pi's `api` values: `openai-completions`,
 `openai-responses`, and `anthropic-messages`.
 
-Model `input` accepts `text` and `image` only; other modalities are rejected.
+Model `input` accepts `text` and `image` only; other modalities are dropped with
+a warning, and a model left with none omits the field.
 `cost` is emitted as zeros because the IR has no pricing scope. `contextWindow`
 and `maxTokens` are emitted only when the IR sets them, so Pi's own defaults
 (128000 and 16384) stay in place when a model omits them — writing a zero would
@@ -61,12 +62,12 @@ for a model that declares `variants`.
 - any other string is a literal.
 
 IR `ENV:NAME` therefore renders as `"$NAME"`. A literal API key that starts with
-`$` or `!` would be read as that syntax rather than as a token, so it is
-rejected.
+`$` or `!` would be read as that syntax rather than as a token, so the emitter
+warns and omits `apiKey`.
 
-An IR `Authorization: "Bearer ENV:NAME"` provider header stays rejected for this
-target. Pi has no bearer form for an arbitrary header, and the equivalent route
-is `api_key` plus `auth_type: bearer`.
+An IR `Authorization: "Bearer ENV:NAME"` provider header is skipped with a
+warning for this target, and the header is omitted. Pi has no bearer form for an
+arbitrary header, and the equivalent route is `api_key` plus `auth_type: bearer`.
 
 ### Authentication
 
@@ -91,8 +92,9 @@ thinking level is emitted.
 
 Pi ships without built-in MCP support. The third-party `pi-mcp-adapter` reads a
 standard `mcpServers` document from its own search paths, but it is not part of
-Pi and its schema is not vendored here. `gen --to pi` therefore fails when the
-IR declares MCP servers rather than emitting a document Pi would ignore.
+Pi and its schema is not vendored here. `gen --to pi` therefore skips every
+declared MCP server rather than emitting a document Pi would ignore; the run
+continues and writes the models document.
 
 ## Defaults
 

@@ -29,19 +29,19 @@ func (t Target) Validate(cfg ir.Config) []diag.Diagnostic {
 	for i, p := range cfg.Providers {
 		path := fmt.Sprintf("providers[%d]", i)
 		if p.Protocol == ir.ProtocolOpenAIResponses {
-			diags = append(diags, diag.TargetErrorf(t.ID(), path+".protocol",
+			diags = append(diags, diag.TargetWarnf(t.ID(), path+".protocol",
 				"zcode user config exposes provider kind only; openai-responses has no native location for custom providers"))
 		} else if _, ok := kindByProtocol[p.Protocol]; !ok {
-			diags = append(diags, diag.TargetErrorf(t.ID(), path+".protocol",
+			diags = append(diags, diag.TargetWarnf(t.ID(), path+".protocol",
 				"zcode provider kind must be anthropic, openai, or openai-compatible; got %q", p.Protocol))
 		}
 		if p.APIKey.FromEnv != "" {
-			diags = append(diags, diag.TargetErrorf(t.ID(), path+".api_key",
+			diags = append(diags, diag.TargetWarnf(t.ID(), path+".api_key",
 				"zcode stores inline apiKey strings only with no env interpolation; api_key environment references are not representable"))
 		}
 		for name, v := range p.Headers {
 			if v.FromEnv != "" || v.BearerFromEnv != "" {
-				diags = append(diags, diag.TargetErrorf(t.ID(), path+".headers."+name,
+				diags = append(diags, diag.TargetWarnf(t.ID(), path+".headers."+name,
 					"zcode headers are literal strings; only constant header values are representable"))
 			}
 		}
@@ -50,18 +50,54 @@ func (t Target) Validate(cfg ir.Config) []diag.Diagnostic {
 		path := fmt.Sprintf("mcp[%d]", i)
 		for name, v := range s.Env {
 			if v.FromEnv != "" || v.BearerFromEnv != "" {
-				diags = append(diags, diag.TargetErrorf(t.ID(), path+".env."+name,
+				diags = append(diags, diag.TargetWarnf(t.ID(), path+".env."+name,
 					"zcode mcp.servers env values are literal strings; environment references are not representable"))
 			}
 		}
 		for name, v := range s.Headers {
 			if v.FromEnv != "" || v.BearerFromEnv != "" {
-				diags = append(diags, diag.TargetErrorf(t.ID(), path+".headers."+name,
+				diags = append(diags, diag.TargetWarnf(t.ID(), path+".headers."+name,
 					"zcode mcp.servers headers are literal strings; environment references are not representable"))
 			}
 		}
 	}
+	if cfg.Defaults != nil && cfg.Defaults.Model != "" {
+		pid, mid, ok := splitRef(cfg.Defaults.Model)
+		if !ok {
+			diags = append(diags, diag.TargetWarnf(t.ID(), "defaults.model",
+				`zcode expects defaults.model as "provider/model"; got %q`, cfg.Defaults.Model))
+		} else if !emittedModel(cfg, pid, mid) {
+			diags = append(diags, diag.TargetWarnf(t.ID(), "defaults.model",
+				"zcode default %q does not resolve to an emitted provider model", cfg.Defaults.Model))
+		}
+	}
 	return diags
+}
+
+func emittedModel(cfg ir.Config, pid, mid string) bool {
+	for _, p := range cfg.Providers {
+		if p.ID != pid {
+			continue
+		}
+		if _, ok := kindByProtocol[p.Protocol]; !ok {
+			continue // the provider is skipped, so its models are not emitted
+		}
+		for _, m := range p.Models {
+			if m.ID == mid {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func splitRef(providerModel string) (string, string, bool) {
+	for i := 0; i < len(providerModel); i++ {
+		if providerModel[i] == '/' {
+			return providerModel[:i], providerModel[i+1:], true
+		}
+	}
+	return "", "", false
 }
 
 func (t Target) Emit(cfg ir.Config) ([]artifact.Artifact, error) {
@@ -69,7 +105,13 @@ func (t Target) Emit(cfg ir.Config) ([]artifact.Artifact, error) {
 		Provider: map[string]zcodeProvider{},
 	}
 	servers := map[string]any{}
+	emittedProviders := map[string]bool{}
 	for _, p := range cfg.Providers {
+		kind, ok := kindByProtocol[p.Protocol]
+		if !ok {
+			continue // openai-responses has no custom-provider kind
+		}
+		emittedProviders[p.ID] = true
 		opts := map[string]any{"baseURL": p.BaseURL}
 		if p.APIKey.Value != "" {
 			opts["apiKey"] = p.APIKey.Value
@@ -77,13 +119,16 @@ func (t Target) Emit(cfg ir.Config) ([]artifact.Artifact, error) {
 		if len(p.Headers) > 0 {
 			headers := map[string]string{}
 			for name, v := range p.Headers {
+				if v.FromEnv != "" || v.BearerFromEnv != "" {
+					continue // zcode headers are literal-only
+				}
 				headers[name] = v.Value
 			}
 			if len(headers) > 0 {
 				opts["headers"] = headers
 			}
 		}
-		zp := zcodeProvider{Kind: kindByProtocol[p.Protocol], Name: p.Name, Options: opts, Models: map[string]zcodeModel{}}
+		zp := zcodeProvider{Kind: kind, Name: p.Name, Options: opts, Models: map[string]zcodeModel{}}
 		for _, m := range p.Models {
 			zm := zcodeModel{}
 			if m.Name != "" {
@@ -127,6 +172,9 @@ func (t Target) Emit(cfg ir.Config) ([]artifact.Artifact, error) {
 		if s.Transport == ir.TransportStdio {
 			env := map[string]string{}
 			for name, v := range s.Env {
+				if v.FromEnv != "" || v.BearerFromEnv != "" {
+					continue // zcode MCP env values are literal-only
+				}
 				env[name] = v.Value
 			}
 			entry := map[string]any{
@@ -150,6 +198,9 @@ func (t Target) Emit(cfg ir.Config) ([]artifact.Artifact, error) {
 		} else {
 			headers := map[string]string{}
 			for name, v := range s.Headers {
+				if v.FromEnv != "" || v.BearerFromEnv != "" {
+					continue // zcode MCP header values are literal-only
+				}
 				headers[name] = v.Value
 			}
 			entry := map[string]any{
@@ -167,7 +218,9 @@ func (t Target) Emit(cfg ir.Config) ([]artifact.Artifact, error) {
 		}
 	}
 	if cfg.Defaults != nil && cfg.Defaults.Model != "" {
-		doc.Model = &zcodeModelSel{Main: cfg.Defaults.Model}
+		if pid, _, ok := splitRef(cfg.Defaults.Model); ok && emittedProviders[pid] {
+			doc.Model = &zcodeModelSel{Main: cfg.Defaults.Model}
+		}
 	}
 	if len(servers) > 0 {
 		doc.MCP = &zcodeMCP{Servers: servers}

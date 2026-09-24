@@ -29,8 +29,8 @@ providers:
         context_length: 128000
 ```
 
-- `api_mode` is one of `chat_completions`, `codex_responses`, `anthropic_messages`; the three IR protocols map 1:1.
-- `api_key_env` (alias `key_env`) is native; IR `api_key: "ENV:NAME"` maps directly.
+- `api_mode` is one of `chat_completions`, `codex_responses`, `anthropic_messages`; the three IR protocols map 1:1. A provider on any other protocol is skipped with a warning.
+- `api_key_env` (alias `key_env`) is native; IR `api_key: "ENV:NAME"` maps directly. A literal `api_key` containing `${` is skipped with a warning, since the value would read as a native environment expression.
 - Hermes expands `${VAR}` and `${env:VAR}` recursively over **all** config strings at load, so every IR env-reference form is native: provider header `ENV:NAME` → `"${VAR}"`, `Authorization: "Bearer ENV:NAME"` → `"Bearer ${VAR}"`.
 - `models` is a `<model-id> → {context_length}` mapping. IR `max_output_tokens`, `reasoning`, `tool_calling`, and input/output modalities have no Hermes config field and are not emitted; Hermes auto-detects capabilities from the provider.
 - Provider display `name` has no Hermes field and is not emitted.
@@ -38,14 +38,16 @@ providers:
 ## Defaults
 
 `defaults.model "provider/model"` splits into `model.provider` +
-`model.default`.
+`model.default`. A value that does not resolve to an emitted provider model is
+skipped with a warning.
 
 ## MCP
 
 `mcp_servers.<id>` supports stdio (`command`, `args`, `env`, `cwd`) and http
-(`url`, `headers`), with `${VAR}` expansion native at connect time. IR
-`timeout_ms` is emitted as `timeout` in seconds (`ms/1000`) and must be
-positive. IR `enabled` maps to the native `enabled` flag.
+(`url`, `headers`), with `${VAR}` expansion native at connect time. A stdio
+server with no command is dropped with a warning. IR `timeout_ms` is emitted as
+`timeout` in seconds (`ms/1000`); a non-positive value is skipped with a
+warning. IR `enabled` maps to the native `enabled` flag.
 
 ## Reasoning variants
 

@@ -19,33 +19,36 @@ Design principles:
   and translates references into each CLI's native syntax.
 - **stdout only.** `gen` prints fragments. It never writes target files. Review
   the output, then merge it into the native config yourself.
-- **Never guess.** When a target cannot represent an IR field, the emitter
-  rejects it with a diagnostic instead of silently dropping it.
+- **Never guess.** A target that cannot represent an IR field skips that field
+  and warns, naming the field and the reason; it never silently drops it and
+  never fails the whole target for one unsupported field.
 
 ## Supported targets
 
 | Target | Agent | Providers | MCP | Notes |
 |---|---|---|---|---|
 | `codex` | [openai/codex](https://github.com/openai/codex) | Responses only | stdio + HTTP | `[model_providers]` TOML fragment; `ENV:NAME` → `env_key`; MCP `timeout_ms` → `startup_timeout_ms` |
-| `opencode` | [sst/opencode](https://github.com/sst/opencode) | OpenAI-compatible only | stdio + HTTP | `provider` + `mcp` in `opencode.json`; Anthropic/Responses providers rejected in v1 |
-| `pi` | [earendil-works/pi](https://github.com/earendil-works/pi) | any (`models.json`) | rejected in v1 (no built-in MCP) | `~/.pi/agent/models.json`; `ENV:NAME` → `"$NAME"`; `auth_type: bearer` → `authHeader: true`; unset limits are omitted so Pi's defaults apply |
+| `opencode` | [sst/opencode](https://github.com/sst/opencode) | Chat · Responses · Anthropic | stdio + HTTP | native V2 shape (`providers` + `mcp.servers`); `ENV:NAME` → `env: [NAME]`; provider headers and the model reasoning flag cannot be represented and are skipped with warnings |
+| `pi` | [earendil-works/pi](https://github.com/earendil-works/pi) | any (`models.json`) | skipped (no built-in MCP) | `~/.pi/agent/models.json`; `ENV:NAME` → `"$NAME"`; `auth_type: bearer` → `authHeader: true`; unset limits are omitted so Pi's defaults apply |
 | `prime-agent` | [contract](docs/agents/prime-agent.md) | any (`models.json`) | stdio + HTTP | `models.json` + `settings.json` `mcpServers` fragments; `ENV:NAME` → bare environment-variable names; `auth_type: bearer` → `authHeader: true` |
 | `omp` | [can1357/oh-my-pi](https://github.com/can1357/oh-my-pi) | any (`models.yml`) | stdio + HTTP (`mcp.json`) | YAML provider document; `ENV:NAME` → bare environment-variable names; `auth_type: bearer` → `authHeader: true`; MCP `timeout_ms` → `timeout`; `defaults.model` → `modelRoles.default` |
-| `deepseek-harness` | [deepseek-ai/deepseek-harness](https://github.com/deepseek-ai/deepseek-harness) | any (`api` route field) | stdio + HTTP (Cordis patch) | YAML provider route + `@deepseek-ai/dsh-mcp-client` patch; literal API keys rejected |
-| `grok` | [xai-org/grok-build](https://github.com/xai-org/grok-build) | Chat · Responses · Anthropic | stdio + HTTP | per-model TOML tables; duplicate model ids rejected; `ENV:NAME` headers → `env_http_headers` |
-| `kimi` | [MoonshotAI/kimi-code](https://github.com/MoonshotAI/kimi-code) | Chat · Responses · Anthropic | stdio + HTTP | flat `[models]` aliases; duplicate model ids rejected; `ENV:NAME` API keys → `api_key_env`; MCP `timeout_ms` → `startupTimeoutMs`; provider headers stay literal |
+| `deepseek-harness` | [deepseek-ai/deepseek-harness](https://github.com/deepseek-ai/deepseek-harness) | any (`api` route field) | stdio + HTTP (Cordis patch) | YAML provider route + `@deepseek-ai/dsh-mcp-client` patch; literal API keys skipped |
+| `grok` | [xai-org/grok-build](https://github.com/xai-org/grok-build) | Chat · Responses · Anthropic | stdio + HTTP | per-model TOML tables; duplicate model ids skipped; `ENV:NAME` headers → `env_http_headers` |
+| `kimi` | [MoonshotAI/kimi-code](https://github.com/MoonshotAI/kimi-code) | Chat · Responses · Anthropic | stdio + HTTP | flat `[models]` aliases; duplicate model ids skipped; `ENV:NAME` API keys → `api_key_env`; MCP `timeout_ms` → `startupTimeoutMs`; provider headers stay literal |
 | `zcode` | [zcode.z.ai](https://zcode.z.ai) | Chat · Anthropic | stdio + HTTP | closed-source CLI; MCP env/headers are literal-only |
 | `mimocode` | [XiaomiMiMo/MiMo-Code](https://github.com/XiaomiMiMo/MiMo-Code) | Chat · Anthropic | stdio + HTTP | single JSON fragment against the official live schema |
 | `jcode` | [1jehuang/jcode](https://github.com/1jehuang/jcode) | Chat · Anthropic | stdio | custom providers only; Responses API is built-in-provider-only; literal headers |
-| `cline` | [cline/cline](https://github.com/cline/cline) | Chat · Responses · Anthropic | stdio + HTTP | literal `apiKey` only (`api_key: "ENV:NAME"` rejected); MCP env refs rejected; timeout is seconds (`ms/1000`) |
+| `cline` | [cline/cline](https://github.com/cline/cline) | Chat · Responses · Anthropic | stdio + HTTP | literal `apiKey` only (`api_key: "ENV:NAME"` skipped); MCP env refs skipped; timeout is seconds (`ms/1000`) |
 | `gajae` | [Yeachan-Heo/gajae-code](https://github.com/Yeachan-Heo/gajae-code) | Chat · Responses · Anthropic | stdio + HTTP | all three protocols map 1:1 |
 | `hermes` | [NousResearch/hermes-agent](https://github.com/NousResearch/hermes-agent) | Chat · Responses · Anthropic | stdio + HTTP | provider display `name` not emitted |
 | `openclaw` | [openclaw/openclaw](https://github.com/openclaw/openclaw) | Chat · Responses · Anthropic | stdio + HTTP | JSON5 native; never write the agent-local `models.json` |
 | `crush` | [charmbracelet/crush](https://github.com/charmbracelet/crush) | Chat · Responses · Anthropic | stdio + HTTP | per-model `context_window` + `default_max_tokens` required; no MCP `cwd`; whole-second timeouts |
-| `goose` | [block/goose](https://github.com/block/goose) | Chat · Responses (`base_path`) · Anthropic | stdio + streamable HTTP | strict rejections: per-model max tokens, non-text modalities, `tool_calling: false`, renamed MCP env refs, fractional timeouts; provider headers are literal |
+| `goose` | [block/goose](https://github.com/block/goose) | Chat · Responses (`base_path`) · Anthropic | stdio + streamable HTTP | skips what it cannot represent: per-model max tokens, non-text modalities, `tool_calling: false`, renamed MCP env refs, fractional timeouts; provider headers are literal |
+| `commandcode` | [CommandCodeAI/command-code](https://github.com/CommandCodeAI/command-code) | Chat · Responses · Anthropic | stdio + HTTP | `providers.json` + `.mcp.json` + `config.json` fragments; literal API keys and env-derived provider headers skipped with warnings; built-in lane provider ids skipped; no MCP `cwd`/`timeout` |
+| `cometixcode` | [Haleclipse/CometixCode](https://github.com/Haleclipse/CometixCode) | Anthropic only (one endpoint via `ANTHROPIC_BASE_URL`) | stdio + HTTP | Rust Claude Code reimplementation; `settings.json` + `.mcp.json` fragments; `auth_type` picks `ANTHROPIC_API_KEY` or `ANTHROPIC_AUTH_TOKEN`; literal credential only; per-model facts skipped with warnings |
 
 "Chat" = OpenAI Chat Completions, "Responses" = OpenAI Responses API. The full
-field-by-field contract per target, including what is rejected and why, lives
+field-by-field contract per target, including what is skipped and why, lives
 in [`docs/agents/`](docs/agents/README.md). `--to all` selects every target
 above.
 
@@ -176,10 +179,9 @@ What this file says:
   It is not a wildcard. `targets: [all]` is an unknown id.
 
 This example is valid for Crush and Gajae. It is not valid for every CLI:
-Codex rejects `openai-completions`, OpenCode rejects `anthropic-messages`,
-Cline/ZCode reject `ENV:NAME` API keys, Kimi rejects env-derived provider
-headers, and Pi rejects MCP. Put the CLIs you actually generate for in
-`targets:`, then override with `--to`.
+Codex skips `openai-completions`, Cline/ZCode skip `ENV:NAME` API keys,
+Kimi skips env-derived provider headers, and Pi skips MCP. Put the CLIs you
+actually generate for in `targets:`, then override with `--to`.
 
 2. Validate the IR and every selected target. `--config` defaults to
    `agentcfg.yaml` in the current directory:
@@ -248,15 +250,15 @@ headers:
 ```
 
 Quote values that YAML would treat as a boolean or a number (`true`, `no`,
-`1e6`). Cline and ZCode store inline API keys and reject `ENV:NAME` on
+`1e6`). Cline and ZCode store inline API keys and skip `ENV:NAME` on
 `api_key`. Kimi maps `api_key: "ENV:NAME"` to `api_key_env`. Goose and
-DeepSeek Harness reject literal API keys (they only have an environment-name
+DeepSeek Harness skip literal API keys (they only have an environment-name
 field).
 
 ### Protocol
 
 ```yaml
-protocol: openai-completions   # Chat Completions; OpenCode accepts only this
+protocol: openai-completions   # Chat Completions
 protocol: openai-responses     # Responses API; Codex accepts only this
 protocol: anthropic-messages   # Anthropic Messages
 ```
@@ -266,7 +268,7 @@ protocol: anthropic-messages   # Anthropic Messages
 ### Models
 
 Crush and Kimi require `context_window`. Crush also requires
-`max_output_tokens`. Goose rejects per-model `max_output_tokens` and any
+`max_output_tokens`. Goose skips per-model `max_output_tokens` and any
 non-text modality.
 
 ```yaml
@@ -292,7 +294,7 @@ mcp:
   - id: context7
     transport: stdio
     command: [npx, -y, "@upstash/context7-mcp"]
-    cwd: /var/lib/context7          # stdio only; Crush/MiMo Code/jcode reject it
+    cwd: /var/lib/context7          # stdio only; Crush/MiMo Code/jcode skip it
     timeout_ms: 30000               # milliseconds; some targets convert to seconds
     env:
       CONTEXT7_API_KEY: "ENV:CONTEXT7_API_KEY"
@@ -306,13 +308,14 @@ mcp:
 ```
 
 There is no `sse` transport in the IR. Targets that distinguish SSE from
-streamable HTTP map `http` to streamable HTTP. Pi rejects every MCP server
+streamable HTTP map `http` to streamable HTTP. Pi skips every MCP server
 in v1. jcode loads stdio only.
 
-`timeout_ms` stays milliseconds on OpenCode, Gajae, Codex, Kimi
-(`startupTimeoutMs`), ZCode, and several others. Crush, Goose, and jcode
+`timeout_ms` stays milliseconds on Gajae, Codex, Kimi (`startupTimeoutMs`),
+ZCode, and several others. OpenCode V2 writes its `timeout` object with
+`catalog` and `execution` set. Crush, Goose, and jcode
 require a whole number of seconds (`timeout_ms` divisible by 1000). Grok and
-Prime Agent reject `timeout_ms` because they have no verified native field.
+Prime Agent skip `timeout_ms` because they have no verified native field.
 Omit it unless every selected target can represent it.
 
 ### Defaults and target selection
@@ -396,7 +399,7 @@ docs/agents/           per-target native config contracts
 Adding a target:
 
 1. Research the agent's native config and write `docs/agents/<id>.md`
-   (schema source, field mappings, rejections).
+   (schema source, field mappings, skipped fields).
 2. Create `internal/target/<id>/` with `Validate` and `Emit`; `Emit` returns
    artifacts and must never silently drop unrepresentable IR fields.
 3. Register it with a blank import in `internal/target/all/all.go`.

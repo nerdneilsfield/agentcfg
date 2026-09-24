@@ -25,27 +25,37 @@ var npmByProtocol = map[ir.Protocol]string{
 	ir.ProtocolAnthropicMessages: "@ai-sdk/anthropic",
 }
 
+// expressionLiteral reports whether a literal value would be read as MiMo Code's
+// own {env:...}/{file:...} expression syntax instead of as the literal token.
+func expressionLiteral(v string) bool {
+	return strings.Contains(v, "{env:") || strings.Contains(v, "{file:")
+}
+
 func (t Target) Validate(cfg ir.Config) []diag.Diagnostic {
 	var diags []diag.Diagnostic
 	for i, p := range cfg.Providers {
-		if strings.Contains(p.APIKey.Value, "{env:") || strings.Contains(p.APIKey.Value, "{file:") {
-			diags = append(diags, diag.TargetErrorf(t.ID(), fmt.Sprintf("providers[%d].api_key", i), "literal API key contains native expression syntax and cannot be represented literally"))
+		if expressionLiteral(p.APIKey.Value) {
+			diags = append(diags, diag.TargetWarnf(t.ID(), fmt.Sprintf("providers[%d].api_key", i), "literal API key contains native expression syntax and cannot be represented literally"))
 		}
 	}
 	for i, p := range cfg.Providers {
 		path := fmt.Sprintf("providers[%d]", i)
 		if p.Protocol == ir.ProtocolOpenAIResponses {
-			diags = append(diags, diag.TargetErrorf(t.ID(), path+".protocol",
+			diags = append(diags, diag.TargetWarnf(t.ID(), path+".protocol",
 				"mimocode maps custom providers via AI SDK npm packages; openai-responses is not representable for custom providers"))
 		} else if _, ok := npmByProtocol[p.Protocol]; !ok {
-			diags = append(diags, diag.TargetErrorf(t.ID(), path+".protocol",
+			diags = append(diags, diag.TargetWarnf(t.ID(), path+".protocol",
 				"mimocode has no native mapping for protocol %q", p.Protocol))
 		}
 	}
 	for i, s := range cfg.MCP {
 		if s.CWD != "" {
-			diags = append(diags, diag.TargetErrorf(t.ID(), fmt.Sprintf("mcp[%d].cwd", i),
+			diags = append(diags, diag.TargetWarnf(t.ID(), fmt.Sprintf("mcp[%d].cwd", i),
 				"mimocode MCP has no cwd field"))
+		}
+		if s.Transport == ir.TransportStdio && len(s.Command) == 0 {
+			diags = append(diags, diag.TargetWarnf(t.ID(), fmt.Sprintf("mcp[%d].command", i),
+				"mimocode local MCP server needs a command; the server is skipped"))
 		}
 	}
 	return diags
@@ -57,10 +67,19 @@ func (t Target) Emit(cfg ir.Config) ([]artifact.Artifact, error) {
 		MCP:      map[string]any{},
 	}
 	for _, p := range cfg.Providers {
+		npm := npmByProtocol[p.Protocol]
+		if npm == "" {
+			// No AI SDK package maps this protocol; Validate warns and the
+			// provider is skipped.
+			continue
+		}
 		opts := map[string]any{"baseURL": p.BaseURL}
-		if p.APIKey.FromEnv != "" {
+		switch {
+		case p.APIKey.FromEnv != "":
 			opts["apiKey"] = "{env:" + p.APIKey.FromEnv + "}"
-		} else if p.APIKey.Value != "" {
+		case p.APIKey.Value != "" && !expressionLiteral(p.APIKey.Value):
+			// A literal read as MiMo Code's own expression would not be the
+			// credential the IR asked for; Validate warns and the field is omitted.
 			opts["apiKey"] = p.APIKey.Value
 		}
 		if len(p.Headers) > 0 {
@@ -71,7 +90,7 @@ func (t Target) Emit(cfg ir.Config) ([]artifact.Artifact, error) {
 			opts["headers"] = headers
 		}
 		mp := mimoProvider{
-			NPM:     npmByProtocol[p.Protocol],
+			NPM:     npm,
 			Name:    orDefault(p.Name, p.ID),
 			Options: opts,
 			Models:  map[string]mimoModel{},
@@ -115,6 +134,10 @@ func (t Target) Emit(cfg ir.Config) ([]artifact.Artifact, error) {
 			enabled = *s.Enabled
 		}
 		if s.Transport == ir.TransportStdio {
+			if len(s.Command) == 0 {
+				// No command to run; Validate warns and the server is skipped.
+				continue
+			}
 			env := map[string]string{}
 			for name, v := range s.Env {
 				env[name] = envInterp(v)

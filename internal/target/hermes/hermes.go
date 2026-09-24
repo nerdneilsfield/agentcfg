@@ -31,29 +31,33 @@ func (t Target) Validate(cfg ir.Config) []diag.Diagnostic {
 	var diags []diag.Diagnostic
 	for i, p := range cfg.Providers {
 		if strings.Contains(p.APIKey.Value, "${") {
-			diags = append(diags, diag.TargetErrorf(t.ID(), fmt.Sprintf("providers[%d].api_key", i), "literal API key contains native expression syntax and cannot be represented literally"))
+			diags = append(diags, diag.TargetWarnf(t.ID(), fmt.Sprintf("providers[%d].api_key", i), "literal API key contains native expression syntax and cannot be represented literally"))
 		}
 	}
 	for i, p := range cfg.Providers {
 		path := fmt.Sprintf("providers[%d]", i)
 		if _, ok := apiMode[p.Protocol]; !ok {
-			diags = append(diags, diag.TargetErrorf(t.ID(), path+".protocol",
+			diags = append(diags, diag.TargetWarnf(t.ID(), path+".protocol",
 				"hermes api_mode must be chat_completions, codex_responses, or anthropic_messages; got %q", p.Protocol))
 		}
 	}
 	for i, s := range cfg.MCP {
+		if s.Transport == ir.TransportStdio && len(s.Command) == 0 {
+			diags = append(diags, diag.TargetWarnf(t.ID(), fmt.Sprintf("mcp[%d].command", i),
+				"hermes stdio MCP server has no command; the entry is skipped"))
+		}
 		if s.TimeoutMS != nil && *s.TimeoutMS <= 0 {
-			diags = append(diags, diag.TargetErrorf(t.ID(), fmt.Sprintf("mcp[%d].timeout_ms", i),
+			diags = append(diags, diag.TargetWarnf(t.ID(), fmt.Sprintf("mcp[%d].timeout_ms", i),
 				"hermes MCP timeout must be positive"))
 		}
 	}
 	if cfg.Defaults != nil && cfg.Defaults.Model != "" {
 		pid, mid, ok := splitRef(cfg.Defaults.Model)
 		if !ok {
-			diags = append(diags, diag.TargetErrorf(t.ID(), "defaults.model",
+			diags = append(diags, diag.TargetWarnf(t.ID(), "defaults.model",
 				`hermes expects defaults.model as "provider/model"; got %q`, cfg.Defaults.Model))
 		} else if !hasModel(cfg, pid, mid) {
-			diags = append(diags, diag.TargetErrorf(t.ID(), "defaults.model",
+			diags = append(diags, diag.TargetWarnf(t.ID(), "defaults.model",
 				"hermes default %q does not resolve to an emitted provider model", cfg.Defaults.Model))
 		}
 	}
@@ -70,10 +74,18 @@ func (t Target) Emit(cfg ir.Config) ([]artifact.Artifact, error) {
 		defPID, defMID, _ = splitRef(cfg.Defaults.Model)
 	}
 	for _, p := range cfg.Providers {
+		mode := apiMode[p.Protocol]
+		if mode == "" {
+			// Validate reports the unsupported protocol; without an api_mode
+			// the provider cannot be represented.
+			continue
+		}
 		hp := hermesProvider{
 			APIKeyEnv: p.APIKey.FromEnv,
-			APIKey:    p.APIKey.Value,
-			APIMode:   apiMode[p.Protocol],
+			APIMode:   mode,
+		}
+		if p.APIKey.Value != "" && !strings.Contains(p.APIKey.Value, "${") {
+			hp.APIKey = p.APIKey.Value
 		}
 		if p.BaseURL != "" {
 			hp.BaseURL = p.BaseURL
@@ -99,9 +111,16 @@ func (t Target) Emit(cfg ir.Config) ([]artifact.Artifact, error) {
 		doc.Providers[p.ID] = hp
 	}
 	if defPID != "" {
-		doc.Model = &hermesModelSel{Provider: defPID, Default: defMID}
+		if hp, ok := doc.Providers[defPID]; ok {
+			if _, ok := hp.Models[defMID]; ok {
+				doc.Model = &hermesModelSel{Provider: defPID, Default: defMID}
+			}
+		}
 	}
 	for _, s := range cfg.MCP {
+		if s.Transport == ir.TransportStdio && len(s.Command) == 0 {
+			continue
+		}
 		hs := hermesMCPServer{Enabled: true}
 		if s.Enabled != nil {
 			hs.Enabled = *s.Enabled
@@ -131,7 +150,7 @@ func (t Target) Emit(cfg ir.Config) ([]artifact.Artifact, error) {
 				hs.Headers = headers
 			}
 		}
-		if s.TimeoutMS != nil {
+		if s.TimeoutMS != nil && *s.TimeoutMS > 0 {
 			hs.Timeout = float64(*s.TimeoutMS) / 1000
 		}
 		doc.MCPServers[s.ID] = hs

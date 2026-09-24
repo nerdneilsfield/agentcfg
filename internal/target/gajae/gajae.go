@@ -33,12 +33,12 @@ func (t Target) Validate(cfg ir.Config) []diag.Diagnostic {
 	for i, p := range cfg.Providers {
 		path := fmt.Sprintf("providers[%d]", i)
 		if _, ok := apiName[p.Protocol]; !ok {
-			diags = append(diags, diag.TargetErrorf(t.ID(), path+".protocol",
+			diags = append(diags, diag.TargetWarnf(t.ID(), path+".protocol",
 				"gajae api must be openai-completions, openai-responses, or anthropic-messages for custom providers; got %q", p.Protocol))
 		}
 		for name, v := range p.Headers {
 			if v.BearerFromEnv != "" {
-				diags = append(diags, diag.TargetErrorf(t.ID(), path+".headers."+name,
+				diags = append(diags, diag.TargetWarnf(t.ID(), path+".headers."+name,
 					"gajae provider headers are flat strings with no bearer-from-env convention; use ENV:NAME or a constant value"))
 			}
 		}
@@ -46,10 +46,16 @@ func (t Target) Validate(cfg ir.Config) []diag.Diagnostic {
 			mpath := fmt.Sprintf("%s.models[%d]", path, j)
 			for _, mod := range append(append([]ir.Modality{}, m.Input...), m.Output...) {
 				if mod != ir.ModalityText && mod != ir.ModalityImage {
-					diags = append(diags, diag.TargetErrorf(t.ID(), mpath,
+					diags = append(diags, diag.TargetWarnf(t.ID(), mpath,
 						"gajae modalities are limited to text and image; %q is not representable", mod))
 				}
 			}
+		}
+	}
+	for i, s := range cfg.MCP {
+		if s.Transport == ir.TransportStdio && len(s.Command) == 0 {
+			diags = append(diags, diag.TargetWarnf(t.ID(), fmt.Sprintf("mcp[%d].command", i),
+				"gajae stdio MCP server needs a command; the server is skipped"))
 		}
 	}
 	return diags
@@ -59,18 +65,31 @@ func (t Target) Emit(cfg ir.Config) ([]artifact.Artifact, error) {
 	// Artifact 1: models.yml
 	providers := map[string]gajaeProvider{}
 	for _, p := range cfg.Providers {
+		api := apiName[p.Protocol]
+		if api == "" {
+			// No api string maps this protocol; Validate warns and the provider
+			// is skipped.
+			continue
+		}
 		gp := gajaeProvider{
 			BaseURL:   p.BaseURL,
-			API:       apiName[p.Protocol],
+			API:       api,
 			APIKeyEnv: p.APIKey.FromEnv,
 			APIKey:    p.APIKey.Value,
 		}
 		if len(p.Headers) > 0 {
 			headers := map[string]string{}
 			for name, v := range p.Headers {
+				if v.BearerFromEnv != "" {
+					// A flat string cannot carry a bearer reference; Validate
+					// warns and the header is skipped.
+					continue
+				}
 				headers[name] = headerValue(v)
 			}
-			gp.Headers = headers
+			if len(headers) > 0 {
+				gp.Headers = headers
+			}
 		}
 		for _, m := range p.Models {
 			gm := gajaeModel{ID: m.ID}
@@ -83,19 +102,11 @@ func (t Target) Emit(cfg ir.Config) ([]artifact.Artifact, error) {
 			if m.MaxOutputTokens != nil {
 				gm.MaxTokens = m.MaxOutputTokens
 			}
-			if len(m.Input) > 0 {
-				in := make([]string, 0, len(m.Input))
-				for _, mod := range m.Input {
-					in = append(in, string(mod))
-				}
-				gm.Input = in
+			if mods := gajaeModalities(m.Input); len(mods) > 0 {
+				gm.Input = mods
 			}
-			if len(m.Output) > 0 {
-				out := make([]string, 0, len(m.Output))
-				for _, mod := range m.Output {
-					out = append(out, string(mod))
-				}
-				gm.Output = out
+			if mods := gajaeModalities(m.Output); len(mods) > 0 {
+				gm.Output = mods
 			}
 			if m.Reasoning != nil {
 				gm.Reasoning = m.Reasoning
@@ -161,6 +172,10 @@ func (t Target) Emit(cfg ir.Config) ([]artifact.Artifact, error) {
 				gs.Timeout = s.TimeoutMS
 			}
 			if s.Transport == ir.TransportStdio {
+				if len(s.Command) == 0 {
+					// No command to run; Validate warns and the server is skipped.
+					continue
+				}
 				gs.Type = "stdio"
 				gs.Command = s.Command[0]
 				if len(s.Command) > 1 {
@@ -217,6 +232,18 @@ func headerValue(v ir.HeaderValue) string {
 		return v.FromEnv
 	}
 	return v.Value
+}
+
+// gajaeModalities keeps only the modalities Gajae represents: text and image.
+// A declared modality it does not carry is dropped.
+func gajaeModalities(in []ir.Modality) []string {
+	out := make([]string, 0, len(in))
+	for _, mod := range in {
+		if mod == ir.ModalityText || mod == ir.ModalityImage {
+			out = append(out, string(mod))
+		}
+	}
+	return out
 }
 
 // envValue renders MCP values. Gajae mcp.json applies ${VAR} expansion at

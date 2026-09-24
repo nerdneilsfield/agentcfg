@@ -30,25 +30,28 @@ var providerType = map[ir.Protocol]string{
 func (t Target) Validate(cfg ir.Config) []diag.Diagnostic {
 	var diags []diag.Diagnostic
 	seen := map[string]string{}
+	emitted := map[string]bool{}
 	for i, p := range cfg.Providers {
 		path := fmt.Sprintf("providers[%d]", i)
 		if _, ok := providerType[p.Protocol]; !ok {
-			diags = append(diags, diag.TargetErrorf(t.ID(), path+".protocol",
+			diags = append(diags, diag.TargetWarnf(t.ID(), path+".protocol",
 				"kimi provider type must be one of kimi, anthropic, openai, openai_responses, google-genai, vertexai; got %q", p.Protocol))
 		}
 		for name, v := range p.Headers {
 			if v.FromEnv != "" || v.BearerFromEnv != "" {
-				diags = append(diags, diag.TargetErrorf(t.ID(), path+".headers."+name,
+				diags = append(diags, diag.TargetWarnf(t.ID(), path+".headers."+name,
 					"kimi custom_headers are literal strings with no interpolation; only constant header values are representable"))
 			}
 		}
 		for j, m := range p.Models {
 			if m.ContextWindow == nil {
-				diags = append(diags, diag.TargetErrorf(t.ID(), fmt.Sprintf("%s.models[%d]", path, j),
+				diags = append(diags, diag.TargetWarnf(t.ID(), fmt.Sprintf("%s.models[%d]", path, j),
 					"kimi requires max_context_size for every model; set context_window in the IR"))
+			} else {
+				emitted[m.ID] = true
 			}
 			if prev, dup := seen[m.ID]; dup && prev != p.ID {
-				diags = append(diags, diag.TargetErrorf(t.ID(), path+".models",
+				diags = append(diags, diag.TargetWarnf(t.ID(), path+".models",
 					"kimi model aliases are flat; duplicate model id %q across providers %q and %q is rejected", m.ID, prev, p.ID))
 			} else if !dup {
 				seen[m.ID] = p.ID
@@ -58,32 +61,32 @@ func (t Target) Validate(cfg ir.Config) []diag.Diagnostic {
 	for i, s := range cfg.MCP {
 		path := fmt.Sprintf("mcp[%d]", i)
 		if s.TimeoutMS != nil && (*s.TimeoutMS < 1 || *s.TimeoutMS > 2147483647) {
-			diags = append(diags, diag.TargetErrorf(t.ID(), path+".timeout_ms",
+			diags = append(diags, diag.TargetWarnf(t.ID(), path+".timeout_ms",
 				"kimi startupTimeoutMs must be between 1 and 2147483647 milliseconds"))
 		}
 		if s.Transport == ir.TransportStdio {
 			for name, v := range s.Env {
 				if v.FromEnv != "" || v.BearerFromEnv != "" {
-					diags = append(diags, diag.TargetErrorf(t.ID(), path+".env."+name,
+					diags = append(diags, diag.TargetWarnf(t.ID(), path+".env."+name,
 						"kimi mcp.json env values are literal strings; environment references are not representable"))
 				}
 			}
 		} else {
 			for name, v := range s.Headers {
 				if v.FromEnv != "" {
-					diags = append(diags, diag.TargetErrorf(t.ID(), path+".headers."+name,
+					diags = append(diags, diag.TargetWarnf(t.ID(), path+".headers."+name,
 						"kimi mcp.json header values are literal strings; use Bearer ENV:NAME on Authorization instead"))
 				}
 				if v.BearerFromEnv != "" && name != "Authorization" {
-					diags = append(diags, diag.TargetErrorf(t.ID(), path+".headers."+name,
+					diags = append(diags, diag.TargetWarnf(t.ID(), path+".headers."+name,
 						"kimi bearerTokenEnvVar applies to Authorization only; use a constant value for other headers"))
 				}
 			}
 		}
 	}
 	if cfg.Defaults != nil && cfg.Defaults.Model != "" {
-		if _, ok := seen[modelKey(cfg.Defaults.Model)]; !ok {
-			diags = append(diags, diag.TargetErrorf(t.ID(), "defaults.model",
+		if _, ok := emitted[modelKey(cfg.Defaults.Model)]; !ok {
+			diags = append(diags, diag.TargetWarnf(t.ID(), "defaults.model",
 				"kimi default_model must be a [models] alias; %q does not resolve to an emitted model", cfg.Defaults.Model))
 		}
 	}
@@ -95,6 +98,7 @@ func (t Target) Emit(cfg ir.Config) ([]artifact.Artifact, error) {
 		Providers: map[string]kimiProvider{},
 		Models:    map[string]kimiModel{},
 	}
+	emitted := map[string]bool{}
 	for _, p := range cfg.Providers {
 		kp := kimiProvider{Type: providerType[p.Protocol], APIKey: p.APIKey.Value, APIKeyEnv: p.APIKey.FromEnv}
 		if p.BaseURL != "" {
@@ -103,6 +107,9 @@ func (t Target) Emit(cfg ir.Config) ([]artifact.Artifact, error) {
 		if len(p.Headers) > 0 {
 			headers := map[string]string{}
 			for name, v := range p.Headers {
+				if v.FromEnv != "" || v.BearerFromEnv != "" {
+					continue // custom_headers are literal-only
+				}
 				headers[name] = v.Value
 			}
 			if len(headers) > 0 {
@@ -111,6 +118,12 @@ func (t Target) Emit(cfg ir.Config) ([]artifact.Artifact, error) {
 		}
 		doc.Providers[p.ID] = kp
 		for _, m := range p.Models {
+			// max_context_size is required; a model without context_window has
+			// no faithful entry. The flat [models] alias table also means a
+			// repeated id can only be one entry, so keep the first.
+			if m.ContextWindow == nil || emitted[m.ID] {
+				continue
+			}
 			km := kimiModel{
 				Provider:       p.ID,
 				Model:          m.ID,
@@ -127,10 +140,13 @@ func (t Target) Emit(cfg ir.Config) ([]artifact.Artifact, error) {
 				km.SupportEfforts = effortStrings(m.Variants)
 			}
 			doc.Models[m.ID] = km
+			emitted[m.ID] = true
 		}
 	}
 	if cfg.Defaults != nil && cfg.Defaults.Model != "" {
-		doc.DefaultModel = modelKey(cfg.Defaults.Model)
+		if key := modelKey(cfg.Defaults.Model); emitted[key] {
+			doc.DefaultModel = key
+		}
 	}
 
 	var tbuf bytes.Buffer
@@ -152,7 +168,7 @@ func (t Target) Emit(cfg ir.Config) ([]artifact.Artifact, error) {
 			if s.Enabled != nil {
 				entry.Enabled = *s.Enabled
 			}
-			if s.TimeoutMS != nil {
+			if s.TimeoutMS != nil && *s.TimeoutMS >= 1 && *s.TimeoutMS <= 2147483647 {
 				entry.StartupTimeoutMS = s.TimeoutMS
 			}
 			if s.Transport == ir.TransportStdio {
@@ -164,9 +180,14 @@ func (t Target) Emit(cfg ir.Config) ([]artifact.Artifact, error) {
 				if len(s.Env) > 0 {
 					env := map[string]string{}
 					for name, v := range s.Env {
+						if v.FromEnv != "" || v.BearerFromEnv != "" {
+							continue // mcp.json env values are literal-only
+						}
 						env[name] = v.Value
 					}
-					entry.Env = env
+					if len(env) > 0 {
+						entry.Env = env
+					}
 				}
 				if s.CWD != "" {
 					entry.CWD = s.CWD
@@ -179,6 +200,9 @@ func (t Target) Emit(cfg ir.Config) ([]artifact.Artifact, error) {
 					if v.BearerFromEnv != "" && name == "Authorization" {
 						entry.BearerTokenEnvVar = v.BearerFromEnv
 						continue
+					}
+					if v.FromEnv != "" || v.BearerFromEnv != "" {
+						continue // mcp.json headers are literal-only
 					}
 					headers[name] = v.Value
 				}

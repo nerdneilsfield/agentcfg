@@ -32,18 +32,23 @@ func (t Target) Validate(cfg ir.Config) []diag.Diagnostic {
 	for i, p := range cfg.Providers {
 		path := fmt.Sprintf("providers[%d]", i)
 		if _, ok := apiBackend[p.Protocol]; !ok {
-			diags = append(diags, diag.TargetErrorf(t.ID(), path+".protocol",
+			diags = append(diags, diag.TargetWarnf(t.ID(), path+".protocol",
 				"grok api_backend must be chat_completions, responses, or messages; got %q", p.Protocol))
 		}
 		for name, v := range p.Headers {
 			if v.BearerFromEnv != "" {
-				diags = append(diags, diag.TargetErrorf(t.ID(), path+".headers."+name,
+				diags = append(diags, diag.TargetWarnf(t.ID(), path+".headers."+name,
 					"grok env_http_headers inserts a raw environment value; Bearer ENV:NAME is not representable"))
 			}
 		}
-		for _, m := range p.Models {
+		for j, m := range p.Models {
+			if m.ContextWindow == nil {
+				diags = append(diags, diag.TargetWarnf(t.ID(),
+					fmt.Sprintf("%s.models[%d].context_window", path, j),
+					"grok model tables require context_window; model %q is skipped", m.ID))
+			}
 			if prev, dup := seen[m.ID]; dup && prev != p.ID {
-				diags = append(diags, diag.TargetErrorf(t.ID(), path+".models",
+				diags = append(diags, diag.TargetWarnf(t.ID(), path+".models",
 					"grok has no provider table; duplicate model id %q across providers %q and %q is rejected", m.ID, prev, p.ID))
 			} else if !dup {
 				seen[m.ID] = p.ID
@@ -52,14 +57,18 @@ func (t Target) Validate(cfg ir.Config) []diag.Diagnostic {
 	}
 	for i, srv := range cfg.MCP {
 		path := fmt.Sprintf("mcp[%d]", i)
+		if srv.Transport == ir.TransportStdio && len(srv.Command) == 0 {
+			diags = append(diags, diag.TargetWarnf(t.ID(), path+".command",
+				"grok stdio MCP server has no command; the entry is skipped"))
+		}
 		if srv.TimeoutMS != nil {
-			diags = append(diags, diag.TargetErrorf(t.ID(), path+".timeout_ms",
+			diags = append(diags, diag.TargetWarnf(t.ID(), path+".timeout_ms",
 				"grok mcp_servers has no timeout field"))
 		}
 		if srv.Transport == ir.TransportHTTP {
 			for name, v := range srv.Headers {
 				if v.BearerFromEnv != "" && name != "Authorization" {
-					diags = append(diags, diag.TargetErrorf(t.ID(), path+".headers."+name,
+					diags = append(diags, diag.TargetWarnf(t.ID(), path+".headers."+name,
 						"grok bearer_token_env_var applies to Authorization only; use a constant value or ENV:NAME for other headers"))
 				}
 			}
@@ -68,7 +77,7 @@ func (t Target) Validate(cfg ir.Config) []diag.Diagnostic {
 	if cfg.Defaults != nil && cfg.Defaults.Model != "" {
 		id := modelKey(cfg.Defaults.Model)
 		if _, ok := seen[id]; !ok {
-			diags = append(diags, diag.TargetErrorf(t.ID(), "defaults.model",
+			diags = append(diags, diag.TargetWarnf(t.ID(), "defaults.model",
 				"grok [models] default must be a [model.*] table key; %q does not resolve to an emitted model", cfg.Defaults.Model))
 		}
 	}
@@ -80,18 +89,28 @@ func (t Target) Emit(cfg ir.Config) ([]artifact.Artifact, error) {
 		Model:      map[string]grokModel{},
 		MCPServers: map[string]grokMCPServer{},
 	}
+	emittedModels := map[string]bool{}
 	for _, p := range cfg.Providers {
 		backend := apiBackend[p.Protocol]
+		if backend == "" {
+			// Validate reports the unsupported protocol; without an api_backend
+			// the provider's model tables cannot be represented.
+			continue
+		}
 		headers := map[string]string{}
 		envHeaders := map[string]string{}
 		for name, v := range p.Headers {
 			if v.FromEnv != "" {
 				envHeaders[name] = v.FromEnv
-			} else {
+			} else if v.BearerFromEnv == "" {
 				headers[name] = v.Value
 			}
 		}
 		for _, m := range p.Models {
+			if m.ContextWindow == nil || emittedModels[m.ID] {
+				continue
+			}
+			emittedModels[m.ID] = true
 			gm := grokModel{
 				Model:      m.ID,
 				BaseURL:    p.BaseURL,
@@ -121,9 +140,14 @@ func (t Target) Emit(cfg ir.Config) ([]artifact.Artifact, error) {
 		}
 	}
 	if cfg.Defaults != nil && cfg.Defaults.Model != "" {
-		doc.Models = &grokModels{Default: modelKey(cfg.Defaults.Model)}
+		if key := modelKey(cfg.Defaults.Model); emittedModels[key] {
+			doc.Models = &grokModels{Default: key}
+		}
 	}
 	for _, s := range cfg.MCP {
+		if s.Transport == ir.TransportStdio && len(s.Command) == 0 {
+			continue
+		}
 		gs := grokMCPServer{}
 		if s.Enabled != nil && !*s.Enabled {
 			gs.Enabled = boolPtr(false)
@@ -147,8 +171,10 @@ func (t Target) Emit(cfg ir.Config) ([]artifact.Artifact, error) {
 			gs.URL = s.URL
 			headers := map[string]string{}
 			for name, v := range s.Headers {
-				if v.BearerFromEnv != "" && name == "Authorization" {
-					gs.BearerTokenEnvVar = v.BearerFromEnv
+				if v.BearerFromEnv != "" {
+					if name == "Authorization" {
+						gs.BearerTokenEnvVar = v.BearerFromEnv
+					}
 					continue
 				}
 				headers[name] = envLiteral(v)

@@ -14,19 +14,19 @@ func b(v bool) *bool { return &v }
 
 func expectValid(t *testing.T, cfg ir.Config) {
 	t.Helper()
-	if diags := (Target{}).Validate(cfg); diag.HasErrors(diags) {
+	if diags := (Target{}).Validate(cfg); len(diags) != 0 {
 		t.Fatalf("expected valid config, got %v", diags)
 	}
 }
 
-func expectInvalid(t *testing.T, cfg ir.Config, substr string) {
+func expectWarning(t *testing.T, cfg ir.Config, substr string) {
 	t.Helper()
 	diags := (Target{}).Validate(cfg)
-	if !diag.HasErrors(diags) {
+	if len(diags) == 0 {
 		t.Fatalf("expected validation error containing %q, got none", substr)
 	}
 	for _, d := range diags {
-		if d.Severity == diag.SeverityError && strings.Contains(d.Message, substr) {
+		if d.Severity == diag.SeverityWarning && strings.Contains(d.Message, substr) {
 			return
 		}
 	}
@@ -124,10 +124,14 @@ mcp_servers:
 	}
 }
 
-func TestRejectsUnresolvedDefault(t *testing.T) {
+func TestSkipsUnresolvedDefault(t *testing.T) {
 	cfg := exampleConfig()
 	cfg.Defaults = &ir.Defaults{Model: "volcengine/nope"}
-	expectInvalid(t, cfg, "does not resolve")
+	expectWarning(t, cfg, "does not resolve")
+	out := emitContent(t, cfg)
+	if strings.Contains(out, "provider: volcengine") || strings.Contains(out, "default: nope") {
+		t.Fatalf("unresolved default must be skipped:\n%s", out)
+	}
 }
 
 func TestIgnoresModelReasoningVariants(t *testing.T) {
@@ -146,10 +150,62 @@ func TestIgnoresModelReasoningVariants(t *testing.T) {
 	}
 }
 
-func TestRejectsNonPositiveTimeout(t *testing.T) {
+func TestSkipsNonPositiveTimeout(t *testing.T) {
 	for _, timeout := range []int64{0, -1000} {
 		cfg := exampleConfig()
 		cfg.MCP[0].TimeoutMS = i64(timeout)
-		expectInvalid(t, cfg, "must be positive")
+		expectWarning(t, cfg, "must be positive")
+		out := emitContent(t, cfg)
+		if strings.Contains(out, "timeout:") {
+			t.Fatalf("non-positive timeout must be omitted (timeout=%d):\n%s", timeout, out)
+		}
+	}
+}
+
+func emitContent(t *testing.T, cfg ir.Config) string {
+	t.Helper()
+	arts, err := (Target{}).Emit(cfg)
+	if err != nil {
+		t.Fatalf("Emit: %v", err)
+	}
+	if len(arts) != 1 {
+		t.Fatalf("expected 1 artifact, got %d", len(arts))
+	}
+	return string(arts[0].Content)
+}
+
+func TestOmitsLiteralAPIKeyWithExpression(t *testing.T) {
+	cfg := exampleConfig()
+	cfg.Providers[0].APIKey = ir.HeaderValue{Value: "${SECRET}"}
+	expectWarning(t, cfg, "native expression")
+	out := emitContent(t, cfg)
+	if strings.Contains(out, "${SECRET}") {
+		t.Fatalf("literal key with expression syntax must be skipped:\n%s", out)
+	}
+	if !strings.Contains(out, "api_mode: chat_completions") {
+		t.Fatalf("the provider must still be emitted:\n%s", out)
+	}
+}
+
+func TestSkipsUnknownProtocolProvider(t *testing.T) {
+	cfg := exampleConfig()
+	cfg.Providers[0].Protocol = "bogus"
+	expectWarning(t, cfg, "api_mode")
+	out := emitContent(t, cfg)
+	if strings.Contains(out, "volcengine:") || strings.Contains(out, "provider:") {
+		t.Fatalf("provider with an unsupported protocol must be skipped:\n%s", out)
+	}
+}
+
+func TestSkipsStdioMCPWithoutCommand(t *testing.T) {
+	cfg := exampleConfig()
+	cfg.MCP[0].Command = nil
+	expectWarning(t, cfg, "no command")
+	out := emitContent(t, cfg)
+	if strings.Contains(out, "context7") {
+		t.Fatalf("stdio server without a command must be skipped:\n%s", out)
+	}
+	if !strings.Contains(out, "github") {
+		t.Fatalf("the rest of the document must still generate:\n%s", out)
 	}
 }

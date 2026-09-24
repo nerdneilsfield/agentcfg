@@ -32,7 +32,8 @@ type AuthTypeMapper interface {
 }
 
 // AuthTypeDiagnostics reports auth_type values the target does not map, so a
-// non-official value is never silently ignored.
+// non-official value is never silently ignored. An unmapped value is a
+// representability limitation: the emitter keeps generating and warns.
 func AuthTypeDiagnostics(t Target, cfg ir.Config) []diag.Diagnostic {
 	mapped := map[ir.AuthType]bool{ir.AuthTypeOfficial: true}
 	if m, ok := t.(AuthTypeMapper); ok {
@@ -45,7 +46,7 @@ func AuthTypeDiagnostics(t Target, cfg ir.Config) []diag.Diagnostic {
 		if mapped[p.EffectiveAuthType()] {
 			continue
 		}
-		diags = append(diags, diag.TargetErrorf(t.ID(), fmt.Sprintf("providers[%d].auth_type", i),
+		diags = append(diags, diag.TargetWarnf(t.ID(), fmt.Sprintf("providers[%d].auth_type", i),
 			"target %s does not implement auth_type: %s", t.ID(), p.EffectiveAuthType()))
 	}
 	return diags

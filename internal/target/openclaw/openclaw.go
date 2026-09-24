@@ -30,30 +30,36 @@ func (t Target) Validate(cfg ir.Config) []diag.Diagnostic {
 	var diags []diag.Diagnostic
 	for i, p := range cfg.Providers {
 		if strings.Contains(p.APIKey.Value, "${") {
-			diags = append(diags, diag.TargetErrorf(t.ID(), fmt.Sprintf("providers[%d].api_key", i), "literal API key contains native expression syntax and cannot be represented literally"))
+			diags = append(diags, diag.TargetWarnf(t.ID(), fmt.Sprintf("providers[%d].api_key", i), "literal API key contains native expression syntax and cannot be represented literally"))
 		}
 	}
 	for i, p := range cfg.Providers {
 		path := fmt.Sprintf("providers[%d]", i)
 		if _, ok := apiName[p.Protocol]; !ok {
-			diags = append(diags, diag.TargetErrorf(t.ID(), path+".protocol",
+			diags = append(diags, diag.TargetWarnf(t.ID(), path+".protocol",
 				"openclaw api must be openai-completions, openai-responses, or anthropic-messages for custom providers; got %q", p.Protocol))
 		}
 		for j, m := range p.Models {
 			for _, mod := range m.Input {
 				if mod == ir.ModalityPDF {
-					diags = append(diags, diag.TargetErrorf(t.ID(), fmt.Sprintf("%s.models[%d].input", path, j), "openclaw model input does not support pdf"))
+					diags = append(diags, diag.TargetWarnf(t.ID(), fmt.Sprintf("%s.models[%d].input", path, j), "openclaw model input does not support pdf"))
 				}
 			}
+		}
+	}
+	for i, s := range cfg.MCP {
+		if s.Transport == ir.TransportStdio && len(s.Command) == 0 {
+			diags = append(diags, diag.TargetWarnf(t.ID(), fmt.Sprintf("mcp[%d].command", i),
+				"openclaw stdio MCP server has no command; the entry is skipped"))
 		}
 	}
 	if cfg.Defaults != nil && cfg.Defaults.Model != "" {
 		pid, mid, ok := splitRef(cfg.Defaults.Model)
 		if !ok {
-			diags = append(diags, diag.TargetErrorf(t.ID(), "defaults.model",
+			diags = append(diags, diag.TargetWarnf(t.ID(), "defaults.model",
 				`openclaw expects defaults.model as "provider/model"; got %q`, cfg.Defaults.Model))
 		} else if !hasModel(cfg, pid, mid) {
-			diags = append(diags, diag.TargetErrorf(t.ID(), "defaults.model",
+			diags = append(diags, diag.TargetWarnf(t.ID(), "defaults.model",
 				"openclaw default %q does not resolve to an emitted provider model", cfg.Defaults.Model))
 		}
 	}
@@ -62,14 +68,20 @@ func (t Target) Validate(cfg ir.Config) []diag.Diagnostic {
 
 func (t Target) Emit(cfg ir.Config) ([]artifact.Artifact, error) {
 	providers := map[string]openclawProvider{}
+	emittedModels := map[string]bool{}
 	for _, p := range cfg.Providers {
+		api := apiName[p.Protocol]
+		if api == "" {
+			// Validate reports the unsupported protocol; there is no native api value.
+			continue
+		}
 		op := openclawProvider{
 			BaseURL: p.BaseURL,
-			API:     apiName[p.Protocol],
+			API:     api,
 		}
 		if p.APIKey.FromEnv != "" {
 			op.APIKey = "${" + p.APIKey.FromEnv + "}"
-		} else if p.APIKey.Value != "" {
+		} else if p.APIKey.Value != "" && !strings.Contains(p.APIKey.Value, "${") {
 			op.APIKey = p.APIKey.Value
 		}
 		if len(p.Headers) > 0 {
@@ -90,9 +102,14 @@ func (t Target) Emit(cfg ir.Config) ([]artifact.Artifact, error) {
 			if len(m.Input) > 0 {
 				in := make([]string, 0, len(m.Input))
 				for _, mod := range m.Input {
+					if mod == ir.ModalityPDF {
+						continue
+					}
 					in = append(in, string(mod))
 				}
-				om.Input = in
+				if len(in) > 0 {
+					om.Input = in
+				}
 			}
 			if m.Reasoning != nil {
 				om.Reasoning = m.Reasoning
@@ -104,55 +121,59 @@ func (t Target) Emit(cfg ir.Config) ([]artifact.Artifact, error) {
 				om.Compat = map[string]bool{"supportsTools": *m.ToolCalling}
 			}
 			op.Models = append(op.Models, om)
+			emittedModels[p.ID+"/"+m.ID] = true
 		}
 		providers[p.ID] = op
 	}
 	doc := openclawConfig{
 		Models: openclawModels{Providers: providers},
 	}
-	if cfg.Defaults != nil && cfg.Defaults.Model != "" {
+	if cfg.Defaults != nil && cfg.Defaults.Model != "" && emittedModels[cfg.Defaults.Model] {
 		doc.Agents = &openclawAgents{Defaults: openclawAgentDefaults{Model: cfg.Defaults.Model}}
 	}
-	if len(cfg.MCP) > 0 {
-		servers := map[string]openclawMCPServer{}
-		for _, s := range cfg.MCP {
-			osrv := openclawMCPServer{Enabled: true}
-			if s.Enabled != nil {
-				osrv.Enabled = *s.Enabled
-			}
-			if s.Transport == ir.TransportStdio {
-				osrv.Transport = "stdio"
-				osrv.Command = s.Command[0]
-				if len(s.Command) > 1 {
-					osrv.Args = s.Command[1:]
-				}
-				if len(s.Env) > 0 {
-					env := map[string]string{}
-					for name, v := range s.Env {
-						env[name] = envInterp(v)
-					}
-					osrv.Env = env
-				}
-				if s.CWD != "" {
-					osrv.CWD = s.CWD
-				}
-			} else {
-				osrv.Transport = "streamable-http"
-				osrv.URL = s.URL
-				if len(s.Headers) > 0 {
-					headers := map[string]string{}
-					for name, v := range s.Headers {
-						headers[name] = envInterp(v)
-					}
-					osrv.Headers = headers
-				}
-			}
-			if s.TimeoutMS != nil {
-				osrv.ConnectionTimeoutMs = s.TimeoutMS
-				osrv.RequestTimeoutMs = s.TimeoutMS
-			}
-			servers[s.ID] = osrv
+	servers := map[string]openclawMCPServer{}
+	for _, s := range cfg.MCP {
+		if s.Transport == ir.TransportStdio && len(s.Command) == 0 {
+			continue
 		}
+		osrv := openclawMCPServer{Enabled: true}
+		if s.Enabled != nil {
+			osrv.Enabled = *s.Enabled
+		}
+		if s.Transport == ir.TransportStdio {
+			osrv.Transport = "stdio"
+			osrv.Command = s.Command[0]
+			if len(s.Command) > 1 {
+				osrv.Args = s.Command[1:]
+			}
+			if len(s.Env) > 0 {
+				env := map[string]string{}
+				for name, v := range s.Env {
+					env[name] = envInterp(v)
+				}
+				osrv.Env = env
+			}
+			if s.CWD != "" {
+				osrv.CWD = s.CWD
+			}
+		} else {
+			osrv.Transport = "streamable-http"
+			osrv.URL = s.URL
+			if len(s.Headers) > 0 {
+				headers := map[string]string{}
+				for name, v := range s.Headers {
+					headers[name] = envInterp(v)
+				}
+				osrv.Headers = headers
+			}
+		}
+		if s.TimeoutMS != nil {
+			osrv.ConnectionTimeoutMs = s.TimeoutMS
+			osrv.RequestTimeoutMs = s.TimeoutMS
+		}
+		servers[s.ID] = osrv
+	}
+	if len(servers) > 0 {
 		doc.MCP = &openclawMCP{Servers: servers}
 	}
 

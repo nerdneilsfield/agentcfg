@@ -40,16 +40,17 @@ A value is resolved by running it as a command when it starts with `!`, and
 otherwise by treating the whole value as an environment variable name and
 falling back to the literal string. IR `ENV:NAME` therefore renders as a bare
 `NAME`: `"$NAME"` is Pi's syntax and this fork would send it as a literal token.
-A literal API key starting with `$` or `!` would be read as that syntax, so it is
-rejected.
+A literal API key starting with `$` or `!` would be read as that syntax, so the
+emitter warns and omits `apiKey`.
 
 `apiKey` is omitted rather than written empty. The schema requires a non-empty
 string when the field is present, and an invalid `models.yml` makes the registry
 run on built-in models only.
 
 All three IR protocols map 1:1 to `api` values. Model `input` accepts `text` and
-`image` only. `cost` is emitted as zeros because the IR has no pricing scope, and
-`contextWindow` / `maxTokens` are emitted only when the IR sets them.
+`image` only; other modalities are dropped with a warning. `cost` is emitted as
+zeros because the IR has no pricing scope, and `contextWindow` / `maxTokens` are
+emitted only when the IR sets them.
 
 ### Authentication
 
@@ -89,6 +90,7 @@ stdio and http servers are emitted:
 - http: `url`, `headers`
 - both: `timeout` (IR `timeout_ms`, in milliseconds, unchanged) and
   `enabled: false` for a disabled server
+- a stdio server that declares no command is skipped with a warning
 
 stdio `env` references render as bare environment names, and
 `Authorization: "Bearer ENV:NAME"` renders as `"Bearer ${NAME}"`, which Oh My Pi

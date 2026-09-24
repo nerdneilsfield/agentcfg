@@ -14,19 +14,19 @@ func b(v bool) *bool { return &v }
 
 func expectValid(t *testing.T, cfg ir.Config) {
 	t.Helper()
-	if diags := (Target{}).Validate(cfg); diag.HasErrors(diags) {
+	if diags := (Target{}).Validate(cfg); len(diags) != 0 {
 		t.Fatalf("expected valid config, got %v", diags)
 	}
 }
 
-func expectInvalid(t *testing.T, cfg ir.Config, substr string) {
+func expectWarning(t *testing.T, cfg ir.Config, substr string) {
 	t.Helper()
 	diags := (Target{}).Validate(cfg)
-	if !diag.HasErrors(diags) {
+	if len(diags) == 0 {
 		t.Fatalf("expected validation error containing %q, got none", substr)
 	}
 	for _, d := range diags {
-		if d.Severity == diag.SeverityError && strings.Contains(d.Message, substr) {
+		if d.Severity == diag.SeverityWarning && strings.Contains(d.Message, substr) {
 			return
 		}
 	}
@@ -154,16 +154,16 @@ func TestEmitGolden(t *testing.T) {
 	}
 }
 
-func TestRejectsResponsesProtocol(t *testing.T) {
+func TestSkipsResponsesProtocol(t *testing.T) {
 	cfg := exampleConfig()
 	cfg.Providers[0].Protocol = ir.ProtocolOpenAIResponses
-	expectInvalid(t, cfg, "not representable")
+	expectWarning(t, cfg, "not representable")
 }
 
-func TestRejectsMCPCWD(t *testing.T) {
+func TestSkipsMCPCWD(t *testing.T) {
 	cfg := exampleConfig()
 	cfg.MCP[0].CWD = "/tmp"
-	expectInvalid(t, cfg, "cwd")
+	expectWarning(t, cfg, "cwd")
 }
 
 func TestOmitsEmptyMCP(t *testing.T) {
@@ -176,6 +176,57 @@ func TestOmitsEmptyMCP(t *testing.T) {
 	}
 	if strings.Contains(string(arts[0].Content), `"mcp"`) {
 		t.Fatalf("empty MCP must not emit an mcp object:\n%s", arts[0].Content)
+	}
+}
+
+func TestSkipsUnmappedProtocolProvider(t *testing.T) {
+	cfg := exampleConfig()
+	cfg.Providers[0].Protocol = ir.ProtocolOpenAIResponses
+	expectWarning(t, cfg, "not representable")
+	arts, err := (Target{}).Emit(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := string(arts[0].Content)
+	if strings.Contains(out, `"npm"`) {
+		t.Fatalf("a provider with no AI SDK mapping must be skipped:\n%s", out)
+	}
+	if !strings.Contains(out, `"provider": {}`) {
+		t.Fatalf("expected an empty provider map:\n%s", out)
+	}
+}
+
+func TestOmitsLiteralExpressionAPIKey(t *testing.T) {
+	cfg := exampleConfig()
+	cfg.Providers[0].APIKey = ir.HeaderValue{Value: "{file:secret}"}
+	expectWarning(t, cfg, "native expression syntax")
+	arts, err := (Target{}).Emit(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := string(arts[0].Content)
+	if strings.Contains(out, "apiKey") || strings.Contains(out, "{file:secret}") {
+		t.Fatalf("unrepresentable literal key must be omitted:\n%s", out)
+	}
+	if !strings.Contains(out, `"volcengine"`) {
+		t.Fatalf("provider entry must survive the omission:\n%s", out)
+	}
+}
+
+func TestSkipsLocalMCPWithoutCommand(t *testing.T) {
+	cfg := exampleConfig()
+	cfg.MCP = append(cfg.MCP, ir.MCPServer{ID: "broken", Transport: ir.TransportStdio})
+	expectWarning(t, cfg, "needs a command")
+	arts, err := (Target{}).Emit(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := string(arts[0].Content)
+	if strings.Contains(out, "broken") {
+		t.Fatalf("commandless local server must be skipped:\n%s", out)
+	}
+	if !strings.Contains(out, "context7") || !strings.Contains(out, "github") {
+		t.Fatalf("other MCP servers must still emit:\n%s", out)
 	}
 }
 

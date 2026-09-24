@@ -55,12 +55,26 @@ func emit(t *testing.T, cfg ir.Config) map[string]string {
 
 func expectValid(t *testing.T, cfg ir.Config) {
 	t.Helper()
-	if diags := (Target{}).Validate(cfg); diag.HasErrors(diags) {
+	if diags := (Target{}).Validate(cfg); len(diags) != 0 {
 		t.Fatalf("expected valid config, got %v", diags)
 	}
 	if diags := target.AuthTypeDiagnostics(Target{}, cfg); diag.HasErrors(diags) {
 		t.Fatalf("expected no auth_type diagnostics, got %v", diags)
 	}
+}
+
+func expectWarning(t *testing.T, cfg ir.Config, substr string) {
+	t.Helper()
+	diags := (Target{}).Validate(cfg)
+	if len(diags) == 0 {
+		t.Fatalf("expected a warning containing %q, got none", substr)
+	}
+	for _, d := range diags {
+		if d.Severity == diag.SeverityWarning && strings.Contains(d.Message, substr) {
+			return
+		}
+	}
+	t.Fatalf("no diagnostic containing %q: %v", substr, diags)
 }
 
 func TestEmitsModelsDocument(t *testing.T) {
@@ -146,20 +160,68 @@ func TestRoleArtifactOnlyWhenDefaultSet(t *testing.T) {
 	}
 }
 
-func TestRejectsLiteralExpressionKeys(t *testing.T) {
+func TestSkipsLiteralExpressionKeys(t *testing.T) {
 	for _, key := range []string{"!op read op://x/y", "$TOKEN"} {
 		cfg := exampleConfig()
 		cfg.Providers[0].APIKey = ir.HeaderValue{Value: key}
-		if diags := (Target{}).Validate(cfg); !diag.HasErrors(diags) {
+		if diags := (Target{}).Validate(cfg); len(diags) == 0 {
 			t.Fatalf("expected a diagnostic for literal %q", key)
 		}
 	}
 }
 
-func TestRejectsUnsupportedModelInput(t *testing.T) {
+func TestSkipsUnsupportedModelInput(t *testing.T) {
 	cfg := exampleConfig()
 	cfg.Providers[0].Models[0].Input = []ir.Modality{ir.ModalityPDF}
-	if diags := (Target{}).Validate(cfg); !diag.HasErrors(diags) {
+	if diags := (Target{}).Validate(cfg); len(diags) == 0 {
 		t.Fatal("expected a diagnostic for pdf input")
+	}
+	models := emit(t, cfg)["models.yml"]
+	if strings.Contains(models, "pdf") {
+		t.Fatalf("unsupported modality must be dropped:\n%s", models)
+	}
+	if !strings.Contains(models, "claude-sonnet-4-5") {
+		t.Fatalf("model entry must survive the omission:\n%s", models)
+	}
+}
+
+func TestDropsUnsupportedModelModalities(t *testing.T) {
+	cfg := exampleConfig()
+	cfg.Providers[0].Models[0].Input = []ir.Modality{ir.ModalityText, ir.ModalityAudio}
+	if diags := (Target{}).Validate(cfg); len(diags) == 0 {
+		t.Fatal("expected a diagnostic for audio input")
+	}
+	models := emit(t, cfg)["models.yml"]
+	if strings.Contains(models, "audio") {
+		t.Fatalf("unsupported modality must be dropped:\n%s", models)
+	}
+	if !strings.Contains(models, "text") {
+		t.Fatalf("supported modality must remain:\n%s", models)
+	}
+}
+
+func TestOmitsLiteralExpressionAPIKey(t *testing.T) {
+	cfg := exampleConfig()
+	cfg.Providers[0].APIKey = ir.HeaderValue{Value: "!command"}
+	expectWarning(t, cfg, "native expression syntax")
+	models := emit(t, cfg)["models.yml"]
+	if strings.Contains(models, "apiKey") || strings.Contains(models, "!command") {
+		t.Fatalf("unrepresentable literal key must be omitted:\n%s", models)
+	}
+	if !strings.Contains(models, "relay") {
+		t.Fatalf("provider entry must survive the omission:\n%s", models)
+	}
+}
+
+func TestSkipsStdioMCPWithoutCommand(t *testing.T) {
+	cfg := exampleConfig()
+	cfg.MCP = append(cfg.MCP, ir.MCPServer{ID: "broken", Transport: ir.TransportStdio})
+	expectWarning(t, cfg, "needs a command")
+	mcp := emit(t, cfg)["mcp.json"]
+	if strings.Contains(mcp, "broken") {
+		t.Fatalf("commandless stdio server must be skipped:\n%s", mcp)
+	}
+	if !strings.Contains(mcp, "github") {
+		t.Fatalf("other MCP servers must still emit:\n%s", mcp)
 	}
 }

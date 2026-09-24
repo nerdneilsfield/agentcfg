@@ -9,7 +9,8 @@
 
 IR `api_key: "ENV:NAME"` maps to native `apiKeyEnv: NAME`. The provider
 credential resolver supports this reference rather than a literal key, so literal
-IR API keys are rejected. A provider `name` maps to `displayName`. Literal provider headers map to native `headers`. Environment and bearer header
+IR API keys are skipped with a warning and `apiKeyEnv` is omitted. A
+provider `name` maps to `displayName`. Literal provider headers map to native `headers`. Environment and bearer header
 references have no verified native provider expression form, so this target skips
 them rather than emitting an incorrect literal.
 
@@ -34,8 +35,9 @@ llm-pi-ai:
 ```
 
 Verified protocols are `openai-completions`, `openai-responses`, and
-`anthropic-messages`. Model input is limited to `text` and `image`. The emitter
-does not write the obsolete model `reasoning` or `cost` fields.
+`anthropic-messages`. Model input is limited to `text` and `image`; other input
+modalities are dropped with a warning. The emitter does not write the obsolete
+model `reasoning` or `cost` fields.
 
 ## Reasoning variants
 
@@ -64,7 +66,8 @@ prefixed `mcp-`. Stdio maps command, args, environment, cwd, and `timeout_ms`
 to `toolCallTimeoutMs`. HTTP maps to native `streamable-http`, URL, headers,
 and the same tool-call timeout. `enabled: false` maps to the Cordis row's
 `disabled: true`. Environment values use the documented `!!js process.env.NAME`
-form; bearer values use the documented JavaScript template expression.
+form; bearer values use the documented JavaScript template expression. A stdio
+server that declares no command is skipped with a warning.
 
 ```yaml
 - insert:

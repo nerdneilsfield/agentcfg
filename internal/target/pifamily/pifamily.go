@@ -59,9 +59,13 @@ func Providers(cfg ir.Config, opts Options) map[string]any {
 			"models":  models,
 		}
 		if p.EffectiveAuthType() != ir.AuthTypeNone {
-			if p.APIKey.FromEnv != "" {
+			switch {
+			case p.APIKey.FromEnv != "":
 				entry["apiKey"] = envRef(opts.Syntax, p.APIKey.FromEnv)
-			} else if p.APIKey.Value != "" {
+			case p.APIKey.Value != "" && !nativeExpression(p.APIKey.Value):
+				// A literal the fork reads as its own expression syntax would
+				// not be the credential the IR asked for; Validate warns and
+				// the field is omitted.
 				entry["apiKey"] = p.APIKey.Value
 			}
 		}
@@ -76,11 +80,16 @@ func Providers(cfg ir.Config, opts Options) map[string]any {
 					headers[name] = opts.Bearer(v.BearerFromEnv)
 				case v.FromEnv != "":
 					headers[name] = envRef(opts.Syntax, v.FromEnv)
+				case v.BearerFromEnv != "":
+					// A flat header cannot carry a bearer reference; Validate
+					// warns and the header is skipped.
 				default:
 					headers[name] = v.Value
 				}
 			}
-			entry["headers"] = headers
+			if len(headers) > 0 {
+				entry["headers"] = headers
+			}
 		}
 		providers[p.ID] = entry
 	}
@@ -89,10 +98,12 @@ func Providers(cfg ir.Config, opts Options) map[string]any {
 
 func model(m ir.Model, opts Options) map[string]any {
 	out := map[string]any{
-		"id":    m.ID,
-		"name":  orDefault(m.Name, m.ID),
-		"input": modalities(m.Input),
-		"cost":  map[string]any{"input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0},
+		"id":   m.ID,
+		"name": orDefault(m.Name, m.ID),
+		"cost": map[string]any{"input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0},
+	}
+	if mods := modalities(m.Input); mods != nil {
+		out["input"] = mods
 	}
 	out["reasoning"] = m.Reasoning != nil && *m.Reasoning
 	if levels := thinkingLevelMap(m.Variants, opts.Levels); levels != nil {
@@ -146,16 +157,22 @@ func MappedAuthTypes() []ir.AuthType {
 	return []ir.AuthType{ir.AuthTypeOfficial, ir.AuthTypeBearer, ir.AuthTypeNone}
 }
 
+// nativeExpression reports whether a literal value would be read as the fork's
+// own expression syntax instead of as the literal token it was written as.
+func nativeExpression(v string) bool {
+	return strings.HasPrefix(v, "$") || strings.HasPrefix(v, "!")
+}
+
 // ValidateLiteralAPIKeys rejects literals a fork would read as its own
 // expression syntax instead of as a literal token.
 func ValidateLiteralAPIKeys(tid string, cfg ir.Config) []diag.Diagnostic {
 	var diags []diag.Diagnostic
 	for i, p := range cfg.Providers {
 		key := p.APIKey.Value
-		if !strings.HasPrefix(key, "$") && !strings.HasPrefix(key, "!") {
+		if !nativeExpression(key) {
 			continue
 		}
-		diags = append(diags, diag.TargetErrorf(tid, fmt.Sprintf("providers[%d].api_key", i),
+		diags = append(diags, diag.TargetWarnf(tid, fmt.Sprintf("providers[%d].api_key", i),
 			"literal API key contains native expression syntax and cannot be represented literally"))
 	}
 	return diags
@@ -170,7 +187,7 @@ func ValidateModelInput(tid string, cfg ir.Config) []diag.Diagnostic {
 				if mod == ir.ModalityText || mod == ir.ModalityImage {
 					continue
 				}
-				diags = append(diags, diag.TargetErrorf(tid, fmt.Sprintf("providers[%d].models[%d].input", i, j),
+				diags = append(diags, diag.TargetWarnf(tid, fmt.Sprintf("providers[%d].models[%d].input", i, j),
 					"%s model input supports text and image only", tid))
 			}
 		}
@@ -204,13 +221,21 @@ func containsEffort(efforts []ir.ReasoningEffort, wanted ir.ReasoningEffort) boo
 	return false
 }
 
+// modalities carries only the modalities the forks represent: text and image.
+// A declared modality they do not carry is dropped, and a model left with none
+// omits the field rather than gain one the IR never declared.
 func modalities(in []ir.Modality) []string {
 	if len(in) == 0 {
 		return []string{string(ir.ModalityText)}
 	}
 	out := make([]string, 0, len(in))
 	for _, m := range in {
-		out = append(out, string(m))
+		if m == ir.ModalityText || m == ir.ModalityImage {
+			out = append(out, string(m))
+		}
+	}
+	if len(out) == 0 {
+		return nil
 	}
 	return out
 }

@@ -18,6 +18,9 @@ func TestScalarAPIKeys(t *testing.T) {
 				if id == "codex" {
 					protocol = "openai-responses"
 				}
+				if id == "cometixcode" {
+					protocol = "anthropic-messages"
+				}
 				cfg, ds, err := ir.Load([]byte("version: 1\nproviders:\n  - id: test\n    protocol: " + protocol + "\n    base_url: https://example.com/v1\n    api_key: " + key + "\n    models: [{id: model, context_window: 128000}]\n"))
 				if err != nil || diag.HasErrors(ds) {
 					t.Fatalf("load: %v %v", err, ds)
@@ -28,10 +31,10 @@ func TestScalarAPIKeys(t *testing.T) {
 				}
 				emitter, _ := target.Lookup(id)
 				ds = emitter.Validate(cfg)
-				reject := ((id == "goose" || id == "deepseek-harness") && key == "literal-test-key") || ((id == "cline" || id == "zcode") && key != "literal-test-key")
+				reject := ((id == "goose" || id == "deepseek-harness" || id == "commandcode") && key == "literal-test-key") || ((id == "cline" || id == "zcode" || id == "cometixcode") && key != "literal-test-key")
 				if reject {
-					if !diag.HasErrors(ds) {
-						t.Fatal("expected unsupported key diagnostic")
+					if len(ds) == 0 {
+						t.Fatal("expected an unsupported key diagnostic")
 					}
 					return
 				}
@@ -96,7 +99,7 @@ func TestScalarAPIKeys(t *testing.T) {
 	}
 }
 
-func TestRejectsNativeExpressionsInLiteralAPIKeys(t *testing.T) {
+func TestSkipsNativeExpressionsInLiteralAPIKeys(t *testing.T) {
 	cases := map[string]string{
 		"crush": "$(touch /tmp/not-executed)", "pi": "$TOKEN", "prime-agent": "!command",
 		"opencode": "{env:TOKEN}", "mimocode": "{file:secret}", "openclaw": "${TOKEN}", "hermes": "${TOKEN}",

@@ -4,6 +4,8 @@ package all
 import (
 	_ "agentcfg/internal/target/cline"
 	_ "agentcfg/internal/target/codex"
+	_ "agentcfg/internal/target/cometixcode"
+	_ "agentcfg/internal/target/commandcode"
 	_ "agentcfg/internal/target/crush"
 	_ "agentcfg/internal/target/deepseekharness"
 	_ "agentcfg/internal/target/gajae"

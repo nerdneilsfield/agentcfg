@@ -1,14 +1,17 @@
 # Target contracts
 
-This directory records the native configuration evidence used by agentcfg emitters. It is intentionally separate from [`../protocol.md`](../protocol.md): the protocol describes how to write `agentcfg.yaml`; these files describe how each CLI spells the same facts, and which IR fields it rejects.
+This directory records the native configuration evidence used by agentcfg emitters. It is intentionally separate from [`../protocol.md`](../protocol.md): the protocol describes how to write `agentcfg.yaml`; these files describe how each CLI spells the same facts, and which IR fields it cannot spell.
 
-Write the IR against the protocol. Open the contract for a target before putting that id in `targets:` or `--to`. A field that is legal in the IR can still be unrepresentable on a given CLI. Common mismatches:
+Write the IR against the protocol. Open the contract for a target before putting that id in `targets:` or `--to`. A field that is legal in the IR can still be unrepresentable on a given CLI. A target skips a field it cannot spell natively, warns with the field path and the reason, and still generates everything else; only invalid IR fails a run. Common mismatches:
 
-- Codex accepts `openai-responses` only; OpenCode accepts `openai-completions` only.
-- Cline and ZCode reject `api_key: "ENV:NAME"` (literal keys only). Kimi maps that scalar to `api_key_env`. Goose and DeepSeek Harness reject literal API keys.
-- Pi rejects every MCP server in v1. jcode rejects HTTP MCP.
-- Crush, MiMo Code, and jcode reject MCP `cwd`. Grok and Prime Agent reject MCP `timeout_ms`. Kimi maps `timeout_ms` to `startupTimeoutMs` and does not write `toolTimeoutMs`.
-- Crush keeps reasoning-effort names such as `ultra`. Gajae, OpenClaw, Pi, Prime Agent, Grok, and DeepSeek Harness skip names outside their native ladder.
+- Codex accepts `openai-responses` only; OpenCode maps all three protocols to native V2 provider packages.
+- Cline and ZCode are literal-only, so an `api_key: "ENV:NAME"` reference is skipped and no credential is written. Kimi maps that scalar to `api_key_env`. Goose and DeepSeek Harness skip a literal API key; Command Code skips one too and writes `"$NAME"` for a reference.
+- Pi has no built-in MCP support and skips every MCP server; jcode skips HTTP MCP.
+- Crush, MiMo Code, and jcode have no native MCP `cwd` and skip it. Grok and Prime Agent have no MCP timeout field and skip `timeout_ms`. Kimi maps `timeout_ms` to `startupTimeoutMs` and does not write `toolTimeoutMs`. Command Code has no native field for either and skips both.
+- Crush keeps reasoning-effort names such as `ultra`. Gajae, OpenClaw, Pi, Prime Agent, Grok, DeepSeek Harness, and Command Code skip names outside their native ladder.
+- Command Code skips environment-derived provider headers, which it does not interpolate, and provider ids reserved for its built-in subscription lanes.
+- OpenCode has no model reasoning flag in V2, so that IR field is skipped with a warning; its provider headers do expand `{env:NAME}`.
+- CometixCode configures one Anthropic endpoint through environment variables: only one provider is emitted, `api_key: "ENV:NAME"` is skipped because settings values are literal, and per-model facts have no native field.
 
 `--to all` is a CLI wildcard for every compiled-in emitter. An IR list `targets: [all]` is an unknown id. One document rarely represents faithfully on every target at once; put the CLIs you generate for in `targets:` and override with `--to`.
 
@@ -31,5 +34,7 @@ Write the IR against the protocol. Open the contract for a target before putting
 | [OpenClaw](openclaw.md) | JSON `models.providers` | JSON `mcp.servers` | official repo zod schemas |
 | [Crush](crush.md) | JSON `providers` | JSON `mcp` | live schema charm.land/crush.json |
 | [Goose](goose.md) | JSON `custom_providers/<id>.json` | YAML `extensions` | official repo (block/goose) |
+| [Command Code](commandcode.md) | JSON `provider` | JSON `mcpServers` | installed v1.64.0 BYOK/MCP parsers + official BYOK and MCP docs |
+| [CometixCode](cometixcode.md) | Anthropic env (`ANTHROPIC_BASE_URL`) | JSON `mcpServers` | repo source (`Haleclipse/CometixCode`) + Claude Code settings/env/MCP docs |
 
 Every emitter change must update the applicable target contract with version, source URL/path, and tested status.

@@ -14,19 +14,19 @@ func b(v bool) *bool { return &v }
 
 func expectValid(t *testing.T, cfg ir.Config) {
 	t.Helper()
-	if diags := (Target{}).Validate(cfg); diag.HasErrors(diags) {
+	if diags := (Target{}).Validate(cfg); len(diags) != 0 {
 		t.Fatalf("expected valid config, got %v", diags)
 	}
 }
 
-func expectInvalid(t *testing.T, cfg ir.Config, substr string) {
+func expectWarning(t *testing.T, cfg ir.Config, substr string) {
 	t.Helper()
 	diags := (Target{}).Validate(cfg)
-	if !diag.HasErrors(diags) {
+	if len(diags) == 0 {
 		t.Fatalf("expected validation error containing %q, got none", substr)
 	}
 	for _, d := range diags {
-		if d.Severity == diag.SeverityError && strings.Contains(d.Message, substr) {
+		if d.Severity == diag.SeverityWarning && strings.Contains(d.Message, substr) {
 			return
 		}
 	}
@@ -148,16 +148,16 @@ func TestEmitGolden(t *testing.T) {
 	}
 }
 
-func TestRejectsProviderBearerHeader(t *testing.T) {
+func TestSkipsProviderBearerHeader(t *testing.T) {
 	cfg := exampleConfig()
 	cfg.Providers[0].Headers["Authorization"] = ir.HeaderValue{BearerFromEnv: "TOKEN"}
-	expectInvalid(t, cfg, "bearer-from-env")
+	expectWarning(t, cfg, "bearer-from-env")
 }
 
-func TestRejectsNonImageModality(t *testing.T) {
+func TestSkipsNonImageModality(t *testing.T) {
 	cfg := exampleConfig()
 	cfg.Providers[0].Models[0].Input = []ir.Modality{ir.ModalityAudio}
-	expectInvalid(t, cfg, "text and image")
+	expectWarning(t, cfg, "text and image")
 }
 
 func TestEmitsEffortThinkingLevels(t *testing.T) {
@@ -189,5 +189,69 @@ func TestSkipsUnsupportedReasoningEffort(t *testing.T) {
 	out := string(arts[0].Content)
 	if !strings.Contains(out, "minLevel: low") || strings.Contains(out, "ultra") {
 		t.Fatalf("unsupported effort was not skipped:\n%s", out)
+	}
+}
+
+func TestSkipsBearerProviderHeaderOutput(t *testing.T) {
+	cfg := exampleConfig()
+	cfg.Providers[0].Headers = map[string]ir.HeaderValue{"Authorization": {BearerFromEnv: "TOKEN"}}
+	expectWarning(t, cfg, "bearer-from-env")
+	arts, err := (Target{}).Emit(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := string(arts[0].Content)
+	if strings.Contains(out, "Authorization") || strings.Contains(out, `""`) {
+		t.Fatalf("a flat string cannot carry a bearer reference:\n%s", out)
+	}
+	if !strings.Contains(out, "volcengine") {
+		t.Fatalf("provider entry must survive the omission:\n%s", out)
+	}
+}
+
+func TestDropsUnsupportedModalities(t *testing.T) {
+	cfg := exampleConfig()
+	cfg.Providers[0].Models[0].Input = []ir.Modality{ir.ModalityText, ir.ModalityAudio}
+	expectWarning(t, cfg, "text and image")
+	arts, err := (Target{}).Emit(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := string(arts[0].Content)
+	if strings.Contains(out, "audio") {
+		t.Fatalf("unsupported modality must be dropped:\n%s", out)
+	}
+	if !strings.Contains(out, "- text") {
+		t.Fatalf("supported modality must remain:\n%s", out)
+	}
+}
+
+func TestSkipsUnmappableProtocolProvider(t *testing.T) {
+	cfg := exampleConfig()
+	cfg.Providers[0].Protocol = ir.Protocol("gemini")
+	expectWarning(t, cfg, "gajae api must be")
+	arts, err := (Target{}).Emit(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if out := string(arts[0].Content); strings.Contains(out, "volcengine") {
+		t.Fatalf("provider with no representable api must be skipped:\n%s", out)
+	}
+}
+
+func TestSkipsStdioMCPWithoutCommand(t *testing.T) {
+	cfg := exampleConfig()
+	cfg.MCP[0].Command = nil
+	expectWarning(t, cfg, "needs a command")
+	arts, err := (Target{}).Emit(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := string(arts[2].Content)
+	if strings.Contains(out, "context7") {
+		t.Fatalf("commandless stdio server must be skipped:\n%s", out)
+	}
+	if !strings.Contains(out, "github") {
+		t.Fatalf("other MCP servers must still emit:\n%s", out)
 	}
 }

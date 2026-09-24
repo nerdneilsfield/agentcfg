@@ -2,6 +2,8 @@
 package omp
 
 import (
+	"fmt"
+
 	"agentcfg/internal/artifact"
 	"agentcfg/internal/diag"
 	"agentcfg/internal/ir"
@@ -55,7 +57,14 @@ func ompModelFields(m ir.Model) map[string]any {
 
 func (t Target) Validate(cfg ir.Config) []diag.Diagnostic {
 	diags := pifamily.ValidateLiteralAPIKeys(t.ID(), cfg)
-	return append(diags, pifamily.ValidateModelInput(t.ID(), cfg)...)
+	diags = append(diags, pifamily.ValidateModelInput(t.ID(), cfg)...)
+	for i, s := range cfg.MCP {
+		if s.Transport == ir.TransportStdio && len(s.Command) == 0 {
+			diags = append(diags, diag.TargetWarnf(t.ID(), fmt.Sprintf("mcp[%d].command", i),
+				"omp stdio MCP server needs a command; the server is skipped"))
+		}
+	}
+	return diags
 }
 
 // MappedAuthTypes reports the auth_type values Oh My Pi maps.
@@ -117,6 +126,10 @@ func mcpServers(cfg ir.Config) map[string]any {
 		entry := map[string]any{"type": string(s.Transport)}
 		switch s.Transport {
 		case ir.TransportStdio:
+			if len(s.Command) == 0 {
+				// No command to run; Validate warns and the server is skipped.
+				continue
+			}
 			entry["command"] = s.Command[0]
 			if len(s.Command) > 1 {
 				entry["args"] = s.Command[1:]

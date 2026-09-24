@@ -28,10 +28,14 @@ func piOptions() pifamily.Options {
 func (t Target) Validate(cfg ir.Config) []diag.Diagnostic {
 	diags := pifamily.ValidateLiteralAPIKeys(t.ID(), cfg)
 	diags = append(diags, pifamily.ValidateModelInput(t.ID(), cfg)...)
+	if len(cfg.MCP) > 0 {
+		diags = append(diags, diag.TargetWarnf(t.ID(), "mcp",
+			"pi has no built-in MCP support, so every declared MCP server is skipped"))
+	}
 	for i, p := range cfg.Providers {
 		for name, v := range p.Headers {
 			if v.BearerFromEnv != "" {
-				diags = append(diags, diag.TargetErrorf(t.ID(), fmt.Sprintf("providers[%d].headers.%s", i, name),
+				diags = append(diags, diag.TargetWarnf(t.ID(), fmt.Sprintf("providers[%d].headers.%s", i, name),
 					"pi header values use the $NAME expression syntax; Bearer ENV:NAME has no verified bearer expansion; use auth_type: bearer instead"))
 			}
 		}

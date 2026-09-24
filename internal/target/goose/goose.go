@@ -39,38 +39,38 @@ func (t Target) Validate(cfg ir.Config) []diag.Diagnostic {
 	for i, p := range cfg.Providers {
 		path := fmt.Sprintf("providers[%d]", i)
 		if p.APIKey.Value != "" {
-			diags = append(diags, diag.TargetErrorf(t.ID(), path+".api_key", "goose does not support literal API keys in the verified native configuration"))
+			diags = append(diags, diag.TargetWarnf(t.ID(), path+".api_key", "goose does not support literal API keys in the verified native configuration"))
 		}
 		if _, ok := engineName[p.Protocol]; !ok {
-			diags = append(diags, diag.TargetErrorf(t.ID(), path+".protocol",
+			diags = append(diags, diag.TargetWarnf(t.ID(), path+".protocol",
 				"goose custom provider engine must be openai or anthropic; got %q", p.Protocol))
 		}
 		for name, v := range p.Headers {
 			if v.FromEnv != "" || v.BearerFromEnv != "" {
-				diags = append(diags, diag.TargetErrorf(t.ID(), path+".headers."+name,
+				diags = append(diags, diag.TargetWarnf(t.ID(), path+".headers."+name,
 					"goose custom-provider headers are literal strings with no interpolation"))
 			}
 		}
 		for j, m := range p.Models {
 			mpath := fmt.Sprintf("%s.models[%d]", path, j)
 			if m.MaxOutputTokens != nil {
-				diags = append(diags, diag.TargetErrorf(t.ID(), mpath+".max_output_tokens",
+				diags = append(diags, diag.TargetWarnf(t.ID(), mpath+".max_output_tokens",
 					"goose ModelInfo has no per-model max-tokens field (global GOOSE_MAX_TOKENS only); per-model max_output_tokens is not representable"))
 			}
 			for _, mod := range m.Input {
 				if mod != ir.ModalityText {
-					diags = append(diags, diag.TargetErrorf(t.ID(), mpath+".input",
+					diags = append(diags, diag.TargetWarnf(t.ID(), mpath+".input",
 						"goose ModelInfo has no modality fields; %q is not representable", mod))
 				}
 			}
 			for _, mod := range m.Output {
 				if mod != ir.ModalityText {
-					diags = append(diags, diag.TargetErrorf(t.ID(), mpath+".output",
+					diags = append(diags, diag.TargetWarnf(t.ID(), mpath+".output",
 						"goose ModelInfo has no modality fields; %q is not representable", mod))
 				}
 			}
 			if m.ToolCalling != nil && !*m.ToolCalling {
-				diags = append(diags, diag.TargetErrorf(t.ID(), mpath+".tool_calling",
+				diags = append(diags, diag.TargetWarnf(t.ID(), mpath+".tool_calling",
 					"goose agents always expose tools; tool_calling: false is not representable"))
 			}
 		}
@@ -78,19 +78,19 @@ func (t Target) Validate(cfg ir.Config) []diag.Diagnostic {
 	for i, s := range cfg.MCP {
 		path := fmt.Sprintf("mcp[%d]", i)
 		if s.TimeoutMS != nil && *s.TimeoutMS <= 0 {
-			diags = append(diags, diag.TargetErrorf(t.ID(), path+".timeout_ms",
+			diags = append(diags, diag.TargetWarnf(t.ID(), path+".timeout_ms",
 				"goose extension timeout must be positive"))
 		} else if s.TimeoutMS != nil && *s.TimeoutMS%1000 != 0 {
-			diags = append(diags, diag.TargetErrorf(t.ID(), path+".timeout_ms",
+			diags = append(diags, diag.TargetWarnf(t.ID(), path+".timeout_ms",
 				"goose extension timeout is whole seconds; %d ms is not divisible by 1000", *s.TimeoutMS))
 		}
 		for name, v := range s.Env {
 			if v.BearerFromEnv != "" {
-				diags = append(diags, diag.TargetErrorf(t.ID(), path+".env."+name,
+				diags = append(diags, diag.TargetWarnf(t.ID(), path+".env."+name,
 					"goose extension env values are plain environment names or literals; Bearer ENV:NAME is not representable on env"))
 			}
 			if v.FromEnv != "" && v.FromEnv != name {
-				diags = append(diags, diag.TargetErrorf(t.ID(), path+".env."+name,
+				diags = append(diags, diag.TargetWarnf(t.ID(), path+".env."+name,
 					"goose stdio env_keys preserve the source name; renamed environment references are not representable"))
 			}
 		}
@@ -98,10 +98,10 @@ func (t Target) Validate(cfg ir.Config) []diag.Diagnostic {
 	if cfg.Defaults != nil && cfg.Defaults.Model != "" {
 		pid, mid, ok := splitRef(cfg.Defaults.Model)
 		if !ok {
-			diags = append(diags, diag.TargetErrorf(t.ID(), "defaults.model",
+			diags = append(diags, diag.TargetWarnf(t.ID(), "defaults.model",
 				`goose expects defaults.model as "provider/model"; got %q`, cfg.Defaults.Model))
-		} else if !hasModel(cfg, pid, mid) {
-			diags = append(diags, diag.TargetErrorf(t.ID(), "defaults.model",
+		} else if !emittedModel(cfg, pid, mid) {
+			diags = append(diags, diag.TargetWarnf(t.ID(), "defaults.model",
 				"goose default %q does not resolve to an emitted provider model", cfg.Defaults.Model))
 		}
 	}
@@ -110,10 +110,17 @@ func (t Target) Validate(cfg ir.Config) []diag.Diagnostic {
 
 func (t Target) Emit(cfg ir.Config) ([]artifact.Artifact, error) {
 	arts := []artifact.Artifact{}
+	emitted := map[string]bool{}
 	for _, p := range cfg.Providers {
+		engine, ok := engineName[p.Protocol]
+		if !ok {
+			// No native engine: the custom provider cannot be represented.
+			continue
+		}
+		emitted[p.ID] = true
 		gp := gooseProvider{
 			Name:              p.ID,
-			Engine:            engineName[p.Protocol],
+			Engine:            engine,
 			DisplayName:       orDefault(p.Name, p.ID),
 			APIKeyEnv:         p.APIKey.FromEnv,
 			BaseURL:           p.BaseURL,
@@ -127,6 +134,9 @@ func (t Target) Emit(cfg ir.Config) ([]artifact.Artifact, error) {
 		if len(p.Headers) > 0 {
 			headers := map[string]string{}
 			for name, v := range p.Headers {
+				if v.FromEnv != "" || v.BearerFromEnv != "" {
+					continue
+				}
 				headers[name] = v.Value
 			}
 			if len(headers) > 0 {
@@ -160,10 +170,11 @@ func (t Target) Emit(cfg ir.Config) ([]artifact.Artifact, error) {
 
 	cfgDoc := gooseConfig{Extensions: map[string]gooseExt{}}
 	if cfg.Defaults != nil && cfg.Defaults.Model != "" {
-		pid, mid, _ := splitRef(cfg.Defaults.Model)
-		cfgDoc.ActiveProvider = pid
-		cfgDoc.Providers = map[string]gooseProviderEntry{
-			pid: {Enabled: true, Model: mid, Configured: true},
+		if pid, mid, ok := splitRef(cfg.Defaults.Model); ok && emitted[pid] && hasModel(cfg, pid, mid) {
+			cfgDoc.ActiveProvider = pid
+			cfgDoc.Providers = map[string]gooseProviderEntry{
+				pid: {Enabled: true, Model: mid, Configured: true},
+			}
 		}
 	}
 	for _, s := range cfg.MCP {
@@ -174,8 +185,8 @@ func (t Target) Emit(cfg ir.Config) ([]artifact.Artifact, error) {
 		if s.Enabled != nil {
 			ext.Enabled = *s.Enabled
 		}
-		if s.TimeoutMS != nil {
-			ext.Timeout = int64(*s.TimeoutMS / 1000)
+		if s.TimeoutMS != nil && *s.TimeoutMS > 0 && *s.TimeoutMS%1000 == 0 {
+			ext.Timeout = *s.TimeoutMS / 1000
 		}
 		if s.Transport == ir.TransportStdio {
 			ext.Type = "stdio"
@@ -190,9 +201,14 @@ func (t Target) Emit(cfg ir.Config) ([]artifact.Artifact, error) {
 				env := map[string]string{}
 				keys := []string{}
 				for name, v := range s.Env {
-					if v.FromEnv != "" {
+					switch {
+					case v.BearerFromEnv != "":
+						// Not representable on env.
+					case v.FromEnv == name:
 						keys = append(keys, v.FromEnv)
-					} else {
+					case v.FromEnv != "":
+						// Renamed references are not representable.
+					default:
 						env[name] = v.Value
 					}
 				}
@@ -265,6 +281,25 @@ func hasModel(cfg ir.Config, pid, mid string) bool {
 	for _, p := range cfg.Providers {
 		if p.ID != pid {
 			continue
+		}
+		for _, m := range p.Models {
+			if m.ID == mid {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// emittedModel reports whether Emit keeps the referenced model: goose skips a
+// provider whose protocol has no native engine.
+func emittedModel(cfg ir.Config, pid, mid string) bool {
+	for _, p := range cfg.Providers {
+		if p.ID != pid {
+			continue
+		}
+		if _, ok := engineName[p.Protocol]; !ok {
+			return false
 		}
 		for _, m := range p.Models {
 			if m.ID == mid {

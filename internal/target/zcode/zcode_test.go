@@ -14,19 +14,19 @@ func b(v bool) *bool { return &v }
 
 func expectValid(t *testing.T, cfg ir.Config) {
 	t.Helper()
-	if diags := (Target{}).Validate(cfg); diag.HasErrors(diags) {
+	if diags := (Target{}).Validate(cfg); len(diags) != 0 {
 		t.Fatalf("expected valid config, got %v", diags)
 	}
 }
 
-func expectInvalid(t *testing.T, cfg ir.Config, substr string) {
+func expectWarning(t *testing.T, cfg ir.Config, substr string) {
 	t.Helper()
 	diags := (Target{}).Validate(cfg)
-	if !diag.HasErrors(diags) {
+	if len(diags) == 0 {
 		t.Fatalf("expected validation error containing %q, got none", substr)
 	}
 	for _, d := range diags {
-		if d.Severity == diag.SeverityError && strings.Contains(d.Message, substr) {
+		if d.Severity == diag.SeverityWarning && strings.Contains(d.Message, substr) {
 			return
 		}
 	}
@@ -135,22 +135,87 @@ func TestEmitGolden(t *testing.T) {
 	}
 }
 
-func TestRejectsResponsesProtocol(t *testing.T) {
+func TestSkipsResponsesProtocol(t *testing.T) {
 	cfg := exampleConfig()
 	cfg.Providers[0].Protocol = ir.ProtocolOpenAIResponses
-	expectInvalid(t, cfg, "no native location")
+	expectWarning(t, cfg, "no native location")
+	expectWarning(t, cfg, "does not resolve")
+	arts, err := (Target{}).Emit(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := string(arts[0].Content)
+	if strings.Contains(out, "volcengine") || strings.Contains(out, `"model"`) {
+		t.Fatalf("a skipped provider and its default must be omitted:\n%s", out)
+	}
 }
 
-func TestRejectsAPIKeyEnv(t *testing.T) {
+func TestSkipsAPIKeyEnv(t *testing.T) {
 	cfg := exampleConfig()
 	cfg.Providers[0].APIKey.FromEnv = "VOLC_API_KEY"
-	expectInvalid(t, cfg, "api_key")
+	expectWarning(t, cfg, "api_key")
+	arts, err := (Target{}).Emit(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(arts[0].Content), "VOLC_API_KEY") {
+		t.Fatalf("an env-derived api_key must be skipped:\n%s", arts[0].Content)
+	}
 }
 
-func TestRejectsMCPEnvRef(t *testing.T) {
+func TestSkipsEnvDerivedProviderHeader(t *testing.T) {
+	cfg := exampleConfig()
+	cfg.Providers[0].Headers["X-Gateway-Key"] = ir.HeaderValue{FromEnv: "GATEWAY_KEY"}
+	expectWarning(t, cfg, "literal strings")
+	arts, err := (Target{}).Emit(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := string(arts[0].Content)
+	if strings.Contains(out, "X-Gateway-Key") {
+		t.Fatalf("an env-derived provider header must be skipped:\n%s", out)
+	}
+	if !strings.Contains(out, "X-Tenant") {
+		t.Fatalf("a literal provider header must be kept:\n%s", out)
+	}
+}
+
+func TestSkipsMCPEnvRef(t *testing.T) {
 	cfg := exampleConfig()
 	cfg.MCP[0].Env["CONTEXT7_API_KEY"] = ir.HeaderValue{FromEnv: "CONTEXT7_API_KEY"}
-	expectInvalid(t, cfg, "literal strings")
+	expectWarning(t, cfg, "literal strings")
+	arts, err := (Target{}).Emit(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := string(arts[0].Content)
+	if strings.Contains(out, "CONTEXT7_API_KEY") {
+		t.Fatalf("an env-derived MCP env value must be skipped:\n%s", out)
+	}
+	if !strings.Contains(out, `"context7"`) {
+		t.Fatalf("the MCP entry itself must be kept:\n%s", out)
+	}
+}
+
+func TestSkipsMCPHeaderRef(t *testing.T) {
+	cfg := exampleConfig()
+	cfg.MCP[0].Transport = ir.TransportHTTP
+	cfg.MCP[0].Command = nil
+	cfg.MCP[0].Env = nil
+	cfg.MCP[0].URL = "https://mcp.example.com/mcp"
+	cfg.MCP[0].Headers = map[string]ir.HeaderValue{"X-Token": {FromEnv: "MCP_TOKEN"}}
+	expectWarning(t, cfg, "literal strings")
+	arts, err := (Target{}).Emit(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := string(arts[0].Content)
+	if strings.Contains(out, "X-Token") {
+		t.Fatalf("an env-derived MCP header must be skipped:\n%s", out)
+	}
+	if !strings.Contains(out, `"type": "http"`) {
+		t.Fatalf("the http entry itself must be kept:\n%s", out)
+	}
 }
 
 func TestOmitsEmptyMCP(t *testing.T) {

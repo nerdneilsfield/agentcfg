@@ -102,3 +102,45 @@ func TestDSHValidationAndProviderFields(t *testing.T) {
 	}
 }
 func i64(v int64) *int64 { return &v }
+
+func TestDropsUnsupportedInputModalities(t *testing.T) {
+	cfg := variantConfig("low")
+	cfg.Providers[0].Models[0].Input = []ir.Modality{ir.ModalityText, ir.ModalityAudio}
+	if diags := (Target{}).Validate(cfg); len(diags) == 0 {
+		t.Fatal("expected an input diagnostic")
+	}
+	arts, err := (Target{}).Emit(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := string(arts[0].Content)
+	if strings.Contains(out, "audio") {
+		t.Fatalf("unsupported modality must be dropped:\n%s", out)
+	}
+	if !strings.Contains(out, "text") {
+		t.Fatalf("supported modality must remain:\n%s", out)
+	}
+}
+
+func TestSkipsStdioMCPWithoutCommand(t *testing.T) {
+	cfg := variantConfig("low")
+	cfg.Defaults = &ir.Defaults{Model: "provider/model"}
+	cfg.MCP = []ir.MCPServer{{ID: "broken", Transport: ir.TransportStdio}}
+	if diags := (Target{}).Validate(cfg); len(diags) == 0 {
+		t.Fatal("expected a command diagnostic")
+	}
+	arts, err := (Target{}).Emit(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(arts) != 2 || arts[1].Name != "cordis.patch.yml" {
+		t.Fatalf("unexpected artifacts: %#v", arts)
+	}
+	out := string(arts[1].Content)
+	if strings.Contains(out, "broken") || strings.Contains(out, "dsh-mcp-client") {
+		t.Fatalf("commandless stdio server must be skipped:\n%s", out)
+	}
+	if !strings.Contains(out, "dsh-agent-default-model") {
+		t.Fatalf("other patch rows must still emit:\n%s", out)
+	}
+}

@@ -14,19 +14,19 @@ func b(v bool) *bool { return &v }
 
 func expectValid(t *testing.T, cfg ir.Config) {
 	t.Helper()
-	if diags := (Target{}).Validate(cfg); diag.HasErrors(diags) {
+	if diags := (Target{}).Validate(cfg); len(diags) != 0 {
 		t.Fatalf("expected valid config, got %v", diags)
 	}
 }
 
-func expectInvalid(t *testing.T, cfg ir.Config, substr string) {
+func expectWarning(t *testing.T, cfg ir.Config, substr string) {
 	t.Helper()
 	diags := (Target{}).Validate(cfg)
-	if !diag.HasErrors(diags) {
+	if len(diags) == 0 {
 		t.Fatalf("expected validation error containing %q, got none", substr)
 	}
 	for _, d := range diags {
-		if d.Severity == diag.SeverityError && strings.Contains(d.Message, substr) {
+		if d.Severity == diag.SeverityWarning && strings.Contains(d.Message, substr) {
 			return
 		}
 	}
@@ -158,46 +158,46 @@ func TestMapsOpenAIResponses(t *testing.T) {
 	}
 }
 
-func TestRejectsPerModelMaxOutputTokens(t *testing.T) {
+func TestSkipsPerModelMaxOutputTokens(t *testing.T) {
 	cfg := exampleConfig()
 	cfg.Providers[0].Models[0].MaxOutputTokens = i64(8192)
-	expectInvalid(t, cfg, "max-tokens")
+	expectWarning(t, cfg, "max-tokens")
 }
 
-func TestRejectsNonTextModality(t *testing.T) {
+func TestSkipsNonTextModality(t *testing.T) {
 	cfg := exampleConfig()
 	cfg.Providers[0].Models[0].Input = append(cfg.Providers[0].Models[0].Input, ir.ModalityAudio)
-	expectInvalid(t, cfg, "modality")
+	expectWarning(t, cfg, "modality")
 }
 
-func TestRejectsToolCallingFalse(t *testing.T) {
+func TestSkipsToolCallingFalse(t *testing.T) {
 	cfg := exampleConfig()
 	cfg.Providers[0].Models[0].ToolCalling = b(false)
-	expectInvalid(t, cfg, "tool_calling")
+	expectWarning(t, cfg, "tool_calling")
 }
 
-func TestRejectsMCPEnvBearer(t *testing.T) {
+func TestSkipsMCPEnvBearer(t *testing.T) {
 	cfg := exampleConfig()
 	cfg.MCP[0].Env["AUTH"] = ir.HeaderValue{BearerFromEnv: "AUTH_TOKEN"}
-	expectInvalid(t, cfg, "Bearer ENV:NAME is not representable on env")
+	expectWarning(t, cfg, "Bearer ENV:NAME is not representable on env")
 }
 
-func TestRejectsFractionalTimeout(t *testing.T) {
+func TestSkipsFractionalTimeout(t *testing.T) {
 	cfg := exampleConfig()
 	cfg.MCP[0].TimeoutMS = i64(1500)
-	expectInvalid(t, cfg, "divisible by 1000")
+	expectWarning(t, cfg, "divisible by 1000")
 }
 
-func TestRejectsEnvDerivedProviderHeaders(t *testing.T) {
+func TestSkipsEnvDerivedProviderHeaders(t *testing.T) {
 	cfg := exampleConfig()
 	cfg.Providers[0].Headers["X-Gateway-Key"] = ir.HeaderValue{FromEnv: "GATEWAY_KEY"}
-	expectInvalid(t, cfg, "literal strings")
+	expectWarning(t, cfg, "literal strings")
 }
 
-func TestRejectsUnresolvedDefault(t *testing.T) {
+func TestSkipsUnresolvedDefault(t *testing.T) {
 	cfg := exampleConfig()
 	cfg.Defaults = &ir.Defaults{Model: "volcengine/nope"}
-	expectInvalid(t, cfg, "does not resolve")
+	expectWarning(t, cfg, "does not resolve")
 }
 
 func TestIgnoresModelReasoningVariants(t *testing.T) {
@@ -216,16 +216,90 @@ func TestIgnoresModelReasoningVariants(t *testing.T) {
 	}
 }
 
-func TestRejectsRenamedStdioEnvReference(t *testing.T) {
+func TestSkipsRenamedStdioEnvReference(t *testing.T) {
 	cfg := exampleConfig()
 	cfg.MCP[0].Env["DEST"] = ir.HeaderValue{FromEnv: "SOURCE"}
-	expectInvalid(t, cfg, "renamed environment references")
+	expectWarning(t, cfg, "renamed environment references")
 }
 
-func TestRejectsNonPositiveTimeout(t *testing.T) {
+func TestSkipsNonPositiveTimeout(t *testing.T) {
 	for _, timeout := range []int64{0, -1000} {
 		cfg := exampleConfig()
 		cfg.MCP[0].TimeoutMS = i64(timeout)
-		expectInvalid(t, cfg, "must be positive")
+		expectWarning(t, cfg, "must be positive")
+	}
+}
+
+func TestEmitOmitsUnrepresentableTimeout(t *testing.T) {
+	for _, timeout := range []int64{0, -1000, 1500} {
+		cfg := exampleConfig()
+		cfg.MCP[0].TimeoutMS = i64(timeout)
+		arts, err := (Target{}).Emit(cfg)
+		if err != nil {
+			t.Fatalf("Emit: %v", err)
+		}
+		if out := string(arts[1].Content); strings.Contains(out, "timeout") {
+			t.Fatalf("%d ms timeout must be omitted, not truncated or invented:\n%s", timeout, out)
+		}
+	}
+}
+
+func TestEmitOmitsRenamedStdioEnvReference(t *testing.T) {
+	cfg := exampleConfig()
+	cfg.MCP[0].Env["DEST"] = ir.HeaderValue{FromEnv: "SOURCE"}
+	expectWarning(t, cfg, "renamed environment references")
+	arts, err := (Target{}).Emit(cfg)
+	if err != nil {
+		t.Fatalf("Emit: %v", err)
+	}
+	yaml := string(arts[1].Content)
+	if strings.Contains(yaml, "SOURCE") || strings.Contains(yaml, "DEST") {
+		t.Fatalf("renamed env reference must be omitted:\n%s", yaml)
+	}
+}
+
+func TestEmitOmitsEnvDerivedProviderHeader(t *testing.T) {
+	cfg := exampleConfig()
+	cfg.Providers[0].Headers["X-Gateway-Key"] = ir.HeaderValue{FromEnv: "GATEWAY_KEY"}
+	expectWarning(t, cfg, "literal strings")
+	arts, err := (Target{}).Emit(cfg)
+	if err != nil {
+		t.Fatalf("Emit: %v", err)
+	}
+	out := string(arts[0].Content)
+	if strings.Contains(out, "X-Gateway-Key") || strings.Contains(out, "GATEWAY_KEY") {
+		t.Fatalf("env-derived provider header must be omitted, not emitted empty:\n%s", out)
+	}
+	if !strings.Contains(out, "X-Tenant") {
+		t.Fatalf("literal header must be kept:\n%s", out)
+	}
+}
+
+func TestEmitSkipsUnknownEngineProvider(t *testing.T) {
+	cfg := exampleConfig()
+	cfg.Providers[0].Protocol = ir.Protocol("gemini")
+	expectWarning(t, cfg, "engine must be")
+	expectWarning(t, cfg, "does not resolve")
+	arts, err := (Target{}).Emit(cfg)
+	if err != nil {
+		t.Fatalf("Emit: %v", err)
+	}
+	configYAML := false
+	for _, art := range arts {
+		if art.Name == "volcengine.json" {
+			t.Fatalf("provider with no native engine must be skipped")
+		}
+		if strings.Contains(string(art.Content), `"engine": ""`) {
+			t.Fatalf("must not emit an empty engine:\n%s", art.Content)
+		}
+		if art.Name == "config.yaml" {
+			configYAML = true
+			if strings.Contains(string(art.Content), "active_provider") {
+				t.Fatalf("default naming a skipped provider must be omitted:\n%s", art.Content)
+			}
+		}
+	}
+	if !configYAML {
+		t.Fatal("expected config.yaml for the MCP extensions")
 	}
 }

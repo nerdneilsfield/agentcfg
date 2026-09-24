@@ -34,7 +34,7 @@ Custom providers are entries of `providers.json`:
 ```
 
 - `protocol` renames: `openai-completions` → `openai-chat`, `openai-responses` → `openai-responses`, `anthropic-messages` → `anthropic`.
-- Cline config is **literal-only**: there is no `${VAR}` expansion anywhere, and the environment fallback for API keys only exists for built-in provider ids. Custom providers therefore effectively need a stored literal `apiKey`, so IR `api_key: "ENV:NAME"` is rejected, and provider `headers` with `ENV:NAME` / `Bearer ENV:NAME` are rejected. Literal headers are emitted.
+- Cline config is **literal-only**: there is no `${VAR}` expansion anywhere, and the environment fallback for API keys only exists for built-in provider ids. Custom providers therefore effectively need a stored literal `apiKey`, so IR `api_key: "ENV:NAME"` is skipped (no `apiKey` is written) and provider `headers` with `ENV:NAME` / `Bearer ENV:NAME` are skipped. Literal headers are emitted.
 
 ## Models
 
@@ -42,8 +42,9 @@ Rich model metadata lives in `models.json` under
 `providers.<id>.models.<model-id>`: `name`, `contextWindow`, `maxTokens`,
 `modalities {input, output}`, and `capabilities` (`images`, `video`, `tools`,
 `reasoning`). `tool_calling: true` maps to `tools`. `tool_calling: false` is
-rejected: Cline's persisted custom model registry treats missing capabilities as
-tool-enabled and cannot faithfully turn tools off. Cline `settings.model` holds
+skipped (the `tools` capability is omitted): Cline's persisted custom model
+registry treats missing capabilities as tool-enabled and cannot faithfully turn
+tools off. Cline `settings.model` holds
 only the bare default model id, and `defaults.model "provider/model"` maps to
 `lastUsedProvider` + `settings.model`.
 
@@ -54,8 +55,8 @@ only the bare default model id, and `defaults.model "provider/model"` maps to
 `http` transport maps here). `enabled: false` maps to `disabled: true`.
 `timeout` is a numeric number of seconds; the emitter preserves the IR
 millisecond value as seconds (for example 1500 ms becomes `1.5`). MCP `env` and `headers` are literal
-strings, so IR `ENV:NAME` / `Bearer ENV:NAME` MCP values are rejected. When the
-IR has no MCP servers, the artifact is omitted.
+strings, so IR `ENV:NAME` / `Bearer ENV:NAME` MCP values are skipped; the
+entry is kept. When the IR has no MCP servers, the artifact is omitted.
 
 Cline-valid MCP therefore uses literals, not `ENV:NAME`:
 
@@ -69,8 +70,9 @@ mcp:
       CONTEXT7_API_KEY: "literal-key"
 ```
 
-Native `timeout` is `1.5`. The same `timeout_ms: 1500` is rejected by Crush
-(not a whole second) and accepted by OpenCode as milliseconds `1500`.
+Native `timeout` is `1.5`. The same `timeout_ms: 1500` is skipped by Crush
+(not a whole second; the `timeout` field is omitted) and accepted by OpenCode
+as milliseconds `1500`.
 
 ## Reasoning variants
 

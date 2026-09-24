@@ -40,22 +40,23 @@ Custom providers live under `providers.<id>` (`ProviderConfig`, `additionalPrope
 }
 ```
 
-- `type` enum includes `openai` (Responses API), `openai-compat` (Chat Completions), `anthropic`, and several hosted backends. IR `openai-completions` maps to `openai-compat`; `openai-responses` maps to `openai`; `anthropic-messages` maps to `anthropic`. Crush `type=openai` always calls the Responses API, so a completions-only gateway should use `openai-completions` instead.
+- `type` enum includes `openai` (Responses API), `openai-compat` (Chat Completions), `anthropic`, and several hosted backends. IR `openai-completions` maps to `openai-compat`; `openai-responses` maps to `openai`; `anthropic-messages` maps to `anthropic`. Crush `type=openai` always calls the Responses API, so a completions-only gateway should use `openai-completions` instead. A provider whose IR protocol maps to no Crush type is skipped with a warning and its entry is omitted.
 - `api_key` is a string whose documented example is `"$OPENAI_API_KEY"`; IR `api_key: "ENV:NAME"` maps to `"$VAR"` without resolving the reference.
 - Crush evaluates shell-style expressions in these native configuration strings.
-  IR literals containing `$` or backticks are rejected for provider URLs,
-  provider headers, MCP commands, arguments, environment values, URLs, and
-  headers rather than being evaluated by Crush.
-- `extra_headers` is a flat `Record<string,string>`. IR `ENV:NAME` renders as `"$VAR"`; `Authorization: "Bearer ENV:NAME"` as `"Bearer ${VAR}"`. `Bearer ENV:NAME` on any other header name is rejected. Explicit model lists set `discover_models: false` so Catwalk cannot merge unexpected models.
-- Model schema **requires** `id`, `name`, `context_window`, `default_max_tokens`, `can_reason`, `supports_attachments`, and four cost fields. The emitter writes `cost_per_1m_*` as `0` (IR has no cost fields). Missing `context_window` or `max_output_tokens` is rejected. `can_reason` comes from IR `reasoning`; `supports_attachments` is true when IR input includes `image`. Input is `text` and `image` only; non-text output is rejected. `tool_calling: false` is rejected (Crush agents always expose tools); `true` has no native field and is not emitted.
+  IR literals containing `$` or backticks are skipped with a warning rather than
+  being evaluated by Crush: a provider API key, URL, or header is omitted, an
+  MCP environment value or header is omitted, and an MCP command, argument, or
+  URL drops the whole entry.
+- `extra_headers` is a flat `Record<string,string>`. IR `ENV:NAME` renders as `"$VAR"`; `Authorization: "Bearer ENV:NAME"` as `"Bearer ${VAR}"`. `Bearer ENV:NAME` on any other header name is skipped with a warning and the header is omitted. Explicit model lists set `discover_models: false` so Catwalk cannot merge unexpected models.
+- Model schema **requires** `id`, `name`, `context_window`, `default_max_tokens`, `can_reason`, `supports_attachments`, and four cost fields. The emitter writes `cost_per_1m_*` as `0` (IR has no cost fields). Missing `context_window` or `max_output_tokens` is skipped with a warning and drops the model entry. `can_reason` comes from IR `reasoning`; `supports_attachments` is true when IR input includes `image`. Input is `text` and `image` only; non-text output is skipped with a warning. `tool_calling: false` is skipped with a warning (Crush agents always expose tools); `true` has no native field and is not emitted.
 
 ## Defaults
 
-`defaults.model "provider/model"` maps to both `models.large` and `models.small` (`SelectedModel` requires `provider` + `model`). Crush has no single default; large/small are the documented pair.
+`defaults.model "provider/model"` maps to both `models.large` and `models.small` (`SelectedModel` requires `provider` + `model`). Crush has no single default; large/small are the documented pair. A `defaults.model` that does not resolve to an emitted provider model is skipped with a warning and no `models` block is written.
 
 ## MCP
 
-`mcp.<id>` (`MCPConfig`) requires `type` in `stdio|sse|http`. IR `http` maps to `http` (not `sse`). stdio uses `command`/`args`/`env`; http uses `url`/`headers`. `enabled: false` maps to `disabled: true`. `timeout` is whole seconds (`timeout_ms / 1000`, native default 15); values not divisible by 1000 are rejected. IR `cwd` has no Crush MCP field and is rejected. Env/header interpolation uses the same `$VAR` / `Bearer ${VAR}` rendering as providers. When the IR has no MCP servers, the `mcp` object is omitted.
+`mcp.<id>` (`MCPConfig`) requires `type` in `stdio|sse|http`. IR `http` maps to `http` (not `sse`). stdio uses `command`/`args`/`env`; http uses `url`/`headers`. `enabled: false` maps to `disabled: true`. `timeout` is whole seconds (`timeout_ms / 1000`, native default 15); a value not divisible by 1000 is skipped with a warning and `timeout` is omitted. IR `cwd` has no Crush MCP field and is skipped with a warning. A stdio server with no `command` is dropped from `mcp`. Env/header interpolation uses the same `$VAR` / `Bearer ${VAR}` rendering as providers. When the IR has no MCP servers, the `mcp` object is omitted.
 
 IR:
 

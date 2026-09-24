@@ -14,19 +14,19 @@ func b(v bool) *bool { return &v }
 
 func expectValid(t *testing.T, cfg ir.Config) {
 	t.Helper()
-	if diags := (Target{}).Validate(cfg); diag.HasErrors(diags) {
+	if diags := (Target{}).Validate(cfg); len(diags) != 0 {
 		t.Fatalf("expected valid config, got %v", diags)
 	}
 }
 
-func expectInvalid(t *testing.T, cfg ir.Config, substr string) {
+func expectWarning(t *testing.T, cfg ir.Config, substr string) {
 	t.Helper()
 	diags := (Target{}).Validate(cfg)
-	if !diag.HasErrors(diags) {
+	if len(diags) == 0 {
 		t.Fatalf("expected validation error containing %q, got none", substr)
 	}
 	for _, d := range diags {
-		if d.Severity == diag.SeverityError && strings.Contains(d.Message, substr) {
+		if d.Severity == diag.SeverityWarning && strings.Contains(d.Message, substr) {
 			return
 		}
 	}
@@ -122,37 +122,75 @@ func TestEmitGolden(t *testing.T) {
 	}
 }
 
-func TestRejectsResponsesProtocol(t *testing.T) {
+func TestSkipsResponsesProtocol(t *testing.T) {
 	cfg := exampleConfig()
 	cfg.Providers[0].Protocol = ir.ProtocolOpenAIResponses
-	expectInvalid(t, cfg, "openai-responses")
+	expectWarning(t, cfg, "openai-responses")
+	expectWarning(t, cfg, "does not resolve")
+	arts, err := (Target{}).Emit(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := string(arts[0].Content)
+	if strings.Contains(out, "volcengine") {
+		t.Fatalf("an unsupported-protocol provider must be skipped:\n%s", out)
+	}
+	if strings.Contains(out, "[provider]") {
+		t.Fatalf("a default naming a skipped provider must be omitted:\n%s", out)
+	}
 }
 
-func TestRejectsEnvDerivedProviderHeaders(t *testing.T) {
+func TestSkipsEnvDerivedProviderHeaders(t *testing.T) {
 	cfg := exampleConfig()
 	cfg.Providers[0].Headers["X-Gateway-Key"] = ir.HeaderValue{FromEnv: "GATEWAY_KEY"}
-	expectInvalid(t, cfg, "literal-only")
+	expectWarning(t, cfg, "literal-only")
+	arts, err := (Target{}).Emit(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := string(arts[0].Content)
+	if strings.Contains(out, "X-Gateway-Key") {
+		t.Fatalf("an env-derived provider header must be skipped:\n%s", out)
+	}
+	if !strings.Contains(out, "X-Tenant") {
+		t.Fatalf("a literal provider header must be kept:\n%s", out)
+	}
 }
 
-func TestRejectsHTTPMCP(t *testing.T) {
+func TestSkipsHTTPMCP(t *testing.T) {
 	cfg := exampleConfig()
 	cfg.MCP[0].Transport = ir.TransportHTTP
+	cfg.MCP[0].Command = nil
 	cfg.MCP[0].URL = "https://example.com/mcp"
-	expectInvalid(t, cfg, "stdio")
+	expectWarning(t, cfg, "stdio")
+	arts, err := (Target{}).Emit(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(arts) != 1 {
+		t.Fatalf("an all-http MCP set must not emit mcp.json, got %d artifacts", len(arts))
+	}
 }
 
-func TestRejectsMCPCWD(t *testing.T) {
+func TestSkipsMCPCWD(t *testing.T) {
 	cfg := exampleConfig()
 	cfg.MCP[0].CWD = "/work"
-	expectInvalid(t, cfg, "cwd")
+	expectWarning(t, cfg, "cwd")
+	arts, err := (Target{}).Emit(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(arts[1].Content), "cwd") {
+		t.Fatalf("jcode has no MCP cwd field:\n%s", arts[1].Content)
+	}
 }
 
-func TestRejectsUnresolvedDefault(t *testing.T) {
+func TestSkipsUnresolvedDefault(t *testing.T) {
 	cfg := exampleConfig()
 	cfg.Defaults = &ir.Defaults{Model: "volcengine/nope"}
-	expectInvalid(t, cfg, "does not resolve")
+	expectWarning(t, cfg, "does not resolve")
 	cfg.Defaults = &ir.Defaults{Model: "glm-5.3"}
-	expectInvalid(t, cfg, "provider/model")
+	expectWarning(t, cfg, "provider/model")
 }
 
 func TestOmitsMCPArtifactWhenEmpty(t *testing.T) {
@@ -184,8 +222,15 @@ func TestIgnoresModelReasoningVariants(t *testing.T) {
 	}
 }
 
-func TestRejectsFractionalMCPTimeout(t *testing.T) {
+func TestSkipsFractionalMCPTimeout(t *testing.T) {
 	cfg := exampleConfig()
 	cfg.MCP[0].TimeoutMS = i64(1500)
-	expectInvalid(t, cfg, "timeout_secs is an integer")
+	expectWarning(t, cfg, "timeout_secs is an integer")
+	arts, err := (Target{}).Emit(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(arts[1].Content), "timeout_secs") {
+		t.Fatalf("a fractional timeout must not be truncated:\n%s", arts[1].Content)
+	}
 }

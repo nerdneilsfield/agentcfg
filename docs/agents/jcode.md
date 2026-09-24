@@ -32,9 +32,9 @@ input = ["image"]
 ```
 
 - `type` is `openai-compatible` / `anthropic-compatible` / `openrouter`. The IR's two OpenAI protocol families map to `openai-compatible`, `anthropic-messages` maps to `anthropic-compatible`.
-- The built-in OpenAI provider is the only one wired for the OpenAI **Responses** API, so IR `openai-responses` on a custom provider is rejected.
+- The built-in OpenAI provider is the only one wired for the OpenAI **Responses** API, so an IR `openai-responses` custom provider is skipped (its `[providers.<id>]` table is dropped).
 - `api_key_env` is native: the IR `api_key: "ENV:NAME"` maps directly without resolving the reference.
-- Provider `headers` are literal-only; IR `ENV:NAME` / `Bearer ENV:NAME` provider headers are rejected. Literal headers are emitted.
+- Provider `headers` are literal-only; IR `ENV:NAME` / `Bearer ENV:NAME` provider headers are skipped. Literal headers are emitted.
 - `[[providers.<id>.models]]` supports `id`, `context_window` (plus aliases), `reasoning`, `reasoning_effort`, and `input` (only `"image"` is meaningful; text is implicit). IR `max_output_tokens`, `output` modalities, and `tool_calling` have no jcode model field and are not emitted.
 
 ## Defaults
@@ -42,13 +42,16 @@ input = ["image"]
 `defaults.model "provider/model"` maps to the `[provider]` table's
 `default_provider` + `default_model` pair. Per-provider `default_model` is set
 to the defaults match when the IR default targets that provider, else the
-provider's first model.
+provider's first model. A default that does not parse as `provider/model`, or
+whose provider is skipped, is skipped with a warning and the `[provider]` table
+is omitted.
 
 ## MCP
 
-`~/.jcode/mcp.json` holds `[server].<id>`-style entries with stdio-only support (`command`, `args`, `env`, `timeout_secs`, `enabled|disabled`). HTTP/SSE entries are parsed but skipped at load, so IR `http` transport is rejected. `${VAR}` / `${VAR:-default}` expansion is native for MCP string fields, so IR `ENV:NAME` renders as `"${VAR}"`. `Authorization: "Bearer ENV:NAME"` renders as `Bearer ${VAR}` inside headers. IR `timeout_ms` maps to integer `timeout_secs`; values not divisible by 1000
-are rejected because the native field is `u64`. IR `cwd` has no jcode field and
-is rejected for MCP servers.
+`~/.jcode/mcp.json` holds `[server].<id>`-style entries with stdio-only support (`command`, `args`, `env`, `timeout_secs`, `enabled|disabled`). HTTP/SSE entries are parsed but skipped at load, so IR `http` transport is dropped by the emitter as well. `${VAR}` / `${VAR:-default}` expansion is native for MCP string fields, so IR `ENV:NAME` renders as `"${VAR}"`. `Authorization: "Bearer ENV:NAME"` renders as `Bearer ${VAR}` inside headers. IR `timeout_ms` maps to integer `timeout_secs`; values not divisible by 1000
+are skipped (the `timeout_secs` field is omitted), since the native field is a
+whole-second `u64`. IR `cwd` has no jcode field, so it is omitted for MCP
+servers.
 
 ## Reasoning variants
 

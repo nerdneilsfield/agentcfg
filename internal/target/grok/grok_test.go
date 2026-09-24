@@ -14,19 +14,19 @@ func b(v bool) *bool { return &v }
 
 func expectValid(t *testing.T, cfg ir.Config) {
 	t.Helper()
-	if diags := (Target{}).Validate(cfg); diag.HasErrors(diags) {
+	if diags := (Target{}).Validate(cfg); len(diags) != 0 {
 		t.Fatalf("expected valid config, got %v", diags)
 	}
 }
 
-func expectInvalid(t *testing.T, cfg ir.Config, substr string) {
+func expectWarning(t *testing.T, cfg ir.Config, substr string) {
 	t.Helper()
 	diags := (Target{}).Validate(cfg)
-	if !diag.HasErrors(diags) {
+	if len(diags) == 0 {
 		t.Fatalf("expected validation error containing %q, got none", substr)
 	}
 	for _, d := range diags {
-		if d.Severity == diag.SeverityError && strings.Contains(d.Message, substr) {
+		if d.Severity == diag.SeverityWarning && strings.Contains(d.Message, substr) {
 			return
 		}
 	}
@@ -134,33 +134,48 @@ func TestEmitsEnvDerivedProviderHeaders(t *testing.T) {
 	}
 }
 
-func TestRejectsDuplicateModelIDs(t *testing.T) {
+func TestSkipsDuplicateModelIDs(t *testing.T) {
 	cfg := exampleConfig()
 	cfg.Providers = append(cfg.Providers, ir.Provider{
 		ID:       "other",
 		Protocol: ir.ProtocolOpenAICompletions,
 		BaseURL:  "https://other.example.com/v1",
-		Models:   []ir.Model{{ID: "glm-5.3"}},
+		Models:   []ir.Model{{ID: "glm-5.3", ContextWindow: i64(4096)}},
 	})
-	expectInvalid(t, cfg, "duplicate model id")
+	expectWarning(t, cfg, "duplicate model id")
+	out := emitContent(t, cfg)
+	if n := strings.Count(out, `[model."glm-5.3"]`); n != 1 {
+		t.Fatalf("expected exactly one glm-5.3 table, got %d:\n%s", n, out)
+	}
+	if !strings.Contains(out, "context_window = 128000") || strings.Contains(out, "context_window = 4096") {
+		t.Fatalf("the first emitted table must win:\n%s", out)
+	}
 }
 
-func TestRejectsUnresolvedDefault(t *testing.T) {
+func TestSkipsUnresolvedDefault(t *testing.T) {
 	cfg := exampleConfig()
 	cfg.Defaults = &ir.Defaults{Model: "volcengine/nope"}
-	expectInvalid(t, cfg, "does not resolve")
+	expectWarning(t, cfg, "does not resolve")
+	out := emitContent(t, cfg)
+	if strings.Contains(out, "default =") {
+		t.Fatalf("unresolved default must be skipped:\n%s", out)
+	}
 }
 
-func TestRejectsBearerOnNonAuthorizationHeader(t *testing.T) {
+func TestSkipsBearerOnNonAuthorizationHeader(t *testing.T) {
 	cfg := exampleConfig()
 	cfg.MCP[1].Headers["X-Token"] = ir.HeaderValue{BearerFromEnv: "SOME_TOKEN"}
-	expectInvalid(t, cfg, "Authorization only")
+	expectWarning(t, cfg, "Authorization only")
+	out := emitContent(t, cfg)
+	if strings.Contains(out, "SOME_TOKEN") {
+		t.Fatalf("bearer on a non-Authorization header must be skipped:\n%s", out)
+	}
 }
 
-func TestRejectsMCPTimeout(t *testing.T) {
+func TestSkipsMCPTimeout(t *testing.T) {
 	cfg := exampleConfig()
 	cfg.MCP[0].TimeoutMS = i64(1500)
-	expectInvalid(t, cfg, "no timeout field")
+	expectWarning(t, cfg, "no timeout field")
 }
 
 func TestOmitsEmptyMCPServers(t *testing.T) {
@@ -194,5 +209,63 @@ func TestEmitsSupportedReasoningEfforts(t *testing.T) {
 		if strings.Contains(out, forbidden) {
 			t.Errorf("unexpected %q:\n%s", forbidden, out)
 		}
+	}
+}
+
+func emitContent(t *testing.T, cfg ir.Config) string {
+	t.Helper()
+	arts, err := (Target{}).Emit(cfg)
+	if err != nil {
+		t.Fatalf("Emit: %v", err)
+	}
+	if len(arts) != 1 {
+		t.Fatalf("expected 1 artifact, got %d", len(arts))
+	}
+	return string(arts[0].Content)
+}
+
+func TestSkipsModelWithoutContextWindow(t *testing.T) {
+	cfg := exampleConfig()
+	cfg.Providers[0].Models[0].ContextWindow = nil
+	expectWarning(t, cfg, "context_window")
+	out := emitContent(t, cfg)
+	if strings.Contains(out, `[model."glm-5.3"]`) {
+		t.Fatalf("model without context_window must be skipped:\n%s", out)
+	}
+	if strings.Contains(out, "default =") {
+		t.Fatalf("default must not reference a skipped model:\n%s", out)
+	}
+}
+
+func TestSkipsUnknownProtocolProvider(t *testing.T) {
+	cfg := exampleConfig()
+	cfg.Providers[0].Protocol = "bogus"
+	expectWarning(t, cfg, "api_backend")
+	out := emitContent(t, cfg)
+	if strings.Contains(out, "api_backend") || strings.Contains(out, "glm-5.3") {
+		t.Fatalf("provider with an unsupported protocol must be skipped:\n%s", out)
+	}
+}
+
+func TestSkipsBearerProviderHeader(t *testing.T) {
+	cfg := exampleConfig()
+	cfg.Providers[0].Headers["Authorization"] = ir.HeaderValue{BearerFromEnv: "GW_TOKEN"}
+	expectWarning(t, cfg, "not representable")
+	out := emitContent(t, cfg)
+	if strings.Contains(out, "Authorization") || strings.Contains(out, `= ""`) {
+		t.Fatalf("bearer provider header must be skipped without an empty value:\n%s", out)
+	}
+}
+
+func TestSkipsStdioMCPWithoutCommand(t *testing.T) {
+	cfg := exampleConfig()
+	cfg.MCP[0].Command = nil
+	expectWarning(t, cfg, "no command")
+	out := emitContent(t, cfg)
+	if strings.Contains(out, "context7") {
+		t.Fatalf("stdio server without a command must be skipped:\n%s", out)
+	}
+	if !strings.Contains(out, "[mcp_servers.github]") {
+		t.Fatalf("the rest of the document must still generate:\n%s", out)
 	}
 }

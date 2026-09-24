@@ -12,19 +12,19 @@ func i64(n int64) *int64 { return &n }
 
 func expectValid(t *testing.T, cfg ir.Config) {
 	t.Helper()
-	if diags := (Target{}).Validate(cfg); diag.HasErrors(diags) {
+	if diags := (Target{}).Validate(cfg); len(diags) != 0 {
 		t.Fatalf("expected valid config, got %v", diags)
 	}
 }
 
-func expectInvalid(t *testing.T, cfg ir.Config, substr string) {
+func expectWarning(t *testing.T, cfg ir.Config, substr string) {
 	t.Helper()
 	diags := (Target{}).Validate(cfg)
-	if !diag.HasErrors(diags) {
+	if len(diags) == 0 {
 		t.Fatalf("expected validation error containing %q, got none", substr)
 	}
 	for _, d := range diags {
-		if d.Severity == diag.SeverityError && strings.Contains(d.Message, substr) {
+		if d.Severity == diag.SeverityWarning && strings.Contains(d.Message, substr) {
 			return
 		}
 	}
@@ -69,12 +69,12 @@ func TestEmitsProviderHeadersWithEnvSyntax(t *testing.T) {
 	}
 }
 
-func TestRejectsBearerFromEnv(t *testing.T) {
+func TestSkipsBearerFromEnv(t *testing.T) {
 	cfg := exampleConfig()
 	cfg.Providers[0].Headers = map[string]ir.HeaderValue{
 		"Authorization": {BearerFromEnv: "GITHUB_TOKEN"},
 	}
-	expectInvalid(t, cfg, "$NAME expression syntax")
+	expectWarning(t, cfg, "$NAME expression syntax")
 }
 
 func TestSkipsMCP(t *testing.T) {
@@ -84,7 +84,7 @@ func TestSkipsMCP(t *testing.T) {
 		Transport: ir.TransportStdio,
 		Command:   []string{"npx"},
 	}}
-	expectValid(t, cfg)
+	expectWarning(t, cfg, "no built-in MCP support")
 	arts, err := (Target{}).Emit(cfg)
 	if err != nil {
 		t.Fatal(err)
@@ -162,10 +162,69 @@ func TestEmitsModelsDocument(t *testing.T) {
 	}
 }
 
-func TestRejectsUnsupportedModelInput(t *testing.T) {
+func TestSkipsUnsupportedModelInput(t *testing.T) {
 	cfg := exampleConfig()
 	cfg.Providers[0].Models[0].Input = []ir.Modality{ir.ModalityAudio}
-	expectInvalid(t, cfg, "text and image only")
+	expectWarning(t, cfg, "text and image only")
+	arts, err := (Target{}).Emit(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := string(arts[0].Content)
+	if strings.Contains(out, "audio") {
+		t.Fatalf("unsupported modality must be dropped:\n%s", out)
+	}
+	if !strings.Contains(out, `"id": "glm-5.3"`) {
+		t.Fatalf("model entry must survive the omission:\n%s", out)
+	}
+}
+
+func TestDropsUnsupportedModelModalities(t *testing.T) {
+	cfg := exampleConfig()
+	cfg.Providers[0].Models[0].Input = []ir.Modality{ir.ModalityText, ir.ModalityPDF}
+	expectWarning(t, cfg, "text and image only")
+	arts, err := (Target{}).Emit(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := string(arts[0].Content)
+	if strings.Contains(out, "pdf") {
+		t.Fatalf("unsupported modality must be dropped:\n%s", out)
+	}
+	if !strings.Contains(out, `"text"`) {
+		t.Fatalf("supported modality must remain:\n%s", out)
+	}
+}
+
+func TestOmitsLiteralExpressionAPIKey(t *testing.T) {
+	cfg := exampleConfig()
+	cfg.Providers[0].APIKey = ir.HeaderValue{Value: "$TOKEN"}
+	expectWarning(t, cfg, "native expression syntax")
+	arts, err := (Target{}).Emit(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := string(arts[0].Content)
+	if strings.Contains(out, "apiKey") || strings.Contains(out, "$TOKEN") {
+		t.Fatalf("unrepresentable literal key must be omitted:\n%s", out)
+	}
+	if !strings.Contains(out, `"volcengine"`) {
+		t.Fatalf("provider entry must survive the omission:\n%s", out)
+	}
+}
+
+func TestSkipsBearerProviderHeader(t *testing.T) {
+	cfg := exampleConfig()
+	cfg.Providers[0].Headers = map[string]ir.HeaderValue{"Authorization": {BearerFromEnv: "TOK"}}
+	expectWarning(t, cfg, "$NAME expression syntax")
+	arts, err := (Target{}).Emit(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := string(arts[0].Content)
+	if strings.Contains(out, "Authorization") || strings.Contains(out, `""`) {
+		t.Fatalf("a bearer header pi cannot expand must be omitted:\n%s", out)
+	}
 }
 
 func TestEmitsAuthHeaderForBearerAuthType(t *testing.T) {

@@ -12,19 +12,19 @@ func i64(n int64) *int64 { return &n }
 
 func expectValid(t *testing.T, cfg ir.Config) {
 	t.Helper()
-	if diags := (Target{}).Validate(cfg); diag.HasErrors(diags) {
+	if diags := (Target{}).Validate(cfg); len(diags) != 0 {
 		t.Fatalf("expected valid config, got %v", diags)
 	}
 }
 
-func expectInvalid(t *testing.T, cfg ir.Config, substr string) {
+func expectWarning(t *testing.T, cfg ir.Config, substr string) {
 	t.Helper()
 	diags := (Target{}).Validate(cfg)
-	if !diag.HasErrors(diags) {
+	if len(diags) == 0 {
 		t.Fatalf("expected validation error containing %q, got none", substr)
 	}
 	for _, d := range diags {
-		if d.Severity == diag.SeverityError && strings.Contains(d.Message, substr) {
+		if d.Severity == diag.SeverityWarning && strings.Contains(d.Message, substr) {
 			return
 		}
 	}
@@ -108,10 +108,10 @@ func TestProviderEnvironmentReferences(t *testing.T) {
 	}
 }
 
-func TestRejectsUnsupportedModelInput(t *testing.T) {
+func TestSkipsUnsupportedModelInput(t *testing.T) {
 	cfg := exampleConfig()
 	cfg.Providers[0].Models[0].Input = []ir.Modality{ir.ModalityAudio}
-	expectInvalid(t, cfg, "text and image only")
+	expectWarning(t, cfg, "text and image only")
 }
 
 func TestEmitsThinkingLevelMap(t *testing.T) {
@@ -152,7 +152,6 @@ func TestSkipsUnsupportedReasoningEffort(t *testing.T) {
 
 func TestSkipsUnsupportedOptionalFields(t *testing.T) {
 	cfg := exampleConfig()
-	cfg.Providers[0].Headers = map[string]ir.HeaderValue{"Authorization": {BearerFromEnv: "TOK"}}
 	cfg.MCP[0].TimeoutMS = i64(5000)
 	cfg.MCP[0].Env["LITERAL"] = ir.HeaderValue{Value: "skip-me"}
 	expectValid(t, cfg)
@@ -163,6 +162,23 @@ func TestSkipsUnsupportedOptionalFields(t *testing.T) {
 	settings := string(arts[1].Content)
 	if strings.Contains(settings, "skip-me") || strings.Contains(settings, "LITERAL") {
 		t.Fatalf("unsupported optional fields must be skipped:\n%s", settings)
+	}
+}
+
+func TestSkipsBearerProviderHeader(t *testing.T) {
+	cfg := exampleConfig()
+	cfg.Providers[0].Headers = map[string]ir.HeaderValue{"Authorization": {BearerFromEnv: "TOK"}}
+	expectWarning(t, cfg, "no bearer-from-env convention")
+	arts, err := (Target{}).Emit(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	models := string(arts[0].Content)
+	if strings.Contains(models, `"Authorization"`) || strings.Contains(models, `"headers"`) {
+		t.Fatalf("bearer provider header must be omitted, got:\n%s", models)
+	}
+	if !strings.Contains(models, `"volcengine"`) {
+		t.Fatalf("provider entry must survive the omission:\n%s", models)
 	}
 }
 
@@ -224,5 +240,78 @@ func TestAuthTypeMappings(t *testing.T) {
 		if !mapped[want] {
 			t.Errorf("auth_type %s is not mapped", want)
 		}
+	}
+}
+
+func TestOmitsLiteralExpressionAPIKey(t *testing.T) {
+	cfg := exampleConfig()
+	cfg.MCP = nil
+	cfg.Providers[0].APIKey = ir.HeaderValue{Value: "$TOKEN"}
+	expectWarning(t, cfg, "native expression syntax")
+	arts, err := (Target{}).Emit(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	models := string(arts[0].Content)
+	if strings.Contains(models, "apiKey") || strings.Contains(models, "$TOKEN") {
+		t.Fatalf("unrepresentable literal key must be omitted:\n%s", models)
+	}
+	if !strings.Contains(models, `"volcengine"`) {
+		t.Fatalf("provider entry must survive the omission:\n%s", models)
+	}
+}
+
+func TestDropsUnsupportedModelModalities(t *testing.T) {
+	cfg := exampleConfig()
+	cfg.MCP = nil
+	cfg.Providers[0].Models[0].Input = []ir.Modality{ir.ModalityText, ir.ModalityAudio, ir.ModalityImage}
+	expectWarning(t, cfg, "text and image only")
+	arts, err := (Target{}).Emit(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	models := string(arts[0].Content)
+	if strings.Contains(models, "audio") {
+		t.Fatalf("unsupported modality must be dropped:\n%s", models)
+	}
+	if !strings.Contains(models, `"text"`) || !strings.Contains(models, `"image"`) {
+		t.Fatalf("supported modalities must remain:\n%s", models)
+	}
+}
+
+func TestSkipsMCPHTTPEnvHeader(t *testing.T) {
+	cfg := exampleConfig()
+	cfg.MCP[1].Headers = map[string]ir.HeaderValue{
+		"Authorization": {BearerFromEnv: "GITHUB_TOKEN"},
+		"X-Auth":        {FromEnv: "MCP_TOKEN"},
+	}
+	expectWarning(t, cfg, "environment interpolation is not verified")
+	arts, err := (Target{}).Emit(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	settings := string(arts[1].Content)
+	if strings.Contains(settings, `"X-Auth"`) || strings.Contains(settings, `""`) {
+		t.Fatalf("an MCP http env header must be skipped:\n%s", settings)
+	}
+	if !strings.Contains(settings, `"bearerTokenEnvVar": "GITHUB_TOKEN"`) {
+		t.Fatalf("the bearer token field must remain:\n%s", settings)
+	}
+}
+
+func TestSkipsStdioMCPWithoutCommand(t *testing.T) {
+	cfg := exampleConfig()
+	cfg.MCP[0].Command = nil
+	expectWarning(t, cfg, "needs a command")
+	arts, err := (Target{}).Emit(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	settings := string(arts[1].Content)
+	if strings.Contains(settings, `"context7"`) {
+		t.Fatalf("commandless stdio server must be skipped:\n%s", settings)
+	}
+	if !strings.Contains(settings, `"github"`) {
+		t.Fatalf("other MCP servers must still emit:\n%s", settings)
 	}
 }

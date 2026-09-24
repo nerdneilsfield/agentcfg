@@ -35,22 +35,22 @@ func (t Target) Validate(cfg ir.Config) []diag.Diagnostic {
 	for i, p := range cfg.Providers {
 		path := fmt.Sprintf("providers[%d]", i)
 		if _, ok := protocolName[p.Protocol]; !ok {
-			diags = append(diags, diag.TargetErrorf(t.ID(), path+".protocol",
+			diags = append(diags, diag.TargetWarnf(t.ID(), path+".protocol",
 				"cline protocol must be anthropic, gemini, openai-chat, or openai-responses; got %q", p.Protocol))
 		}
 		if p.APIKey.FromEnv != "" {
-			diags = append(diags, diag.TargetErrorf(t.ID(), path+".api_key",
+			diags = append(diags, diag.TargetWarnf(t.ID(), path+".api_key",
 				"cline stores literal apiKey strings only; the environment fallback exists for built-in provider ids, not custom providers"))
 		}
 		for name, v := range p.Headers {
 			if v.FromEnv != "" || v.BearerFromEnv != "" {
-				diags = append(diags, diag.TargetErrorf(t.ID(), path+".headers."+name,
+				diags = append(diags, diag.TargetWarnf(t.ID(), path+".headers."+name,
 					"cline headers are literal strings with no interpolation; only constant header values are representable"))
 			}
 		}
 		for j, m := range p.Models {
 			if m.ToolCalling != nil && !*m.ToolCalling {
-				diags = append(diags, diag.TargetErrorf(t.ID(), fmt.Sprintf("%s.models[%d].tool_calling", path, j),
+				diags = append(diags, diag.TargetWarnf(t.ID(), fmt.Sprintf("%s.models[%d].tool_calling", path, j),
 					"cline custom model capabilities cannot disable tools; tool_calling: false is not representable"))
 			}
 		}
@@ -60,14 +60,14 @@ func (t Target) Validate(cfg ir.Config) []diag.Diagnostic {
 		if s.Transport == ir.TransportStdio {
 			for name, v := range s.Env {
 				if v.FromEnv != "" || v.BearerFromEnv != "" {
-					diags = append(diags, diag.TargetErrorf(t.ID(), path+".env."+name,
+					diags = append(diags, diag.TargetWarnf(t.ID(), path+".env."+name,
 						"cline MCP env values are literal strings merged over the process environment; environment references are not representable"))
 				}
 			}
 		} else {
 			for name, v := range s.Headers {
 				if v.FromEnv != "" || v.BearerFromEnv != "" {
-					diags = append(diags, diag.TargetErrorf(t.ID(), path+".headers."+name,
+					diags = append(diags, diag.TargetWarnf(t.ID(), path+".headers."+name,
 						"cline MCP header values are literal strings; environment references are not representable"))
 				}
 			}
@@ -76,10 +76,10 @@ func (t Target) Validate(cfg ir.Config) []diag.Diagnostic {
 	if cfg.Defaults != nil && cfg.Defaults.Model != "" {
 		pid, mid, ok := splitRef(cfg.Defaults.Model)
 		if !ok {
-			diags = append(diags, diag.TargetErrorf(t.ID(), "defaults.model",
+			diags = append(diags, diag.TargetWarnf(t.ID(), "defaults.model",
 				`cline expects defaults.model as "provider/model"; got %q`, cfg.Defaults.Model))
 		} else if !hasModel(cfg, pid, mid) {
-			diags = append(diags, diag.TargetErrorf(t.ID(), "defaults.model",
+			diags = append(diags, diag.TargetWarnf(t.ID(), "defaults.model",
 				"cline default %q does not resolve to an emitted provider model", cfg.Defaults.Model))
 		}
 	}
@@ -105,6 +105,9 @@ func (t Target) Emit(cfg ir.Config) ([]artifact.Artifact, error) {
 		if len(p.Headers) > 0 {
 			headers := map[string]string{}
 			for name, v := range p.Headers {
+				if v.FromEnv != "" || v.BearerFromEnv != "" {
+					continue // cline headers are literal-only
+				}
 				headers[name] = v.Value
 			}
 			if len(headers) > 0 {
@@ -218,6 +221,9 @@ func (t Target) Emit(cfg ir.Config) ([]artifact.Artifact, error) {
 				if len(s.Env) > 0 {
 					env := map[string]string{}
 					for name, v := range s.Env {
+						if v.FromEnv != "" || v.BearerFromEnv != "" {
+							continue // cline MCP env values are literal-only
+						}
 						env[name] = v.Value
 					}
 					tr.Env = env
@@ -231,6 +237,9 @@ func (t Target) Emit(cfg ir.Config) ([]artifact.Artifact, error) {
 				if len(s.Headers) > 0 {
 					headers := map[string]string{}
 					for name, v := range s.Headers {
+						if v.FromEnv != "" || v.BearerFromEnv != "" {
+							continue // cline MCP header values are literal-only
+						}
 						headers[name] = v.Value
 					}
 					tr.Headers = headers

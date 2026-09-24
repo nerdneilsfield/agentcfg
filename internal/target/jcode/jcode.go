@@ -31,15 +31,15 @@ func (t Target) Validate(cfg ir.Config) []diag.Diagnostic {
 	for i, p := range cfg.Providers {
 		path := fmt.Sprintf("providers[%d]", i)
 		if p.Protocol == ir.ProtocolOpenAIResponses {
-			diags = append(diags, diag.TargetErrorf(t.ID(), path+".protocol",
+			diags = append(diags, diag.TargetWarnf(t.ID(), path+".protocol",
 				"jcode custom profiles use chat completions or Anthropic messages; openai-responses is only available on the built-in openai provider"))
 		} else if _, ok := providerType[p.Protocol]; !ok {
-			diags = append(diags, diag.TargetErrorf(t.ID(), path+".protocol",
+			diags = append(diags, diag.TargetWarnf(t.ID(), path+".protocol",
 				"jcode provider type must be openai-compatible, anthropic-compatible, or openrouter; got %q", p.Protocol))
 		}
 		for name, v := range p.Headers {
 			if v.FromEnv != "" || v.BearerFromEnv != "" {
-				diags = append(diags, diag.TargetErrorf(t.ID(), path+".headers."+name,
+				diags = append(diags, diag.TargetWarnf(t.ID(), path+".headers."+name,
 					"jcode config.toml is literal-only; only constant header values are representable"))
 			}
 		}
@@ -47,20 +47,20 @@ func (t Target) Validate(cfg ir.Config) []diag.Diagnostic {
 	for i, s := range cfg.MCP {
 		path := fmt.Sprintf("mcp[%d]", i)
 		if s.Transport == ir.TransportHTTP {
-			diags = append(diags, diag.TargetErrorf(t.ID(), path+".transport",
+			diags = append(diags, diag.TargetWarnf(t.ID(), path+".transport",
 				"jcode mcp.json loads stdio servers only; http/sse entries are recognized but skipped"))
 		}
 		if s.CWD != "" {
-			diags = append(diags, diag.TargetErrorf(t.ID(), path+".cwd",
+			diags = append(diags, diag.TargetWarnf(t.ID(), path+".cwd",
 				"jcode MCP servers have no cwd field"))
 		}
 		if s.TimeoutMS != nil && *s.TimeoutMS%1000 != 0 {
-			diags = append(diags, diag.TargetErrorf(t.ID(), path+".timeout_ms",
+			diags = append(diags, diag.TargetWarnf(t.ID(), path+".timeout_ms",
 				"jcode timeout_secs is an integer; timeout_ms must be divisible by 1000"))
 		}
 		for name, v := range s.Headers {
 			if v.FromEnv != "" || v.BearerFromEnv != "" {
-				diags = append(diags, diag.TargetErrorf(t.ID(), path+".headers."+name,
+				diags = append(diags, diag.TargetWarnf(t.ID(), path+".headers."+name,
 					"jcode http MCP headers are parsed but unused; environment references are not representable"))
 			}
 		}
@@ -68,10 +68,10 @@ func (t Target) Validate(cfg ir.Config) []diag.Diagnostic {
 	if cfg.Defaults != nil && cfg.Defaults.Model != "" {
 		pid, mid, ok := splitRef(cfg.Defaults.Model)
 		if !ok {
-			diags = append(diags, diag.TargetErrorf(t.ID(), "defaults.model",
+			diags = append(diags, diag.TargetWarnf(t.ID(), "defaults.model",
 				`jcode expects defaults.model as "provider/model"; got %q`, cfg.Defaults.Model))
 		} else if !hasModel(cfg, pid, mid) {
-			diags = append(diags, diag.TargetErrorf(t.ID(), "defaults.model",
+			diags = append(diags, diag.TargetWarnf(t.ID(), "defaults.model",
 				"jcode default %q does not resolve to an emitted provider model", cfg.Defaults.Model))
 		}
 	}
@@ -86,9 +86,14 @@ func (t Target) Emit(cfg ir.Config) ([]artifact.Artifact, error) {
 	if cfg.Defaults != nil && cfg.Defaults.Model != "" {
 		defPID, defMID, _ = splitRef(cfg.Defaults.Model)
 	}
+	emittedProviders := map[string]bool{}
 	for _, p := range cfg.Providers {
+		typ, ok := providerType[p.Protocol]
+		if !ok {
+			continue // openai-responses has no jcode custom profile
+		}
 		jp := jcodeProvider{
-			Type:         providerType[p.Protocol],
+			Type:         typ,
 			BaseURL:      p.BaseURL,
 			EnvKey:       p.APIKey.FromEnv,
 			APIKey:       p.APIKey.Value,
@@ -97,6 +102,9 @@ func (t Target) Emit(cfg ir.Config) ([]artifact.Artifact, error) {
 		if len(p.Headers) > 0 {
 			headers := map[string]string{}
 			for name, v := range p.Headers {
+				if v.FromEnv != "" || v.BearerFromEnv != "" {
+					continue // config.toml headers are literal-only
+				}
 				headers[name] = v.Value
 			}
 			if len(headers) > 0 {
@@ -120,8 +128,9 @@ func (t Target) Emit(cfg ir.Config) ([]artifact.Artifact, error) {
 			jp.Models = append(jp.Models, jm)
 		}
 		doc.Providers[p.ID] = jp
+		emittedProviders[p.ID] = true
 	}
-	if defPID != "" {
+	if defPID != "" && emittedProviders[defPID] {
 		doc.Provider = &jcodeDefaultProvider{DefaultProvider: defPID, DefaultModel: defMID}
 	}
 
@@ -140,6 +149,9 @@ func (t Target) Emit(cfg ir.Config) ([]artifact.Artifact, error) {
 	if len(cfg.MCP) > 0 {
 		servers := map[string]jcodeMCPServer{}
 		for _, s := range cfg.MCP {
+			if s.Transport != ir.TransportStdio {
+				continue // mcp.json loads stdio servers only
+			}
 			entry := jcodeMCPServer{
 				Command: s.Command[0],
 				Enabled: true,
@@ -157,10 +169,13 @@ func (t Target) Emit(cfg ir.Config) ([]artifact.Artifact, error) {
 				}
 				entry.Env = env
 			}
-			if s.TimeoutMS != nil {
+			if s.TimeoutMS != nil && *s.TimeoutMS%1000 == 0 {
 				entry.TimeoutSecs = *s.TimeoutMS / 1000
 			}
 			servers[s.ID] = entry
+		}
+		if len(servers) == 0 {
+			return arts, nil // every entry was skipped; nothing to emit
 		}
 		var jbuf bytes.Buffer
 		jenc := json.NewEncoder(&jbuf)
@@ -204,6 +219,9 @@ func hasModel(cfg ir.Config, pid, mid string) bool {
 	for _, p := range cfg.Providers {
 		if p.ID != pid {
 			continue
+		}
+		if _, ok := providerType[p.Protocol]; !ok {
+			continue // the provider is skipped, so its models are not emitted
 		}
 		for _, m := range p.Models {
 			if m.ID == mid {

@@ -31,10 +31,10 @@ providers:
         reasoning: true
 ```
 
-- `api` is a 12-value enum including `openai-completions`, `openai-responses`, and `anthropic-messages`, so all three IR protocols map 1:1 (no protocol rejection).
+- `api` is a 12-value enum including `openai-completions`, `openai-responses`, and `anthropic-messages`, so all three IR protocols map 1:1 (a provider whose protocol has no `api` mapping is skipped with a warning).
 - `apiKeyEnv` is native; IR `api_key: "ENV:NAME"` maps directly.
-- Gajae resolves header and credential values with **env-name-or-literal** semantics: a value equal to a set environment variable's name is replaced by that variable's value, otherwise kept as a literal. The emitter renders IR `ENV:NAME` as the bare env var name and documents the ambiguity risk. IR `Bearer ENV:NAME` has no native equivalent for providers (no prefix is added), so it is rejected.
-- `models` is an array of `{id, name, contextWindow, maxTokens, input, output, reasoning, thinking, compat}`; modalities are limited to `text` and `image`, so IR models with other input/output modalities are rejected. Provider display `name` is not in the strict provider schema and is not emitted. IR `tool_calling` has no direct field (only `compat` flags) and is not emitted.
+- Gajae resolves header and credential values with **env-name-or-literal** semantics: a value equal to a set environment variable's name is replaced by that variable's value, otherwise kept as a literal. The emitter renders IR `ENV:NAME` as the bare env var name and documents the ambiguity risk. IR `Bearer ENV:NAME` has no native equivalent for providers (no prefix is added), so the emitter warns and skips the header.
+- `models` is an array of `{id, name, contextWindow, maxTokens, input, output, reasoning, thinking, compat}`; modalities are limited to `text` and `image`, so other input/output modalities are dropped with a warning. Provider display `name` is not in the strict provider schema and is not emitted. IR `tool_calling` has no direct field (only `compat` flags) and is not emitted.
 - `models.yml` has no `${VAR}` interpolation; env references ride on env-name-or-literal semantics.
 
 ## Defaults
@@ -50,7 +50,8 @@ providers:
 `headers`), `enabled`, and `protocol`. `${VAR}` expansion is native at
 discovery, so IR `ENV:NAME` renders as `"${VAR}"` and
 `Authorization: "Bearer ENV:NAME"` renders as `Bearer ${VAR}`. IR `timeout_ms`
-maps 1:1 (no conversion).
+maps 1:1 (no conversion). A stdio server that declares no command is skipped
+with a warning.
 
 IR:
 

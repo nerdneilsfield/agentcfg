@@ -2,6 +2,8 @@
 package primeagent
 
 import (
+	"fmt"
+
 	"agentcfg/internal/artifact"
 	"agentcfg/internal/diag"
 	"agentcfg/internal/ir"
@@ -26,6 +28,28 @@ func primeOptions() pifamily.Options {
 func (t Target) Validate(cfg ir.Config) []diag.Diagnostic {
 	diags := pifamily.ValidateLiteralAPIKeys(t.ID(), cfg)
 	diags = append(diags, pifamily.ValidateModelInput(t.ID(), cfg)...)
+	for i, p := range cfg.Providers {
+		for name, v := range p.Headers {
+			if v.BearerFromEnv != "" {
+				diags = append(diags, diag.TargetWarnf(t.ID(), fmt.Sprintf("providers[%d].headers.%s", i, name),
+					"prime-agent provider headers are flat strings with no bearer-from-env convention; use ENV:NAME or a constant value"))
+			}
+		}
+	}
+	for i, s := range cfg.MCP {
+		if s.Transport == ir.TransportStdio && len(s.Command) == 0 {
+			diags = append(diags, diag.TargetWarnf(t.ID(), fmt.Sprintf("mcp[%d].command", i),
+				"prime-agent stdio MCP server needs a command; the server is skipped"))
+		}
+		if s.Transport == ir.TransportHTTP {
+			for name, v := range s.Headers {
+				if v.FromEnv != "" {
+					diags = append(diags, diag.TargetWarnf(t.ID(), fmt.Sprintf("mcp[%d].headers.%s", i, name),
+						"prime-agent MCP http headers are static strings; environment interpolation is not verified"))
+				}
+			}
+		}
+	}
 	return diags
 }
 
@@ -52,6 +76,10 @@ func (t Target) Emit(cfg ir.Config) ([]artifact.Artifact, error) {
 		for _, s := range cfg.MCP {
 			switch s.Transport {
 			case ir.TransportStdio:
+				if len(s.Command) == 0 {
+					// No command to run; Validate warns and the server is skipped.
+					continue
+				}
 				entry := map[string]any{
 					"type":    "stdio",
 					"command": s.Command[0],
@@ -80,7 +108,9 @@ func (t Target) Emit(cfg ir.Config) ([]artifact.Artifact, error) {
 				}
 				headers := map[string]string{}
 				for name, v := range s.Headers {
-					if v.BearerFromEnv != "" {
+					if v.BearerFromEnv != "" || v.FromEnv != "" {
+						// MCP http headers carry constant values only; Validate
+						// warns and the reference is skipped.
 						continue
 					}
 					headers[name] = v.Value
@@ -97,7 +127,9 @@ func (t Target) Emit(cfg ir.Config) ([]artifact.Artifact, error) {
 				mcp[s.ID] = entry
 			}
 		}
-		settings["mcpServers"] = mcp
+		if len(mcp) > 0 {
+			settings["mcpServers"] = mcp
+		}
 	}
 
 	settingsJSON, err := pifamily.EncodeJSON(settings)

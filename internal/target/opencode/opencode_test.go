@@ -10,25 +10,25 @@ import (
 
 func i64(n int64) *int64 { return &n }
 
+func boolp(v bool) *bool { return &v }
+
 func expectValid(t *testing.T, cfg ir.Config) {
 	t.Helper()
-	if diags := (Target{}).Validate(cfg); diag.HasErrors(diags) {
-		t.Fatalf("expected valid config, got %v", diags)
+	if diags := (Target{}).Validate(cfg); len(diags) != 0 {
+		t.Fatalf("expected no diagnostics, got %v", diags)
 	}
 }
 
-func expectInvalid(t *testing.T, cfg ir.Config, substr string) {
+func expectWarning(t *testing.T, cfg ir.Config, substr string) []diag.Diagnostic {
 	t.Helper()
 	diags := (Target{}).Validate(cfg)
-	if !diag.HasErrors(diags) {
-		t.Fatalf("expected validation error containing %q, got none", substr)
-	}
 	for _, d := range diags {
-		if d.Severity == diag.SeverityError && strings.Contains(d.Message, substr) {
-			return
+		if d.Severity == diag.SeverityWarning && strings.Contains(d.Message, substr) {
+			return diags
 		}
 	}
-	t.Fatalf("no diagnostic containing %q: %v", substr, diags)
+	t.Fatalf("no warning containing %q: %v", substr, diags)
+	return nil
 }
 
 func exampleConfig() ir.Config {
@@ -41,8 +41,7 @@ func exampleConfig() ir.Config {
 			BaseURL:  "https://example.com/v1",
 			APIKey:   ir.HeaderValue{FromEnv: "VOLC_API_KEY"},
 			Headers: map[string]ir.HeaderValue{
-				"X-Tenant":      {Value: "engineering"},
-				"X-Gateway-Key": {FromEnv: "GATEWAY_KEY"},
+				"X-Tenant": {Value: "engineering"},
 			},
 			Models: []ir.Model{{
 				ID:              "glm-5.3",
@@ -51,112 +50,221 @@ func exampleConfig() ir.Config {
 				MaxOutputTokens: i64(8192),
 				Input:           []ir.Modality{ir.ModalityText, ir.ModalityImage},
 				Output:          []ir.Modality{ir.ModalityText},
-				Reasoning:       boolp(true),
+				ToolCalling:     boolp(true),
+				Variants:        []ir.ReasoningEffort{"low", "high", "ultra"},
 			}},
 		}},
 		Defaults: &ir.Defaults{Model: "volcengine/glm-5.3"},
 	}
 }
 
-func boolp(v bool) *bool { return &v }
-
-func TestRejectsResponsesAndAnthropicProviders(t *testing.T) {
-	responses := exampleConfig()
-	responses.Providers[0].Protocol = ir.ProtocolOpenAIResponses
-	expectInvalid(t, responses, "openai-completions providers only")
-
-	anthropic := exampleConfig()
-	anthropic.Providers[0].Protocol = ir.ProtocolAnthropicMessages
-	expectInvalid(t, anthropic, "openai-completions providers only")
-}
-
-func TestEmitsCompletionsProvider(t *testing.T) {
+func TestEmitsV2ProviderShape(t *testing.T) {
 	expectValid(t, exampleConfig())
-	arts, err := (Target{}).Emit(exampleConfig())
-	if err != nil {
-		t.Fatalf("Emit: %v", err)
-	}
-	if len(arts) != 1 {
-		t.Fatalf("expected 1 artifact, got %d", len(arts))
-	}
-	out := string(arts[0].Content)
-	for _, want := range []string{
-		`"@ai-sdk/openai-compatible"`,
-		`"baseURL": "https://example.com/v1"`,
-		`"apiKey": "{env:VOLC_API_KEY}"`,
-		`"X-Tenant": "engineering"`,
-		`"X-Gateway-Key": "{env:GATEWAY_KEY}"`,
-		`"model": "volcengine/glm-5.3"`,
-	} {
-		if !strings.Contains(out, want) {
-			t.Errorf("missing %q in output:\n%s", want, out)
-		}
-	}
-}
-
-func TestEmitsModelReasoningVariants(t *testing.T) {
-	cfg := exampleConfig()
-	cfg.Providers[0].Models[0].Variants = []ir.ReasoningEffort{
-		"low",
-		"high",
-		"max",
-		"ultra",
-	}
-	arts, err := (Target{}).Emit(cfg)
-	if err != nil {
-		t.Fatalf("Emit: %v", err)
-	}
-	out := string(arts[0].Content)
-	for _, want := range []string{
-		`"variants": {`,
-		`"low": {`, `"reasoningEffort": "low"`,
-		`"high": {`, `"reasoningEffort": "high"`,
-		`"max": {`, `"reasoningEffort": "max"`,
-		`"ultra": {`, `"reasoningEffort": "ultra"`,
-	} {
-		if !strings.Contains(out, want) {
-			t.Errorf("missing %q in output:\n%s", want, out)
-		}
-	}
-	for _, forbidden := range []string{`reasoningSummary`, `textVerbosity`} {
-		if strings.Contains(out, forbidden) {
-			t.Errorf("unexpected %q in output:\n%s", forbidden, out)
-		}
-	}
-}
-
-func TestEmitsModelToolCall(t *testing.T) {
-	cfg := exampleConfig()
-	cfg.Providers[0].Models[0].ToolCalling = boolp(true)
-	arts, err := (Target{}).Emit(cfg)
+	arts, err := Target{}.Emit(exampleConfig())
 	if err != nil {
 		t.Fatal(err)
 	}
-	out := string(arts[0].Content)
-	if !strings.Contains(out, `"tool_call": true`) {
-		t.Fatalf("missing native model tool_call:\n%s", out)
+	if len(arts) != 1 || arts[0].Name != "opencode.json" || arts[0].SuggestedPath != "opencode.json" {
+		t.Fatalf("unexpected artifacts: %v", arts)
 	}
-	if strings.Contains(out, `"tools": true`) {
-		t.Fatalf("must not emit non-model tools field:\n%s", out)
+	want := `{
+  "$schema": "https://opencode.ai/config.json",
+  "providers": {
+    "volcengine": {
+      "name": "Volcengine",
+      "env": [
+        "VOLC_API_KEY"
+      ],
+      "package": "@opencode/ai/providers/openai-compatible",
+      "settings": {
+        "baseURL": "https://example.com/v1"
+      },
+      "headers": {
+        "X-Tenant": "engineering"
+      },
+      "models": {
+        "glm-5.3": {
+          "name": "GLM-5.3",
+          "capabilities": {
+            "tools": true,
+            "input": [
+              "text",
+              "image"
+            ],
+            "output": [
+              "text"
+            ]
+          },
+          "limit": {
+            "context": 128000,
+            "output": 8192
+          },
+          "variants": [
+            {
+              "id": "low",
+              "settings": {
+                "reasoningEffort": "low"
+              }
+            },
+            {
+              "id": "high",
+              "settings": {
+                "reasoningEffort": "high"
+              }
+            },
+            {
+              "id": "ultra",
+              "settings": {
+                "reasoningEffort": "ultra"
+              }
+            }
+          ]
+        }
+      }
+    }
+  },
+  "model": "volcengine/glm-5.3"
+}
+`
+	if got := string(arts[0].Content); got != want {
+		t.Fatalf("opencode.json mismatch:\ngot:\n%s\nwant:\n%s", got, want)
 	}
 }
 
-func TestEmitsMCPTimeout(t *testing.T) {
+func TestMapsEveryProtocolToANativePackage(t *testing.T) {
+	for protocol, want := range map[ir.Protocol]string{
+		ir.ProtocolOpenAICompletions: "@opencode/ai/providers/openai-compatible",
+		ir.ProtocolOpenAIResponses:   "@opencode/ai/providers/openai",
+		ir.ProtocolAnthropicMessages: "@opencode/ai/providers/anthropic",
+	} {
+		t.Run(string(protocol), func(t *testing.T) {
+			cfg := exampleConfig()
+			cfg.Providers[0].Protocol = protocol
+			expectValid(t, cfg)
+			arts, err := Target{}.Emit(cfg)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := string(arts[0].Content); !strings.Contains(got, `"package": "`+want+`"`) {
+				t.Fatalf("missing package %q:\n%s", want, got)
+			}
+		})
+	}
+}
+
+func TestEmitsMCPV2Shape(t *testing.T) {
 	cfg := exampleConfig()
 	cfg.MCP = []ir.MCPServer{{
-		ID: "s", Transport: ir.TransportStdio, Command: []string{"npx"}, TimeoutMS: i64(12000), CWD: "/tmp",
+		ID:        "context7",
+		Transport: ir.TransportStdio,
+		Command:   []string{"npx", "-y", "@upstash/context7-mcp"},
+		CWD:       "/var/lib/context7",
+		Env: map[string]ir.HeaderValue{
+			"CONTEXT7_API_KEY": {FromEnv: "CONTEXT7_API_KEY"},
+		},
+		TimeoutMS: i64(30000),
 	}, {
-		ID: "r", Transport: ir.TransportHTTP, URL: "https://mcp.example", TimeoutMS: i64(34000),
+		ID:        "github",
+		Transport: ir.TransportHTTP,
+		URL:       "https://api.githubcopilot.com/mcp/",
+		Headers: map[string]ir.HeaderValue{
+			"Authorization": {BearerFromEnv: "GITHUB_TOKEN"},
+		},
+		Enabled: boolp(false),
 	}}
 	expectValid(t, cfg)
-	arts, err := (Target{}).Emit(cfg)
+	arts, err := Target{}.Emit(cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
-	out := string(arts[0].Content)
-	for _, want := range []string{`"timeout": 12000`, `"timeout": 34000`, `"cwd": "/tmp"`} {
-		if !strings.Contains(out, want) {
-			t.Errorf("missing %q:\n%s", want, out)
+	got := string(arts[0].Content)
+	for _, want := range []string{
+		`"mcp": {`,
+		`"servers": {`,
+		`"type": "local"`,
+		`"cwd": "/var/lib/context7"`,
+		`"CONTEXT7_API_KEY": "{env:CONTEXT7_API_KEY}"`,
+		`"timeout": {`,
+		`"catalog": 30000`,
+		`"execution": 30000`,
+		`"type": "remote"`,
+		`"Authorization": "Bearer {env:GITHUB_TOKEN}"`,
+		`"disabled": true`,
+	} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("V2 MCP output missing %q:\n%s", want, got)
 		}
+	}
+}
+
+// V2 resolves {env:NAME} in provider header values, so a header keeps its
+// reference instead of being dropped.
+func TestEmitsEnvDerivedProviderHeaders(t *testing.T) {
+	cfg := exampleConfig()
+	cfg.Providers[0].Headers = map[string]ir.HeaderValue{
+		"X-Tenant":      {Value: "engineering"},
+		"X-Gateway-Key": {FromEnv: "GATEWAY_KEY"},
+		"Authorization": {BearerFromEnv: "UPSTREAM_TOKEN"},
+	}
+	expectValid(t, cfg)
+	arts, err := Target{}.Emit(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := string(arts[0].Content)
+	for _, want := range []string{
+		`"X-Tenant": "engineering"`,
+		`"X-Gateway-Key": "{env:GATEWAY_KEY}"`,
+		`"Authorization": "Bearer {env:UPSTREAM_TOKEN}"`,
+	} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("missing %q:\n%s", want, got)
+		}
+	}
+}
+
+func TestSkipsModelReasoningFlag(t *testing.T) {
+	cfg := exampleConfig()
+	cfg.Providers[0].Models[0].Reasoning = boolp(true)
+	expectWarning(t, cfg, "reasoning is expressed through variants")
+	arts, err := Target{}.Emit(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := string(arts[0].Content); strings.Contains(got, `"reasoning"`) {
+		t.Fatalf("V2 has no model reasoning flag:\n%s", got)
+	}
+}
+
+func TestSkipsLiteralNativeExpressionAPIKey(t *testing.T) {
+	cfg := exampleConfig()
+	cfg.Providers[0].APIKey = ir.HeaderValue{Value: "{env:TOKEN}"}
+	diags := expectWarning(t, cfg, "literal API key contains native expression")
+	for _, d := range diags {
+		if strings.Contains(d.String(), "{env:TOKEN}") {
+			t.Fatalf("diagnostic exposed the key: %v", d)
+		}
+	}
+	arts, err := Target{}.Emit(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := string(arts[0].Content); strings.Contains(got, "apiKey") {
+		t.Fatalf("an unrepresentable literal must be skipped:\n%s", got)
+	}
+}
+
+func TestKeylessAuthTypeWritesNoCredential(t *testing.T) {
+	cfg := exampleConfig()
+	cfg.Providers[0].AuthType = ir.AuthTypeNone
+	cfg.Providers[0].APIKey = ir.HeaderValue{}
+	expectValid(t, cfg)
+	arts, err := Target{}.Emit(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := string(arts[0].Content)
+	if strings.Contains(got, `"env"`) || strings.Contains(got, `"apiKey"`) {
+		t.Fatalf("auth_type none must not reference a credential:\n%s", got)
 	}
 }

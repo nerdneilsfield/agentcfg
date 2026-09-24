@@ -1,25 +1,24 @@
 {
   "$schema": "https://opencode.ai/config.json",
-  "provider": {
+  "providers": {
     "volcengine": {
-      "npm": "@ai-sdk/openai-compatible",
       "name": "Volcengine",
-      "options": {
-        "apiKey": "{env:VOLC_API_KEY}",
-        "baseURL": "https://example.com/v1",
-        "headers": {
-          "X-Gateway-Key": "{env:GATEWAY_KEY}",
-          "X-Tenant": "engineering"
-        }
+      "env": [
+        "VOLC_API_KEY"
+      ],
+      "package": "@opencode/ai/providers/openai-compatible",
+      "settings": {
+        "baseURL": "https://example.com/v1"
+      },
+      "headers": {
+        "X-Gateway-Key": "{env:GATEWAY_KEY}",
+        "X-Tenant": "engineering"
       },
       "models": {
         "glm-5.3": {
           "name": "GLM-5.3",
-          "limit": {
-            "context": 128000,
-            "output": 8192
-          },
-          "modalities": {
+          "capabilities": {
+            "tools": true,
             "input": [
               "text",
               "image"
@@ -28,8 +27,10 @@
               "text"
             ]
           },
-          "reasoning": true,
-          "tool_call": true
+          "limit": {
+            "context": 128000,
+            "output": 8192
+          }
         }
       }
     }

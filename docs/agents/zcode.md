@@ -38,9 +38,9 @@ ZCode uses `provider.<id>` objects with a `kind` discriminator, `options`, and a
 }
 ```
 
-`kind` is `anthropic` | `openai` | `openai-compatible`. IR `anthropic-messages` and `openai-completions` map to `anthropic` / `openai-compatible`. IR `openai-responses` has no native location for custom providers and is rejected.
+`kind` is `anthropic` | `openai` | `openai-compatible`. IR `anthropic-messages` and `openai-completions` map to `anthropic` / `openai-compatible`. IR `openai-responses` has no native location for custom providers and is skipped (the provider is dropped).
 
-`options.apiKey` is a literal string with **no** user-level `${ENV}` expansion, so IR `api_key: "ENV:NAME"` is rejected. `headers` values are literal; IR `ENV:NAME`/`Bearer ENV:NAME` provider headers are rejected.
+`options.apiKey` is a literal string with **no** user-level `${ENV}` expansion, so IR `api_key: "ENV:NAME"` is skipped (no `options.apiKey` is written). `headers` values are literal; IR `ENV:NAME`/`Bearer ENV:NAME` provider headers are skipped.
 
 Model `limit`, `modalities`, `reasoning`, and `tool_call` are emitted natively from the IR (`reasoning`/`tool_call` only when set).
 
@@ -48,11 +48,11 @@ Model `limit`, `modalities`, `reasoning`, and `tool_call` are emitted natively f
 
 ZCode uses `mcp.servers.<id>` with `type` `stdio` (`command`, `args`, `env`, `cwd`) or `http`/`sse` (`url`, `headers`, `oauth`), plus shared `enabled` and `timeoutMs`.
 
-MCP `env` and `headers` values are literal strings with no documented expansion, so IR `ENV:NAME`/`Bearer ENV:NAME` MCP references are rejected.
+MCP `env` and `headers` values are literal strings with no documented expansion, so IR `ENV:NAME`/`Bearer ENV:NAME` MCP references are skipped (the entry is kept, the value omitted).
 
 ## Defaults
 
-`defaults.model` maps to `model.main` verbatim — ZCode's `"provider/model"` selector syntax matches the IR string 1:1.
+`defaults.model` maps to `model.main` verbatim — ZCode's `"provider/model"` selector syntax matches the IR string 1:1. A default that does not parse as `provider/model`, or whose provider is skipped, is skipped with a warning and `model` is omitted.
 
 ## Reasoning variants
 

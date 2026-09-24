@@ -26,14 +26,20 @@ func (t Target) Validate(cfg ir.Config) []diag.Diagnostic {
 	for i, p := range cfg.Providers {
 		path := fmt.Sprintf("providers[%d]", i)
 		if p.APIKey.Value != "" {
-			diags = append(diags, diag.TargetErrorf(t.ID(), path+".api_key", "deepseek-harness supports apiKeyEnv credential references only; literal API keys are not representable"))
+			diags = append(diags, diag.TargetWarnf(t.ID(), path+".api_key", "deepseek-harness supports apiKeyEnv credential references only; literal API keys are not representable"))
 		}
 		for j, m := range p.Models {
 			for _, mod := range m.Input {
 				if mod != ir.ModalityText && mod != ir.ModalityImage {
-					diags = append(diags, diag.TargetErrorf(t.ID(), fmt.Sprintf("%s.models[%d].input", path, j), "deepseek-harness model input supports text and image only"))
+					diags = append(diags, diag.TargetWarnf(t.ID(), fmt.Sprintf("%s.models[%d].input", path, j), "deepseek-harness model input supports text and image only"))
 				}
 			}
+		}
+	}
+	for i, s := range cfg.MCP {
+		if s.Transport == ir.TransportStdio && len(s.Command) == 0 {
+			diags = append(diags, diag.TargetWarnf(t.ID(), fmt.Sprintf("mcp[%d].command", i),
+				"deepseek-harness stdio MCP server needs a command; the server is skipped"))
 		}
 	}
 	return diags
@@ -48,7 +54,9 @@ func (t Target) Emit(cfg ir.Config) ([]artifact.Artifact, error) {
 				"id":   m.ID,
 				"name": orDefault(m.Name, m.ID),
 			}
-			mm["input"] = modalStrings(m.Input)
+			if mods := modalStrings(m.Input); mods != nil {
+				mm["input"] = mods
+			}
 			if hasDSHEfforts(m.Variants) {
 				mm["reasoningEfforts"] = dshEffortMap(m.Variants)
 			}
@@ -114,6 +122,10 @@ func (t Target) Emit(cfg ir.Config) ([]artifact.Artifact, error) {
 			config["toolCallTimeoutMs"] = *s.TimeoutMS
 		}
 		if s.Transport == ir.TransportStdio {
+			if len(s.Command) == 0 {
+				// No command to run; Validate warns and the server is skipped.
+				continue
+			}
 			config["transport"] = "stdio"
 			config["command"] = s.Command[0]
 			config["args"] = s.Command[1:]
@@ -181,13 +193,21 @@ func dshExpressions(doc string) string {
 	return strings.Join(lines, "\n")
 }
 
+// modalStrings carries only the input modalities deepseek-harness represents:
+// text and image. A declared modality it does not carry is dropped, and a model
+// left with none omits the field rather than gain one the IR never declared.
 func modalStrings(in []ir.Modality) []string {
 	if len(in) == 0 {
 		return []string{string(ir.ModalityText)}
 	}
 	out := make([]string, 0, len(in))
 	for _, m := range in {
-		out = append(out, string(m))
+		if m == ir.ModalityText || m == ir.ModalityImage {
+			out = append(out, string(m))
+		}
+	}
+	if len(out) == 0 {
+		return nil
 	}
 	return out
 }
