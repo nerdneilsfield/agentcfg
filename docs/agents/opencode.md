@@ -89,7 +89,10 @@ pinned v2.0.12 bundle does not: either name fails with `Cannot initialize
 <provider>/<model>: Cannot find package '@opencode/ai'`, while `openai` and
 `anthropic` load and send to `settings.baseURL` on `/v1/responses` and
 `/v1/messages` respectively. Revisit the two names once a bundle ships that
-resolves them.
+resolves them. A request-level recheck on v2.0.16 (2026-09-25) reproduced
+the same two package-loading failures. The emitted `openai` and `anthropic`
+packages still reached a local capture server at `/v1/responses` and
+`/v1/messages`, respectively, with the configured model ID.
 
 `package` is load-bearing and unvalidated: OpenCode accepts any string, lists the
 provider's models, and fails only when a request is made. Keep the values above

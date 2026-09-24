@@ -178,6 +178,20 @@ provider` reports "Unknown configuration setting: provider"), so v1 does not
 write one; the model picker's own pair key is `modelProvider`, which this
 fragment also leaves alone.
 
+The default was verified through a local OpenAI-compatible streaming server on
+v1.64.0 and v1.65.2 (2026-09-25). With an isolated home, a custom provider in
+`providers.json`, and `{"model":"probe/probe-model"}` in `config.json`,
+`cmd --local-only -p` without `--model` sent `model: "probe-model"` to the
+configured `/v1/chat/completions` endpoint, printed the server's `OK`, and
+exited 0. This verifies default selection and request routing; it does not
+verify authentication against a hosted provider.
+
+Both versions still require a Command Code credential at the headless startup
+check, even with `--local-only` and a keyless BYOK endpoint. Without one, they
+exit 3 with `Not authenticated` before sending a model request. The isolated
+test supplied a dummy `COMMAND_CODE_API_KEY` with `--local-only`; it did not
+use an account credential.
+
 Two cautions belong with this fragment:
 
 - `cmd config set model` validates its value against Command Code's own catalog
