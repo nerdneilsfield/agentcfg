@@ -43,6 +43,8 @@ agentcfg 把一份 `agentcfg.yaml` 编译成各编码智能体 CLI 的原生配�
 | `crush` | [charmbracelet/crush](https://github.com/charmbracelet/crush) | Chat · Responses · Anthropic | stdio + HTTP | 每个模型必须带 `context_window` + `default_max_tokens`；不支持 MCP `cwd`；timeout 取整秒 |
 | `goose` | [block/goose](https://github.com/block/goose) | Chat · Responses（经 `base_path`） · Anthropic | stdio + streamable HTTP | 无法表示的字段一律跳过：模型级 max tokens、非文本模态、`tool_calling: false`、改名的 MCP env 引用、非整秒 timeout；供应商 headers 仅字面量 |
 | `commandcode` | [CommandCodeAI/command-code](https://github.com/CommandCodeAI/command-code) | Chat · Responses · Anthropic | stdio + HTTP | `providers.json` + `.mcp.json` + `config.json` 片段；字面量 API key 与环境派生的供应商 headers 跳过并 warning；内置 lane 的 provider id 跳过；无 MCP `cwd`/`timeout` |
+| `fast-agent` | [evalstate/fast-agent](https://github.com/evalstate/fast-agent) | Chat · Responses · Anthropic | stdio + HTTP | 配置 + 原生 model overlays + 可选 secrets 片段；MCP timeout 仅支持整秒；禁用服务器跳过 |
+| `crow` | [crow-cli/crow-cli](https://github.com/crow-cli/crow-cli) | 仅 Chat | stdio + HTTP | `~/.agents/crow/config.yaml` 片段；默认模型排首位；无供应商 headers 与 MCP `cwd`/timeout；禁用服务器跳过 |
 | `cometixcode` | [Haleclipse/CometixCode](https://github.com/Haleclipse/CometixCode) | 仅 Anthropic（经 `ANTHROPIC_BASE_URL` 单端点） | stdio + HTTP | Claude Code 的 Rust 重实现；`settings.json` + `.mcp.json` 片段；`auth_type` 决定写 `ANTHROPIC_API_KEY` 还是 `ANTHROPIC_AUTH_TOKEN`；仅字面量凭据；模型级字段跳过并 warning |
 
 "Chat" = OpenAI Chat Completions，"Responses" = OpenAI Responses API。

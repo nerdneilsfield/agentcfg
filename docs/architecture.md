@@ -44,6 +44,8 @@ An emitter returns zero or more named artifacts. A target does not have to corre
 - Goose: one JSON file per custom provider plus a `config.yaml` fragment.
 - Command Code: `providers.json`, a `.mcp.json` MCP fragment, and a `config.json` default-model fragment.
 - CometixCode: a `settings.json` fragment and a `.mcp.json` MCP fragment.
+- fast-agent: `fastagent.config.yaml`, home-local model overlays, and optional companion secrets.
+- Crow: one YAML fragment (`~/.agents/crow/config.yaml`), with the default model first.
 
 ```go
 type Artifact struct {

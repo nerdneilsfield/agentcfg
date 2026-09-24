@@ -35,6 +35,8 @@ Write the IR against the protocol. Open the contract for a target before putting
 | [Crush](crush.md) | JSON `providers` | JSON `mcp` | live schema charm.land/crush.json |
 | [Goose](goose.md) | JSON `custom_providers/<id>.json` | YAML `extensions` | official repo (block/goose) |
 | [Command Code](commandcode.md) | JSON `provider` | JSON `mcpServers` | installed v1.64.0 BYOK/MCP parsers + official BYOK and MCP docs |
+| [fast-agent](fast-agent.md) | YAML model overlays | YAML `mcp.servers` | repo source + v0.10.33 native settings/overlay loader |
+| [Crow](crow.md) | YAML `providers` + ordered `models` | YAML `mcpServers` | pinned config loader + ACP MCP conversion |
 | [CometixCode](cometixcode.md) | Anthropic env (`ANTHROPIC_BASE_URL`) | JSON `mcpServers` | repo source (`Haleclipse/CometixCode`) + Claude Code settings/env/MCP docs |
 
 Every emitter change must update the applicable target contract with version, source URL/path, and tested status.
