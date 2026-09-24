@@ -34,6 +34,9 @@ func Validate(req Request) error {
 	req.Log.InfoW("validation started", "command", "validate", "source", req.ConfigPath, "targets", len(targets))
 	if diags := runTargetValidation(cfg, targets); len(diags) > 0 {
 		printDiagnostics(req.Stderr, diags)
+		if diag.HasErrors(diags) {
+			return fmt.Errorf("target validation failed")
+		}
 	}
 	_, _ = fmt.Fprintf(req.Stderr, "%s: OK (%d providers, %d MCP servers, %d targets)\n",
 		req.ConfigPath, len(cfg.Providers), len(cfg.MCP), len(targets))
@@ -77,6 +80,9 @@ func Generate(req Request) error {
 	}
 	if diags := runTargetValidation(cfg, targets); len(diags) > 0 {
 		printDiagnostics(req.Stderr, diags)
+		if diag.HasErrors(diags) {
+			return fmt.Errorf("target validation failed")
+		}
 	}
 
 	var arts []artifact.Artifact
@@ -117,6 +123,8 @@ func loadAndSelect(req Request) (ir.Config, []target.Target, error) {
 	}
 	if len(diags) > 0 {
 		printDiagnostics(req.Stderr, diags)
+	}
+	if diag.HasErrors(diags) {
 		return cfg, nil, fmt.Errorf("invalid agentcfg.yaml (%d diagnostic(s))", len(diags))
 	}
 	targets, err := target.Select(req.To, cfg.Targets)

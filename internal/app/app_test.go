@@ -3,14 +3,54 @@ package app
 import (
 	"bytes"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"agentcfg/internal/artifact"
+	"agentcfg/internal/diag"
 	"agentcfg/internal/example"
+	"agentcfg/internal/ir"
 	"agentcfg/internal/logging"
+	"agentcfg/internal/target"
 	_ "agentcfg/internal/target/all"
 )
+
+type errorTarget struct{ emitted bool }
+
+func (*errorTarget) ID() string { return "app-test-error" }
+
+func (*errorTarget) Validate(ir.Config) []diag.Diagnostic {
+	return []diag.Diagnostic{{Severity: diag.SeverityError, Target: "app-test-error", Message: "unsafe output"}}
+}
+
+func (t *errorTarget) Emit(ir.Config) ([]artifact.Artifact, error) {
+	t.emitted = true
+	return nil, nil
+}
+
+func TestTargetErrorsBlockValidateAndGenerate(t *testing.T) {
+	// A test subprocess keeps this target out of the global --to all registry
+	// used by the other application tests.
+	if os.Getenv("AGENTCFG_TEST_ERROR_TARGET") != "1" {
+		cmd := exec.Command(os.Args[0], "-test.run=^TestTargetErrorsBlockValidateAndGenerate$")
+		cmd.Env = append(os.Environ(), "AGENTCFG_TEST_ERROR_TARGET=1")
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("error target check: %v\n%s", err, out)
+		}
+		return
+	}
+	targetWithError := &errorTarget{}
+	target.Register(targetWithError)
+	for _, run := range []func(Request) error{Validate, Generate} {
+		var stdout, stderr bytes.Buffer
+		err := run(newRequest(fixture(t, "ir", "example.yaml"), targetWithError.ID(), &stdout, &stderr))
+		if err == nil || targetWithError.emitted || stdout.Len() != 0 || strings.Contains(stderr.String(), ": OK") || !strings.Contains(stderr.String(), "unsafe output") {
+			t.Fatalf("error diagnostic did not block operation: err=%v emitted=%v stdout=%q stderr=%q", err, targetWithError.emitted, stdout.String(), stderr.String())
+		}
+	}
+}
 
 func newRequest(cfg, to string, stdout, stderr *bytes.Buffer) Request {
 	return Request{
@@ -106,6 +146,16 @@ func TestGenerateSkipsUnsupportedPiMCP(t *testing.T) {
 	}
 	if !strings.Contains(stdout.String(), `"providers"`) {
 		t.Fatalf("expected models output: %q", stdout.String())
+	}
+	if !strings.Contains(stderr.String(), "warning:") {
+		t.Fatalf("expected warning: %q", stderr.String())
+	}
+	stderr.Reset()
+	if err := Validate(newRequest(fixture(t, "ir", "example-mcp.yaml"), "pi", &stdout, &stderr)); err != nil {
+		t.Fatalf("warning blocked validation: %v", err)
+	}
+	if !strings.Contains(stderr.String(), "warning:") || !strings.Contains(stderr.String(), ": OK") {
+		t.Fatalf("expected warning and OK summary: %q", stderr.String())
 	}
 }
 
