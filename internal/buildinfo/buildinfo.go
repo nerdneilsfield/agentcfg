@@ -3,7 +3,7 @@ package buildinfo
 
 // Values are set with -ldflags at release time.
 var (
-	Version = "v0.1.6"
+	Version = "v0.2.0"
 	Commit  = "none"
 	Date    = "unknown"
 )

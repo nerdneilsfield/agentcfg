@@ -12,13 +12,26 @@ agentcfg compiles one `agentcfg.yaml` into native config fragments for coding
 agent CLIs. Describe custom model providers and MCP servers once, then render
 them for each supported CLI.
 
+## v0.2.0
+
+- 25 targets, including fast-agent, Crow, Aider, Continue, Qwen Code, and Kilo CLI.
+- `gen --in-place` updates native configuration files; `gen --output` writes to
+  a specified file or directory, including agents with multiple config files.
+- File updates replace provider/model and MCP sections and update required
+  credentials and defaults while preserving unrelated settings.
+- Validation errors stop generation; unsupported target capabilities produce
+  warnings and leave supported output available.
+
+See [Updating local configurations](#updating-local-configurations) for examples
+and merge limitations.
+
 Design principles:
 
 - **Explicit credentials.** Use a quoted string literal or `ENV:NAME`.
-  agentcfg never reads the process environment; it emits literals as supplied
+  agentcfg does not resolve credential references; it emits literals as supplied
   and translates references into each CLI's native syntax.
-- **stdout by default.** `gen` prints fragments unless `--in-place` or `--output` is set. Review
-  the output, then merge it into the native config yourself.
+- **stdout by default.** `gen` prints fragments for review. Use `--in-place` or
+  `--output` to merge them into native configuration files.
 - **Never guess.** A target that cannot represent an IR field skips that field
   and warns, naming the field and the reason; it never silently drops it and
   never fails the whole target for one unsupported field.
