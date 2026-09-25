@@ -1,6 +1,6 @@
 # Program architecture
 
-This document is the implementation plan for the stdout-only first release. It deliberately describes a small compiler, not a config-file manager.
+This document describes the compiler and its original stdout output contract. File output is handled by `internal/artifact`: `--in-place` resolves native paths, while `--output` selects a file or directory. Target-specific owned paths control section replacement; companion-file completion clears stale MCP entries when an emitter omits an empty artifact. All destination merges are prepared before per-file atomic replacement.
 
 ## Release boundary
 

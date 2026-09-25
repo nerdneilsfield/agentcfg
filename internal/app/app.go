@@ -23,6 +23,8 @@ type Request struct {
 	Stdout     io.Writer
 	Stderr     io.Writer
 	Log        zapper.Zapper
+	Output     string
+	InPlace    bool
 }
 
 // Validate loads and validates the IR and every selected target.
@@ -74,6 +76,9 @@ func GenExample(req Request, path string) error {
 // Generate loads, validates, emits, and renders artifacts to stdout.
 // stdout is written only after every selected target emits successfully.
 func Generate(req Request) error {
+	if req.InPlace && req.Output != "" {
+		return fmt.Errorf("--in-place and --output are mutually exclusive")
+	}
 	cfg, targets, err := loadAndSelect(req)
 	if err != nil {
 		return err
@@ -95,6 +100,9 @@ func Generate(req Request) error {
 		arts = append(arts, emitted...)
 	}
 	arts = artifact.SortedByName(arts)
+	if req.InPlace || req.Output != "" {
+		return artifact.WriteFiles(arts, len(targets), req.Output, req.InPlace, req.Stderr)
+	}
 
 	var buf bytesBuf
 	if err := artifact.Render(&buf, len(targets), arts); err != nil {

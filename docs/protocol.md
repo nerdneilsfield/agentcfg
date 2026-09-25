@@ -2,7 +2,7 @@
 
 This document specifies version 1 of the `agentcfg.yaml` intermediate representation (IR). The IR describes provider routes and MCP servers only. Native field names, interpolation syntax, and file layout belong to each target contract in [`docs/agents/`](agents/README.md).
 
-Write one YAML document. Compile it with `agentcfg validate` and `agentcfg gen`. agentcfg never writes the native config files; it prints fragments on stdout.
+Write one YAML document. Compile it with `agentcfg validate` and `agentcfg gen`. By default, `gen` prints fragments on stdout. Use `--in-place` to merge into native paths, or `--output` to merge into a specified file or directory; see the README for file layout and merge behavior.
 
 ## IR principles
 

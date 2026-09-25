@@ -17,7 +17,7 @@ Design principles:
 - **Explicit credentials.** Use a quoted string literal or `ENV:NAME`.
   agentcfg never reads the process environment; it emits literals as supplied
   and translates references into each CLI's native syntax.
-- **stdout only.** `gen` prints fragments. It never writes target files. Review
+- **stdout by default.** `gen` prints fragments unless `--in-place` or `--output` is set. Review
   the output, then merge it into the native config yourself.
 - **Never guess.** A target that cannot represent an IR field skips that field
   and warns, naming the field and the reason; it never silently drops it and
@@ -233,10 +233,36 @@ suggested-path: ~/.config/crush/crush.json
 ===== END agentcfg artifact =====
 ```
 
-`suggested-path` tells you where the fragment belongs. agentcfg never writes
-target files in v1. A new file can use the block contents as-is; an existing
-file needs a manual merge. On any validation or emit error, stdout stays empty
-and the process exits `1`.
+`suggested-path` identifies the native destination used by `--in-place`.
+Without file flags, validation or emit errors leave stdout empty and exit `1`.
+
+### Updating local configurations
+
+```bash
+agentcfg gen --to qwen-code --in-place
+agentcfg gen --to qwen-code --output ./settings.json
+agentcfg gen --to aider --output ./aider-config/
+agentcfg gen --to all --output ./generated/
+```
+
+`--in-place` and `--output` are mutually exclusive. A single artifact can use
+an output file; multiple artifacts require a directory. Multiple targets get
+separate `<target>/` directories. Fast-agent overlays retain `.fast-agent/`,
+and Goose provider files retain `custom_providers/` inside the output directory.
+
+Existing files are parsed and merged. Provider/model and MCP sections are
+replaced, including stale entries; required credentials and default-model
+fields are updated while unrelated settings remain. Optional MCP companion
+files are also cleared when the input contains no MCP servers. Standalone
+per-provider/overlay files no longer emitted are not deleted automatically.
+
+All existing destinations are parsed before any file is replaced. Each write
+uses a same-directory temporary file and rename; multiple files are not a
+single filesystem transaction. Existing permissions are retained; new files
+use `0600`. Symlink destinations are rejected. JSONC comments and trailing
+commas are accepted, but comments and formatting are not preserved when
+documents are serialized. Full JSON5 syntax is not supported. DeepSeek Harness
+requires `DSH_HOME` for `--in-place`.
 
 ## Writing agentcfg.yaml
 
@@ -352,7 +378,8 @@ agentcfg version
 | `-t`, `--to` | (YAML `targets:`) | Comma-separated target ids, or `all`. |
 | `-v`, `--verbose` | off | Info logs on stderr. |
 | `-d`, `--debug` | off | Debug logs on stderr. |
-| `-o`, `--output` | stdout | `gen-example` only: write the bundled example to this path. |
+| `-o`, `--output` | stdout | `gen`: merge into a file or directory; `gen-example`: create an example file. |
+| `--in-place` | false | `gen`: merge into native configuration paths. |
 
 `--config`, `--to`, `--verbose`, and `--debug` are root flags, so
 `agentcfg -c file.yaml gen` and `agentcfg gen -c file.yaml` are equivalent.

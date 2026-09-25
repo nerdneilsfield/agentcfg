@@ -24,6 +24,8 @@ func run(args []string) int {
 		verbose    bool
 		debug      bool
 		exampleOut string
+		output     string
+		inPlace    bool
 	)
 
 	root := &cobra.Command{
@@ -52,6 +54,8 @@ func run(args []string) int {
 			Stdout:     os.Stdout,
 			Stderr:     os.Stderr,
 			Log:        logging.New(level),
+			Output:     output,
+			InPlace:    inPlace,
 		}
 	}
 
@@ -62,13 +66,17 @@ func run(args []string) int {
 			return app.Validate(newRequest())
 		},
 	})
-	root.AddCommand(&cobra.Command{
+	gen := &cobra.Command{
 		Use:   "gen",
-		Short: "Generate native configs to stdout",
+		Short: "Generate native configs to stdout or merge into local files",
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return app.Generate(newRequest())
 		},
-	})
+	}
+	gen.Flags().StringVarP(&output, "output", "o", "", "merge into a file (single artifact) or directory (multiple artifacts/targets)")
+	gen.Flags().BoolVar(&inPlace, "in-place", false, "merge into native configuration paths")
+	gen.MarkFlagsMutuallyExclusive("output", "in-place")
+	root.AddCommand(gen)
 	genExample := &cobra.Command{
 		Use:   "gen-example",
 		Short: "Print the example agentcfg.yaml to stdout (or write it with -o)",

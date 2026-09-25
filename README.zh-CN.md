@@ -16,7 +16,7 @@ agentcfg 把一份 `agentcfg.yaml` 编译成各编码智能体 CLI 的原生配�
 - **显式配置凭据。** 使用带引号的字符串字面量或 `ENV:NAME`。
   agentcfg 不读取进程环境变量；字面量按原值写入生成结果，引用则翻译成各 CLI
   的原生语法。
-- **只写 stdout。** `gen` 只打印片段，从不写目标文件。先审阅输出，再自行合并
+- **默认写 stdout。** `gen` 默认打印片段；指定 `--in-place` 或 `--output` 可合并到文件。先审阅输出，再自行合并
   进原生配置。
 - **绝不瞎猜。** 当某个 target 无法表示 IR 中的字段时，会跳过该字段并给出
   warning（写明字段与原因），而不是静默丢弃，也不会因为一个字段不支持就让整个
@@ -225,9 +225,30 @@ suggested-path: ~/.config/crush/crush.json
 ===== END agentcfg artifact =====
 ```
 
-`suggested-path` 指明片段应放进哪个原生文件。v1 中 agentcfg 从不写目标文件：
-新建文件可直接使用块内内容；已有文件需要手动合并。校验或生成失败时 stdout
-保持为空，进程以退出码 `1` 结束。
+`suggested-path` 指明 `--in-place` 使用的原生文件位置。不指定文件选项时，
+校验或生成失败会保持 stdout 为空，并以退出码 `1` 结束。
+
+### 更新本地配置
+
+```bash
+agentcfg gen --to qwen-code --in-place
+agentcfg gen --to qwen-code --output ./settings.json
+agentcfg gen --to aider --output ./aider-config/
+agentcfg gen --to all --output ./generated/
+```
+
+`--in-place` 与 `--output` 互斥。单产物可指定文件；多产物须指定目录。
+多个 target 分别写到 `<target>/` 子目录。Fast-agent 保留 `.fast-agent/`
+目录结构，Goose 的 provider 文件放到 `custom_providers/`。
+
+已有文件先解析再合并：整体替换 provider/model 与 MCP 区块，清除区块内旧条目，
+更新必要凭证和默认模型，保留无关设置。输入没有 MCP 时，也会清空原先的独立
+MCP 配置文件中的服务器。不再生成的独立 provider/overlay 文件不会自动删除。
+
+全部已有目的文件解析成功后才开始替换。每个文件通过同目录临时文件和 rename
+写入；多个文件不构成单一事务。保留已有权限，新文件使用 `0600`，拒绝覆盖符号
+链接。接受 JSONC 注释与尾逗号，但重新序列化不保留注释和排版；不支持完整
+JSON5 语法。DeepSeek Harness 的 `--in-place` 要求设置 `DSH_HOME`。
 
 ## 怎么写 agentcfg.yaml
 
@@ -339,7 +360,8 @@ agentcfg version
 | `-t`, `--to` | （YAML `targets:`） | 逗号分隔的 target id，或 `all`。 |
 | `-v`, `--verbose` | 关 | 在 stderr 打 info 日志。 |
 | `-d`, `--debug` | 关 | 在 stderr 打 debug 日志。 |
-| `-o`, `--output` | stdout | 仅 `gen-example`：把内置示例写到该路径。 |
+| `-o`, `--output` | stdout | `gen`：合并到文件或目录；`gen-example`：新建示例文件。 |
+| `--in-place` | false | `gen`：合并到原生配置位置。 |
 
 `--config`、`--to`、`--verbose`、`--debug` 是根命令参数，因此
 `agentcfg -c file.yaml gen` 和 `agentcfg gen -c file.yaml` 等价。
