@@ -405,6 +405,10 @@ Diagnostics, the `OK` summary, and logs go to stderr. Exit `0` on success,
 
 ## Documentation
 
+- [`docs/cliproxy-codex-fast.md`](docs/cliproxy-codex-fast.md) — Chinese guide to
+  configuring Codex fast aliases in CLIProxy's Web UI for Pi, OpenCode, Grok, and Kimi.
+- [`docs/gpt-load-codex-fast.md`](docs/gpt-load-codex-fast.md) — Chinese guide to
+  GPT-Load 2.x fast aliases, 1.x groups, and forwarding through CLIProxy.
 - [`docs/protocol.md`](docs/protocol.md) — the IR contract: every provider,
   model, MCP, and defaults field, validation rules, and worked examples.
 - [`docs/architecture.md`](docs/architecture.md) — how the compiler is put

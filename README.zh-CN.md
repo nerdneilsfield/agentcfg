@@ -381,6 +381,10 @@ stdout 只给产物（`gen`）或示例 YAML（`gen-example`）。诊断信息�
 
 ## 文档
 
+- [`docs/cliproxy-codex-fast.md`](docs/cliproxy-codex-fast.md) — 在 CLIProxy 自带
+  Web 管理界面配置 Codex fast 别名，并接入 Pi、OpenCode、Grok 和 Kimi。
+- [`docs/gpt-load-codex-fast.md`](docs/gpt-load-codex-fast.md) — GPT-Load 2.x 的
+  fast 别名与参数覆盖 GUI 配置，以及 1.x 分组方案和 CLIProxy 串联方式。
 - [`docs/protocol.md`](docs/protocol.md) — IR 契约：provider、model、MCP、
   defaults 的全部字段、校验规则和工作示例。
 - [`docs/architecture.md`](docs/architecture.md) — 编译器的整体结构。
