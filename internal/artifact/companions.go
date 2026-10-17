@@ -23,6 +23,8 @@ func companions(arts []Artifact) []Artifact {
 			add("mcp.json", "json", "~/.jcode/mcp.json", "{\"mcpServers\":{}}\n")
 		case "kimi":
 			add("mcp.json", "json", "~/.kimi-code/mcp.json", "{\"mcpServers\":{}}\n")
+		case "pi":
+			add("mcp.json", "json", "~/.pi/agent/mcp.json", "{\"mcpServers\":{}}\n")
 		case "gajae":
 			add("mcp.json", "json", "~/.gjc/agent/mcp.json", "{\"mcpServers\":{}}\n")
 			add("config.yml", "yaml", "~/.gjc/agent/config.yml", "{}\n")

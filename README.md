@@ -46,7 +46,7 @@ Design principles:
 | `kilo` | [Kilo-Org/kilo](https://github.com/Kilo-Org/kilo) | Chat · Responses · Anthropic | stdio + HTTP | Kilo CLI, not the legacy IDE extension; singular `provider` + `mcp`; no MCP `cwd` |
 | `codex` | [openai/codex](https://github.com/openai/codex) | Responses only | stdio + HTTP | `[model_providers]` TOML fragment; `ENV:NAME` → `env_key`; MCP `timeout_ms` → `startup_timeout_ms` |
 | `opencode` | [sst/opencode](https://github.com/sst/opencode) | Chat · Responses · Anthropic | stdio + HTTP | native V2 shape (`providers` + `mcp.servers`); `ENV:NAME` → `env: [NAME]`; provider headers and the model reasoning flag cannot be represented and are skipped with warnings |
-| `pi` | [earendil-works/pi](https://github.com/earendil-works/pi) | any (`models.json`) | skipped (no built-in MCP) | `~/.pi/agent/models.json`; `ENV:NAME` → `"$NAME"`; `auth_type: bearer` → `authHeader: true`; unset limits are omitted so Pi's defaults apply |
+| `pi` | [earendil-works/pi](https://github.com/earendil-works/pi) | any (`models.json`) | stdio + streamable HTTP (`mcp.json`) | `~/.pi/agent/models.json` + `mcp.json`; provider `ENV:NAME` → `"$NAME"`; MCP references → `"${NAME}"`; `auth_type: bearer` → `authHeader: true`; MCP timeout converted to seconds |
 | `prime-agent` | [contract](docs/agents/prime-agent.md) | any (`models.json`) | stdio + HTTP | `models.json` + `settings.json` `mcpServers` fragments; `ENV:NAME` → bare environment-variable names; `auth_type: bearer` → `authHeader: true` |
 | `omp` | [can1357/oh-my-pi](https://github.com/can1357/oh-my-pi) | any (`models.yml`) | stdio + HTTP (`mcp.json`) | YAML provider document; `ENV:NAME` → bare environment-variable names; `auth_type: bearer` → `authHeader: true`; MCP `timeout_ms` → `timeout`; `defaults.model` → `modelRoles.default` |
 | `deepseek-harness` | [deepseek-ai/deepseek-harness](https://github.com/deepseek-ai/deepseek-harness) | any (`api` route field) | stdio + HTTP (Cordis patch) | YAML provider route + `@deepseek-ai/dsh-mcp-client` patch; literal API keys skipped |
@@ -199,7 +199,7 @@ What this file says:
 
 This example is valid for Crush and Gajae. It is not valid for every CLI:
 Codex skips `openai-completions`, Cline/ZCode skip `ENV:NAME` API keys,
-Kimi skips env-derived provider headers, and Pi skips MCP. Put the CLIs you
+Kimi skips env-derived provider headers. Put the CLIs you
 actually generate for in `targets:`, then override with `--to`.
 
 2. Validate the IR and every selected target. `--config` defaults to
@@ -353,8 +353,8 @@ mcp:
 ```
 
 There is no `sse` transport in the IR. Targets that distinguish SSE from
-streamable HTTP map `http` to streamable HTTP. Pi skips every MCP server
-in v1. jcode loads stdio only.
+streamable HTTP map `http` to streamable HTTP. Pi emits native `mcp.json`;
+jcode loads stdio only.
 
 `timeout_ms` stays milliseconds on Gajae, Codex, Kimi (`startupTimeoutMs`),
 ZCode, and several others. OpenCode V2 writes its `timeout` object with

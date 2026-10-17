@@ -6,7 +6,7 @@ Write the IR against the protocol. Open the contract for a target before putting
 
 - Codex accepts `openai-responses` only; OpenCode maps all three protocols to native V2 provider packages.
 - Cline and ZCode are literal-only, so an `api_key: "ENV:NAME"` reference is skipped and no credential is written. Kimi maps that scalar to `api_key_env`. Goose and DeepSeek Harness skip a literal API key; Command Code skips one too and writes `"$NAME"` for a reference.
-- Pi has no built-in MCP support and skips every MCP server; jcode skips HTTP MCP.
+- Pi emits native `mcp.json` for stdio and streamable HTTP, with MCP timeouts converted to seconds; jcode skips HTTP MCP.
 - Crush, MiMo Code, and jcode have no native MCP `cwd` and skip it. Grok and Prime Agent have no MCP timeout field and skip `timeout_ms`. Kimi maps `timeout_ms` to `startupTimeoutMs` and does not write `toolTimeoutMs`. Command Code has no native field for either and skips both.
 - Crush keeps reasoning-effort names such as `ultra`. Gajae, OpenClaw, Pi, Prime Agent, Grok, DeepSeek Harness, and Command Code skip names outside their native ladder.
 - Command Code skips environment-derived provider headers, which it does not interpolate, and provider ids reserved for its built-in subscription lanes.
@@ -19,7 +19,7 @@ Write the IR against the protocol. Open the contract for a target before putting
 |---|---|---|---|
 | [Codex](codex.md) | TOML provider table | TOML MCP table | developers.openai.com/codex/config-reference + config.schema.json |
 | [OpenCode](opencode.md) | JSON `provider` | JSON `mcp` | [`opencode.config.schema.json`](opencode.config.schema.json) |
-| [Pi](pi.md) | JSON `models.json` | external adapter only | upstream docs |
+| [Pi](pi.md) | JSON `models.json` | JSON `mcp.json` | installed Pi 1.3.0 + upstream docs |
 | [Prime Agent](prime-agent.md) | JSON `models.json` | JSON `settings.json.mcpServers` | installed 0.9.3 source contract |
 | [Oh My Pi](omp.md) | YAML `models.yml` | JSON `mcp.json` | upstream docs |
 | [DeepSeek Harness](deepseek-harness.md) | YAML `llm-pi-ai` route | Cordis MCP-client patch | provider guide; MCP partial |

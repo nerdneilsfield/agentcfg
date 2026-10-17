@@ -139,23 +139,25 @@ func TestValidateExampleCompletionsOK(t *testing.T) {
 	}
 }
 
-func TestGenerateSkipsUnsupportedPiMCP(t *testing.T) {
+func TestGenerateNativePiMCP(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	if err := Generate(newRequest(fixture(t, "ir", "example-mcp.yaml"), "pi", &stdout, &stderr)); err != nil {
 		t.Fatalf("Generate: %v\nstderr: %s", err, stderr.String())
 	}
-	if !strings.Contains(stdout.String(), `"providers"`) {
-		t.Fatalf("expected models output: %q", stdout.String())
+	for _, want := range []string{"name: models.json", "name: mcp.json", `"providers"`, `"mcpServers"`, `"context7"`, `"github"`, `"${CONTEXT7_API_KEY}"`, `"Bearer ${GITHUB_TOKEN}"`} {
+		if !strings.Contains(stdout.String(), want) {
+			t.Fatalf("Pi output missing %q: %s", want, stdout.String())
+		}
 	}
-	if !strings.Contains(stderr.String(), "warning:") {
-		t.Fatalf("expected warning: %q", stderr.String())
+	if strings.Contains(stderr.String(), "warning:") {
+		t.Fatalf("unexpected warning: %q", stderr.String())
 	}
 	stderr.Reset()
 	if err := Validate(newRequest(fixture(t, "ir", "example-mcp.yaml"), "pi", &stdout, &stderr)); err != nil {
-		t.Fatalf("warning blocked validation: %v", err)
+		t.Fatalf("Validate: %v", err)
 	}
-	if !strings.Contains(stderr.String(), "warning:") || !strings.Contains(stderr.String(), ": OK") {
-		t.Fatalf("expected warning and OK summary: %q", stderr.String())
+	if strings.Contains(stderr.String(), "warning:") || !strings.Contains(stderr.String(), ": OK") {
+		t.Fatalf("expected OK summary without warnings: %q", stderr.String())
 	}
 }
 

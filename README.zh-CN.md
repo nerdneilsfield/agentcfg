@@ -41,7 +41,7 @@ agentcfg 把一份 `agentcfg.yaml` 编译成各编码智能体 CLI 的原生配�
 | `kilo` | [Kilo-Org/kilo](https://github.com/Kilo-Org/kilo) | Chat · Responses · Anthropic | stdio + HTTP | Kilo CLI，非旧 IDE extension；单数 `provider` + `mcp`；无 MCP `cwd` |
 | `codex` | [openai/codex](https://github.com/openai/codex) | 仅 Responses | stdio + HTTP | `[model_providers]` TOML 片段；`ENV:NAME` 写入 `env_key`；MCP `timeout_ms` 写入 `startup_timeout_ms` |
 | `opencode` | [sst/opencode](https://github.com/sst/opencode) | Chat · Responses · Anthropic | stdio + HTTP | 原生 V2 形状（`providers` + `mcp.servers`）；`ENV:NAME` 写入 `env: [NAME]`；供应商 headers 与模型 reasoning 标志无法表示，跳过并 warning |
-| `pi` | [earendil-works/pi](https://github.com/earendil-works/pi) | 任意（TypeScript 扩展） | v1 跳过（无内置 MCP） | 输出 provider 扩展；header 值用 Pi `$NAME` 语法；默认模型在扩展加载前保持延后 |
+| `pi` | [earendil-works/pi](https://github.com/earendil-works/pi) | 任意（`models.json`） | stdio + streamable HTTP（`mcp.json`） | 输出 `~/.pi/agent/models.json` + `mcp.json`；供应商引用用 `$NAME`，MCP 引用用 `${NAME}`；MCP timeout 转换为秒 |
 | `prime-agent` | [契约文档](docs/agents/prime-agent.md) | 任意（`models.json`） | stdio + HTTP | `models.json` + `settings.json` `mcpServers` 片段；跳过 `Bearer ENV:NAME` provider headers |
 | `deepseek-harness` | [deepseek-ai/deepseek-harness](https://github.com/deepseek-ai/deepseek-harness) | 任意（`api` 路由字段） | stdio + HTTP（Cordis 补丁） | YAML provider 路由 + `@deepseek-ai/dsh-mcp-client` 补丁；跳过字面量 API key |
 | `grok` | [xai-org/grok-build](https://github.com/xai-org/grok-build) | Chat · Responses · Anthropic | stdio + HTTP | 按模型拆 TOML 表；跨供应商重复模型 id 会被跳过；`ENV:NAME` headers 写入 `env_http_headers` |
@@ -188,8 +188,8 @@ targets: [crush, gajae]
 
 本例对 Crush 和 Gajae 合法，并不能用于所有 CLI：Codex 跳过
 `openai-completions`，Cline/ZCode
-跳过 `api_key` 上的 `ENV:NAME`，Kimi 跳过环境变量引用的供应商 headers，
-Pi 跳过 MCP。把真正要生成的 CLI 写进 `targets:`，再用 `--to` 覆盖。
+跳过 `api_key` 上的 `ENV:NAME`，Kimi 跳过环境变量引用的供应商 headers。
+把真正要生成的 CLI 写进 `targets:`，再用 `--to` 覆盖。
 
 2. 校验 IR 与所有选中的 target。`--config` 默认为当前目录的 `agentcfg.yaml`：
 
@@ -333,7 +333,7 @@ mcp:
 ```
 
 IR 没有 `sse` 传输。会区分 SSE 与 streamable HTTP 的 target 把 `http` 映射成
-streamable HTTP。Pi 在 v1 跳过全部 MCP。jcode 只加载 stdio。
+streamable HTTP。Pi 生成原生 `mcp.json`；jcode 只加载 stdio。
 
 `timeout_ms` 在 Gajae、Codex、Kimi（`startupTimeoutMs`）、
 ZCode 等 target 上仍是毫秒。OpenCode V2 写入 `timeout` 对象，同时设置

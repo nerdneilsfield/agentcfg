@@ -77,15 +77,88 @@ func TestSkipsBearerFromEnv(t *testing.T) {
 	expectWarning(t, cfg, "$NAME expression syntax")
 }
 
-func TestSkipsMCP(t *testing.T) {
+func TestEmitsNativeMCPArtifacts(t *testing.T) {
 	cfg := exampleConfig()
-	cfg.MCP = []ir.MCPServer{{
-		ID:        "context7",
-		Transport: ir.TransportStdio,
-		Command:   []string{"npx"},
-	}}
-	expectWarning(t, cfg, "no built-in MCP support")
+	disabled := false
+	cfg.MCP = []ir.MCPServer{
+		{
+			ID: "context7", Transport: ir.TransportStdio,
+			Command: []string{"npx", "-y", "@context7/mcp"}, CWD: "/tmp/project",
+			Env:       map[string]ir.HeaderValue{"TOKEN": {FromEnv: "CTX_TOKEN"}, "MODE": {Value: "full"}},
+			TimeoutMS: i64(1500), Enabled: &disabled,
+		},
+		{
+			ID: "remote", Transport: ir.TransportHTTP, URL: "https://example.com/mcp",
+			Headers: map[string]ir.HeaderValue{
+				"Authorization": {BearerFromEnv: "REMOTE_TOKEN"},
+				"X-Static":      {Value: "literal"},
+				"X-Env":         {FromEnv: "REMOTE_ENV"},
+			},
+		},
+	}
+	expectValid(t, cfg)
 	arts, err := (Target{}).Emit(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(arts) != 2 || arts[1].Name != "mcp.json" || arts[1].SuggestedPath != "~/.pi/agent/mcp.json" {
+		t.Fatalf("expected models.json and mcp.json, got %+v", arts)
+	}
+	out := string(arts[1].Content)
+	for _, want := range []string{
+		`"command": "npx"`, `"args": [`, `"cwd": "/tmp/project"`,
+		`"TOKEN": "${CTX_TOKEN}"`, `"MODE": "full"`, `"timeout": 1.5`, `"enabled": false`,
+		`"url": "https://example.com/mcp"`, `"Authorization": "Bearer ${REMOTE_TOKEN}"`,
+		`"X-Static": "literal"`, `"X-Env": "${REMOTE_ENV}"`,
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("missing %q in output:\n%s", want, out)
+		}
+	}
+}
+
+func TestMCPLiteralValuesEscapePiResolverSyntax(t *testing.T) {
+	cfg := exampleConfig()
+	cfg.MCP = []ir.MCPServer{{ID: "safe", Transport: ir.TransportHTTP, URL: "https://example.com/mcp", Headers: map[string]ir.HeaderValue{
+		"X-Braced":   {Value: "${SHOULD_NOT_EXPAND}"},
+		"X-Command":  {Value: "!echo secret"},
+		"X-Variable": {Value: "$LITERAL"},
+		"X-Middle":   {Value: "prefix-$NAME-suffix"},
+		"X-Dollars":  {Value: "$$LITERAL"},
+		"X-Bang":     {Value: "$!LITERAL"},
+	}}}
+	expectValid(t, cfg)
+	arts, err := (Target{}).Emit(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := string(arts[1].Content)
+	for _, want := range []string{`"X-Braced": "$${SHOULD_NOT_EXPAND}"`, `"X-Command": "$!echo secret"`, `"X-Variable": "$$LITERAL"`, `"X-Middle": "prefix-$$NAME-suffix"`, `"X-Dollars": "$$$$LITERAL"`, `"X-Bang": "$$!LITERAL"`} {
+		if !strings.Contains(out, want) {
+			t.Errorf("missing escaped literal %q:\n%s", want, out)
+		}
+	}
+}
+
+func TestMCPNameCollisionSkipsLaterEntry(t *testing.T) {
+	cfg := exampleConfig()
+	cfg.MCP = []ir.MCPServer{
+		{ID: "foo-bar", Transport: ir.TransportStdio, Command: []string{"first"}},
+		{ID: "foo_bar", Transport: ir.TransportStdio, Command: []string{"second"}},
+	}
+	expectWarning(t, cfg, "after Pi normalization")
+	arts, err := (Target{}).Emit(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := string(arts[1].Content)
+	if !strings.Contains(out, `"foo-bar"`) || strings.Contains(out, `"foo_bar"`) || strings.Contains(out, "second") {
+		t.Fatalf("expected first normalized server only:\n%s", out)
+	}
+}
+
+func TestOmitsMCPArtifactWhenNoServers(t *testing.T) {
+	arts, err := (Target{}).Emit(exampleConfig())
 	if err != nil {
 		t.Fatal(err)
 	}

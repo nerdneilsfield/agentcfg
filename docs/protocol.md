@@ -283,7 +283,7 @@ Every MCP server has `id` and `transport`. Optional shared fields are `enabled`,
 | `cwd` | no | Working directory for a stdio process. Invalid on `http`. Crush, MiMo Code, and jcode have no native field and skip it. |
 | `timeout_ms` | no | Timeout in milliseconds. Mapping is target-specific (see below). |
 
-Pi skips every MCP server (no built-in MCP). jcode loads stdio only and skips `http`.
+Pi emits native `mcp.json` for stdio and streamable HTTP. jcode loads stdio only and skips `http`.
 
 ### Stdio
 
@@ -332,14 +332,14 @@ The IR unit is always milliseconds. Emitters do not guess a field that the nativ
 | Behavior | Targets |
 |---|---|
 | Milliseconds unchanged | OpenCode `timeout`, MiMo Code `timeout`, Gajae `timeout`, ZCode `timeoutMs`, DeepSeek Harness `toolCallTimeoutMs`, OpenClaw `connectionTimeoutMs` and `requestTimeoutMs` (same value on both), Codex `startup_timeout_ms`, Kimi `startupTimeoutMs` (range 1–2147483647; `toolTimeoutMs` is not written) |
-| Converted to seconds (`ms / 1000`) | Crush (integer seconds; a value not divisible by 1000 is skipped), Goose (positive integer seconds), jcode `timeout_secs` (integer seconds), Hermes `timeout` (positive; fractional seconds allowed), Cline `timeout` (fractional seconds allowed, so `1500` becomes `1.5`) |
+| Converted to seconds (`ms / 1000`) | Crush (integer seconds; a value not divisible by 1000 is skipped), Goose (positive integer seconds), jcode `timeout_secs` (integer seconds), Hermes `timeout` (positive; fractional seconds allowed), Cline `timeout` (fractional seconds allowed, so `1500` becomes `1.5`), Pi `timeout` (per-request; fractional seconds allowed) |
 | Skipped (no native timeout field) | Grok, Prime Agent |
 
 Omit `timeout_ms` unless every selected target can represent it.
 
 ### `cwd` mapping
 
-`cwd` is stdio-only. OpenCode, Codex, Grok, Kimi, ZCode, Cline, Gajae, Hermes, OpenClaw, Goose, DeepSeek Harness, and Prime Agent emit it. Crush, MiMo Code, and jcode skip it.
+`cwd` is stdio-only. OpenCode, Codex, Pi, Grok, Kimi, ZCode, Cline, Gajae, Hermes, OpenClaw, Goose, DeepSeek Harness, and Prime Agent emit it. Crush, MiMo Code, and jcode skip it.
 
 ## Defaults
 

@@ -3,9 +3,12 @@
 - **Target id:** `pi`
 - **Verified against:** upstream `packages/coding-agent/docs/models.md` and
   `packages/coding-agent/src/core/provider-composer.ts` (`authHeader`), both
-  inspected 2026-09-20.
-- **Native locations:** `~/.pi/agent/models.json` (global); `.pi/` per project.
-- **v1 artifact:** one JSON document containing `providers`.
+  inspected 2026-09-20; native MCP docs and installed Pi 1.3.0 MCP config
+  parser inspected 2026-10-18.
+- **Native locations:** `~/.pi/agent/models.json` and `~/.pi/agent/mcp.json`;
+  project MCP configuration uses `.pi/mcp.json` in trusted projects.
+- **v1 artifacts:** `models.json` containing `providers`, plus `mcp.json`
+  containing `mcpServers` when the IR declares MCP servers.
 
 This document and `docs/agents/prime-agent.md` describe forks of the same
 codebase. Their provider and model field names match, but their credential value
@@ -90,11 +93,49 @@ thinking level is emitted.
 
 ## MCP
 
-Pi ships without built-in MCP support. The third-party `pi-mcp-adapter` reads a
-standard `mcpServers` document from its own search paths, but it is not part of
-Pi and its schema is not vendored here. `gen --to pi` therefore skips every
-declared MCP server rather than emitting a document Pi would ignore; the run
-continues and writes the models document.
+Pi 1.3.0 has built-in MCP support for stdio and streamable HTTP. agentcfg emits
+a separate `~/.pi/agent/mcp.json` document; a third-party adapter is not required.
+
+```json
+{
+  "mcpServers": {
+    "context7": {
+      "command": "npx",
+      "args": ["-y", "@upstash/context7-mcp"],
+      "env": { "CONTEXT7_API_KEY": "${CONTEXT7_API_KEY}" },
+      "cwd": "/var/lib/context7",
+      "timeout": 1.5
+    },
+    "github": {
+      "url": "https://api.githubcopilot.com/mcp/",
+      "headers": { "Authorization": "Bearer ${GITHUB_TOKEN}" },
+      "enabled": false
+    }
+  }
+}
+```
+
+Stdio `command` is the first IR argv element; the rest become `args`. HTTP uses
+`url` and `headers`. The native parser infers transport from `command` or `url`.
+IR `enabled` maps to the native boolean. `timeout_ms` becomes `timeout` in seconds
+(`1500` becomes `1.5`), a per-request timeout reset by progress notifications.
+
+MCP env/header references are emitted as `${NAME}`; `Bearer ENV:NAME` becomes
+`Bearer ${NAME}`. Pi uses the same template resolver as its provider values,
+so literal dollar signs are escaped as `$$` and a leading `!` as `$!`.
+agentcfg neither resolves references nor runs commands.
+Names that differ only in `-` and `_` share a Pi namespace, so the later entry
+is skipped with a warning. Models and other supported MCP entries are preserved.
+
+With no MCP declarations, stdout contains only `models.json`. File-writing mode
+also writes an empty `mcpServers` companion, clearing stale servers while
+preserving unrelated top-level settings such as `autoEnableCodemode`.
+
+Pi connects servers when a session starts. Use `pi mcp list` to check connections,
+`/mcp` to inspect them interactively, and `/reload` after changing configuration.
+Pi owns OAuth sign-in and tokens; agentcfg does not generate OAuth enrollment.
+An extension that registers `/mcp`, such as `pi-mcp-adapter`, replaces built-in
+MCP during sessions; remove that extension to use the native `mcp.json` behavior.
 
 ## Defaults
 
@@ -107,3 +148,6 @@ provider is loaded.
 - `https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/models.md`
 - `packages/coding-agent/src/core/provider-composer.ts` (`withConfiguredAuth`)
 - `packages/ai/src/api/openai-completions.ts`, `api/anthropic-messages.ts` (client construction)
+- [Native MCP documentation](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/mcp.md)
+- `packages/coding-agent/src/core/mcp-servers.ts` (native entry validation)
+- `packages/coding-agent/src/extensions/mcp/config.ts` (file loading and namespace collisions)

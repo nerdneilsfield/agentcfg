@@ -63,6 +63,9 @@ func ownedPaths(a Artifact) []string {
 	case "prime-agent":
 		return []string{"providers", "mcpServers", "defaultModel", "defaultProvider"}
 	case "pi":
+		if a.Name == "mcp.json" {
+			return []string{"mcpServers"}
+		}
 		return []string{"providers"}
 	case "cometixcode":
 		return []string{"mcpServers", "env.ANTHROPIC_BASE_URL", "env.ANTHROPIC_API_KEY", "env.ANTHROPIC_AUTH_TOKEN", "env.ANTHROPIC_MODEL"}

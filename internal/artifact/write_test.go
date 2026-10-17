@@ -21,6 +21,7 @@ func TestMergeOwnedSections(t *testing.T) {
 		{"toml", Artifact{Target: "codex", Format: "toml", Content: []byte("[model_providers.new]\nname = 'new'\n")}, "approval_policy = 'never'\n[model_providers.old]\nname = 'stale'\n[mcp_servers.old]\ncommand = 'stale'\n", []string{"approval_policy", "new"}, []string{"stale", "mcp_servers"}},
 		{"yaml", Artifact{Target: "continue", Format: "yaml", Content: []byte("name: agentcfg\nmodels: []\n")}, "name: Personal\nmodels:\n  - name: stale\nmcpServers: []\nrules:\n  - keep this\n", []string{"Personal", "keep this"}, []string{"stale", "mcpServers"}},
 		{"goose", Artifact{Target: "goose", Name: "config.yaml", Format: "yaml", Content: []byte("{}\n")}, "extensions:\n  builtin:\n    type: builtin\n  stale:\n    type: stdio\n", []string{"builtin"}, []string{"stale"}},
+		{"pi-mcp", Artifact{Target: "pi", Name: "mcp.json", Format: "json", Content: []byte(`{"mcpServers":{"new":{"url":"https://example.com/mcp"}}}`)}, `{"autoEnableCodemode":false,"mcpServers":{"stale":{"command":"old"}}}`, []string{"autoEnableCodemode", "new"}, []string{"stale", "old"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -114,5 +115,29 @@ func TestCordisPreservesTaggedValues(t *testing.T) {
 	}
 	if !strings.Contains(string(b), "!!js") || !strings.Contains(string(b), "keep-plugin") || strings.Contains(string(b), "stale") {
 		t.Fatalf("bad patch: %s", b)
+	}
+}
+
+func TestPiClearsRemovedMCPServers(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	dir := filepath.Join(home, ".pi", "agent")
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(dir, "mcp.json")
+	if err := os.WriteFile(path, []byte(`{"autoEnableCodemode":false,"mcpServers":{"stale":{"command":"old"}}}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	arts := []Artifact{{Target: "pi", Name: "models.json", Format: "json", SuggestedPath: "~/.pi/agent/models.json", Content: []byte(`{"providers":{}}`)}}
+	if err := WriteFiles(arts, 1, "", true, io.Discard); err != nil {
+		t.Fatal(err)
+	}
+	b, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(b), "stale") || !strings.Contains(string(b), `"autoEnableCodemode": false`) || !strings.Contains(string(b), `"mcpServers": {}`) {
+		t.Fatalf("bad MCP companion merge: %s", b)
 	}
 }
