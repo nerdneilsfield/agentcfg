@@ -12,8 +12,11 @@ agentcfg compiles one `agentcfg.yaml` into native config fragments for coding
 agent CLIs. Describe custom model providers and MCP servers once, then render
 them for each supported CLI.
 
-## v0.2.0
+## v0.2.1
 
+- Pi native MCP output for stdio and streamable HTTP, including environment
+  references, timeouts, and stale-server cleanup during file updates.
+- GUI setup guides for Codex fast mode through CLIProxy and GPT-Load.
 - 25 targets, including fast-agent, Crow, Aider, Continue, Qwen Code, and Kilo CLI.
 - `gen --in-place` updates native configuration files; `gen --output` writes to
   a specified file or directory, including agents with multiple config files.

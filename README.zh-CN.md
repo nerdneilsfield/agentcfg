@@ -11,8 +11,10 @@
 agentcfg 把一份 `agentcfg.yaml` 编译成各编码智能体 CLI 的原生配置片段。
 自定义模型供应商和 MCP 服务器只需描述一次，即可为支持的 CLI 分别渲染配置。
 
-## v0.2.0
+## v0.2.1
 
+- Pi 原生 MCP 配置支持 stdio 和 streamable HTTP、环境变量引用、超时与文件更新时的旧服务器清理。
+- 新增 CLIProxy 和 GPT-Load 的 Codex fast 模式 GUI 配置指南。
 - 共支持 25 个 target，包括 fast-agent、Crow、Aider、Continue、Qwen Code 和 Kilo CLI。
 - `gen --in-place` 更新原生配置；`gen --output` 写入指定文件或目录，支持多配置文件的 agent。
 - 文件更新会替换 provider/model 和 MCP 区块，同步必要凭证及默认模型，保留无关设置。
