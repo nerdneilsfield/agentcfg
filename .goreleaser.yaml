@@ -44,3 +44,33 @@ changelog:
       - "^docs:"
       - "^test:"
       - "^chore:"
+
+# Publish to the nerdneilsfield/homebrew-apps tap and Scoop bucket.
+homebrew_casks:
+  - name: agentcfg
+    homepage: https://github.com/nerdneilsfield/agentcfg
+    description: Generate Codex and OpenCode configs from one provider and MCP source
+    binaries:
+      - agentcfg
+    directory: Casks
+    repository:
+      owner: nerdneilsfield
+      name: homebrew-apps
+      token: "{{ .Env.TAP_GITHUB_TOKEN }}"
+    hooks:
+      post:
+        install_steps: |
+          on_macos do
+            run "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "{{ .StagedPath }}/agentcfg"]
+          end
+
+scoops:
+  - name: agentcfg
+    homepage: https://github.com/nerdneilsfield/agentcfg
+    description: Generate Codex and OpenCode configs from one provider and MCP source
+    license: MIT
+    directory: bucket
+    repository:
+      owner: nerdneilsfield
+      name: homebrew-apps
+      token: "{{ .Env.TAP_GITHUB_TOKEN }}"

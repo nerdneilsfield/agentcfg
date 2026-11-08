@@ -66,6 +66,19 @@ agentcfg 把一份 `agentcfg.yaml` 编译成各编码智能体 CLI 的原生配�
 每个 target 逐字段的完整契约（含跳过项与原因）见
 [`docs/agents/`](docs/agents/README.md)。`--to all` 选中以上全部 target。
 
+## 通过 Homebrew / Scoop 安装
+
+```bash
+# macOS / Linux
+brew install --cask nerdneilsfield/apps/agentcfg
+```
+
+```powershell
+# Windows
+scoop bucket add nerdneilsfield https://github.com/nerdneilsfield/homebrew-apps
+scoop install nerdneilsfield/agentcfg
+```
+
 ## 安装
 
 每个 `v*` tag 都由 GoReleaser 自动发布静态二进制，覆盖 darwin/linux/windows

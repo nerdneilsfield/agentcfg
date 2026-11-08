@@ -74,6 +74,19 @@ field-by-field contract per target, including what is skipped and why, lives
 in [`docs/agents/`](docs/agents/README.md). `--to all` selects every target
 above.
 
+## Homebrew / Scoop
+
+```bash
+# macOS / Linux
+brew install --cask nerdneilsfield/apps/agentcfg
+```
+
+```powershell
+# Windows
+scoop bucket add nerdneilsfield https://github.com/nerdneilsfield/homebrew-apps
+scoop install nerdneilsfield/agentcfg
+```
+
 ## Install
 
 Every `v*` tag is published by GoReleaser as static binaries for
